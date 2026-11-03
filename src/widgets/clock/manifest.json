@@ -1,0 +1,19 @@
+{
+	"id": "clock",
+	"name": "Clock",
+	"icon": "clock",
+	"sizes": ["2x1", "2x2", "4x2"],
+	"defaultSize": "4x2",
+	"capabilities": [],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"hour12": { "type": "boolean", "title": "12-hour clock", "default": false },
+			"seconds": { "type": "boolean", "title": "Show seconds", "default": false },
+			"face": { "type": "string", "title": "Face (2×2)", "enum": ["analog", "digital"], "default": "analog" },
+			"city": { "type": "string", "title": "City label", "default": "" },
+			"zones": { "type": "array", "title": "Extra time zones" }
+		}
+	}
+}
