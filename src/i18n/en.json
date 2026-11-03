@@ -1,1 +1,10 @@
-{}
+{
+	"shell": {},
+	"widgets": {
+		"common": {},
+		"clock": {},
+		"date": {},
+		"weather": {},
+		"system": {}
+	}
+}

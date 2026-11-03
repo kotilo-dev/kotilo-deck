@@ -50,8 +50,16 @@ pub fn current() -> &'static dyn Platform;              // cfg-selected impl
 ## IPC contract
 
 - Frontend → backend: `invoke('<area>_<verb>', args)`; args/results are serde types, never OS handles.
+  - Source of truth for names and shapes: `src/lib/ipc/index.ts`. Rust mirrors it with `#[serde(rename_all = "camelCase")]`.
   - `platform_capabilities() -> Capability[]` (Phase 0)
-- Backend → frontend: Tauri events named `<area>://<event>` (e.g. `system://sample`) for pushed data, so the UI never polls.
+  - `settings_get() / settings_set(patch)` — `DeckSettings` in `tauri-plugin-store` (`settings.json`)
+  - `workspace_list() / workspace_save(workspace) / workspace_delete(id)` — files under `~/.kotilo/deck/workspaces/`
+  - `monitor_list() / monitor_select(name)`, `tray_set_workspaces(items, active)`
+  - `system_info() / system_subscribe() / system_unsubscribe() / system_top_processes()` — sampler runs only while subscribed
+  - `weather_geocode(query) / weather_get(latitude, longitude, unit)` — Open-Meteo, 15 min cache, stale fallback
+- Backend → frontend: Tauri events named `<area>://<event>` for pushed data, so the UI never polls:
+  `system://sample`, `workspace://cycle`, `workspace://switch`, `monitor://changed`.
+- Widgets: `src/widgets/index.ts` globs every `<id>/manifest.json` + `Widget.svelte` (+ optional `settings.ts`, `Settings.svelte`); contract types in `src/widgets/types.ts`.
 - Companion (Phase 3): `protocol.md`.
 
 ## Data
