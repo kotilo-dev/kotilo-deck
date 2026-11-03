@@ -1,0 +1,16 @@
+{
+	"id": "agents",
+	"name": "Agent Status",
+	"icon": "agents",
+	"sizes": ["2x1", "2x2", "4x2"],
+	"defaultSize": "2x1",
+	"capabilities": ["companion"],
+	"multiInstance": true,
+	"companion": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"showIdle": { "type": "boolean", "title": "Show idle agents", "default": true }
+		}
+	}
+}

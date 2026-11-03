@@ -7,13 +7,15 @@
 	import './settings.css';
 	import { onMount } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { on, type DeckSettings } from '#lib/ipc/index.ts';
+	import { listen } from '@tauri-apps/api/event';
+	import { isTauri, on, type DeckSettings } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { applyTheme, effectiveThemeId, getTheme, pairFor, themes } from '#lib/theme/index.ts';
 	import { defaultBackend, WorkspaceStore } from '#lib/workspace/index.ts';
 	import { DeckUi, setDeck, sizesOf } from '#lib/ui/deck.svelte.ts';
 	import Toast from '#lib/ui/Toast.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
+	import { companionView, SETTINGS_NAVIGATE_EVENT, takePendingSection } from '#lib/ui/companion.svelte.ts';
 	import { Ambient } from '../ambient.svelte';
 	import { refreshUserThemes } from '../user-themes';
 	import { errText, isSection, SECTIONS, SettingsEnv, setSettingsContext, type SectionId } from './context.svelte';
@@ -23,6 +25,7 @@
 	import Themes from './Themes.svelte';
 	import Workspaces from './Workspaces.svelte';
 	import Weather from './Weather.svelte';
+	import Pomodoro from './Pomodoro.svelte';
 	import Companion from './Companion.svelte';
 	import BurnIn from './BurnIn.svelte';
 	import About from './About.svelte';
@@ -71,8 +74,23 @@
 
 	onMount(() => {
 		const fromHash = location.hash.slice(1);
-		if (isSection(fromHash)) section = fromHash;
+		const pending = takePendingSection();
+		if (pending && isSection(pending)) go(pending);
+		else if (isSection(fromHash)) section = fromHash;
 		const stopAmbient = ambient.start();
+		const stopCompanion = ui.companion.start();
+		// Deep links from the deck (top-bar companion status): an open window gets an event, a browser tab a hash change.
+		const onHash = () => {
+			const id = location.hash.slice(1);
+			if (isSection(id) && id !== section) go(id);
+		};
+		window.addEventListener('hashchange', onHash);
+		const offNavigate = isTauri()
+			? listen<{ section: string }>(SETTINGS_NAVIGATE_EVENT, (e) => {
+					takePendingSection();
+					if (isSection(e.payload.section)) go(e.payload.section);
+				})
+			: Promise.resolve(() => {});
 		void store.init();
 		void env.load(() => backend.capabilities());
 		void refreshUserThemes();
@@ -95,6 +113,9 @@
 		window.addEventListener('pagehide', onPageHide);
 		return () => {
 			stopAmbient();
+			stopCompanion();
+			window.removeEventListener('hashchange', onHash);
+			void offNavigate.then((f) => f());
 			unwatch();
 			for (const p of unlisten) void p.then((off) => off());
 			clearTimeout(reloadTimer);
@@ -120,7 +141,8 @@
 		}
 	}
 
-	const companionOn = false; // Phase 3
+	const companion = $derived(companionView(store.settings.companion.enabled, ui.companion.status));
+	const companionLabel = $derived(t(`settings.companion.view.${companion}`));
 </script>
 
 <div class="window">
@@ -159,8 +181,8 @@
 				>
 					<span>{t(`settings.nav.${id}`)}</span>
 					{#if id === 'companion'}
-						<span class="dot" class:on={companionOn} aria-hidden="true"></span>
-						<span class="k-sr-only">{t('settings.companion.statusOff')}</span>
+						<span class="dot" class:on={companion === 'connected'} aria-hidden="true"></span>
+						<span class="k-sr-only">{companionLabel}</span>
 					{/if}
 				</a>
 			{/each}
@@ -174,6 +196,7 @@
 				{:else if section === 'themes'}<Themes />
 				{:else if section === 'workspaces'}<Workspaces />
 				{:else if section === 'weather'}<Weather />
+				{:else if section === 'pomodoro'}<Pomodoro />
 				{:else if section === 'companion'}<Companion />
 				{:else if section === 'burnin'}<BurnIn />
 				{:else}<About />

@@ -24,6 +24,7 @@ use super::{
 mod audio;
 mod com;
 mod media;
+mod shell;
 
 /// Windows implementation (windows-rs). Capabilities are added as each phase lands.
 pub struct WindowsPlatform;
@@ -39,7 +40,13 @@ impl Platform for WindowsPlatform {
             Capability::Media,
             // tauri-plugin-notification (todo reminders).
             Capability::Notifications,
+            // Phase 3: companion server (portable tokio) + `kotilo://` launch.
+            Capability::Companion,
         ]
+    }
+
+    fn open_url_scheme(&self, url: &str) -> Result<()> {
+        shell::open_url_scheme(url)
     }
 
     fn set_window_opacity(&self, window: NativeWindow, opacity: f64) -> Result<()> {

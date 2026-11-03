@@ -8,11 +8,17 @@
 	import WorkspaceMenu from './WorkspaceMenu.svelte';
 	import WorkspaceSwitcher from './WorkspaceSwitcher.svelte';
 	import { getDeck, unplacedText, widgetName } from './deck.svelte';
+	import { companionText, companionView, openSettingsAt } from './companion.svelte';
 
 	const { store, ui } = getDeck();
+	const companion = ui.companion;
 	const ws = $derived(store.active);
-	/** Phase 3 wires the companion server; until then the deck always reports "not running". */
-	const companionConnected = false;
+	const view = $derived(companionView(store.settings.companion.enabled, companion.status));
+	const text = $derived(companionText(view, companion.status));
+
+	function openCompanion() {
+		void openSettingsAt('companion').catch((e) => ui.say(String(e), 'warning'));
+	}
 
 	const unplaced = $derived(ws ? layout(ws.widgets, ws.grid).unplaced : []);
 	/** Overlay mode is a borderless normal window: the empty parts of the top bar move it. */
@@ -38,12 +44,10 @@
 			<WorkspaceSwitcher />
 		</div>
 		<div class="side end" data-tauri-drag-region={drag}>
-			<span class="companion">
-				<span class="dot" class:on={companionConnected} aria-hidden="true"></span>
-				<span class="companion-label">
-					{companionConnected ? t('shell.topbar.companionOn') : t('shell.topbar.companionOff')}
-				</span>
-			</span>
+			<button type="button" class="companion" title={text.title} aria-label={t('shell.topbar.companionOpen', { status: text.title })} onclick={openCompanion}>
+				<span class="dot" class:on={view === 'connected'} aria-hidden="true"></span>
+				<span class="companion-label">{text.label}</span>
+			</button>
 			<ThemePicker />
 			<button type="button" class="k-btn k-btn-icon" aria-label={t('shell.topbar.edit')} title={t('shell.topbar.edit')} onclick={() => ui.enterEdit()}>
 				<Icon name="edit" size={18} />
@@ -122,13 +126,27 @@
 		letter-spacing: 0.01em;
 		white-space: nowrap;
 	}
+	/* Status, not a control in look: no border; still a 44 px tap target that opens Settings ▸ Companion. */
 	.companion {
 		display: flex;
 		align-items: center;
 		gap: 8px;
+		min-height: 44px;
+		min-width: 44px;
+		padding: 0 6px;
+		margin: 0 -6px;
+		justify-content: center;
+		border: 0;
+		border-radius: 10px;
+		background: transparent;
+		font-family: inherit;
 		font-size: 12px;
 		color: var(--k-text-muted);
 		white-space: nowrap;
+		cursor: pointer;
+	}
+	.companion:hover {
+		color: var(--k-text);
 	}
 	.dot {
 		width: 8px;

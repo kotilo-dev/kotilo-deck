@@ -1,0 +1,15 @@
+{
+	"id": "calendar",
+	"name": "Calendar",
+	"icon": "calendar",
+	"sizes": ["4x2", "4x4"],
+	"defaultSize": "4x2",
+	"capabilities": [],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"allDay": { "type": "boolean", "title": "Show all-day events", "default": true }
+		}
+	}
+}

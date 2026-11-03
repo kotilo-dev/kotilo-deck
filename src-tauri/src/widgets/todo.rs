@@ -381,6 +381,8 @@ pub async fn todo_add(
     let (due, remind_at) = (opt_ms(due)?, opt_ms(remind_at)?);
     let t = todos.with(|db| db.add(&text, due, remind_at, now_ms()))?;
     changed(&app, &todos);
+    // protocol.md `todo.added`; no-op without a connected desktop.
+    crate::companion::todo_added(&app, t.id, &t.text, t.due);
     Ok(t)
 }
 

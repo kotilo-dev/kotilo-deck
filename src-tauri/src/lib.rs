@@ -1,5 +1,6 @@
 pub mod platform;
 
+mod companion;
 mod files;
 mod hotkeys;
 mod logging;
@@ -99,6 +100,18 @@ pub fn run() {
             // Phase 3 calendar
             widgets::calendar::calendar_upcoming,
             widgets::calendar::calendar_refresh,
+            // Phase 3: pomodoro + companion (app-wide; nothing resets on page load)
+            widgets::pomodoro::pomodoro_state,
+            widgets::pomodoro::pomodoro_start,
+            widgets::pomodoro::pomodoro_pause,
+            widgets::pomodoro::pomodoro_resume,
+            widgets::pomodoro::pomodoro_skip,
+            widgets::pomodoro::pomodoro_reset,
+            widgets::pomodoro::pomodoro_today,
+            companion::companion_status,
+            companion::companion_snapshot,
+            companion::companion_respond,
+            companion::companion_open_desktop,
         ])
         .build(tauri::generate_context!());
     match app {

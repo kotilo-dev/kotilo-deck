@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde_json::json;
 use tauri::{App, AppHandle, Emitter, Manager};
 
-use crate::{files, hotkeys, paths, settings, tray, widgets, window, workspace};
+use crate::{companion, files, hotkeys, paths, settings, tray, widgets, window, workspace};
 
 pub const EVENT_QUITTING: &str = "deck://quitting";
 /// Time the webviews get after `deck://quitting` to flush pending saves.
@@ -30,6 +30,7 @@ pub fn manage(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry>
         .manage(widgets::calendar::Calendar::new(
             widgets::calendar::cache_dir(),
         ))
+        .manage(companion::Companion::default())
 }
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
@@ -47,6 +48,13 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     window::spawn_watcher(handle.clone());
     settings::sync_autostart(&handle, &s);
     widgets::todo::spawn_scheduler(handle.clone());
+    // Pomodoro needs the stored cycle settings to restore its timer, so it is managed here.
+    handle.manage(widgets::pomodoro::Pomodoro::open(
+        &paths::database_file(),
+        &s.pomodoro,
+    ));
+    widgets::pomodoro::spawn_scheduler(handle.clone());
+    companion::setup(&handle, s.companion.enabled);
     files::watch_user_themes(&handle);
     widgets::calendar::start(&handle);
 
@@ -69,6 +77,8 @@ pub fn quit(app: &AppHandle) {
     }
     tracing::info!("quit requested");
     let _ = app.emit(EVENT_QUITTING, json!({}));
+    // Closes the desktop connection with 1001 during the grace period.
+    companion::shutdown(app);
     window::hide(app);
     if let Some(w) = app.get_webview_window(crate::settings_window::SETTINGS_LABEL) {
         let _ = w.hide();
@@ -84,6 +94,7 @@ pub fn quit(app: &AppHandle) {
 /// without running destructors).
 pub fn on_exit(app: &AppHandle) {
     app.state::<window::DisplayState>().flush();
+    companion::shutdown(app);
     tracing::info!("Kotilo Deck exiting");
     crate::logging::flush();
 }

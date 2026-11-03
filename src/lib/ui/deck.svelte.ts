@@ -5,6 +5,7 @@ import { t } from '#lib/i18n/index.ts';
 import { parseSize, widgets, type WidgetDefinition } from '../../widgets/index';
 import type { Size } from '#lib/grid/index.ts';
 import type { WorkspaceStore } from '#lib/workspace/index.ts';
+import { CompanionWatch } from './companion.svelte';
 
 export interface NoticeAction {
 	label: string;
@@ -31,6 +32,8 @@ export class DeckUi {
 	/** Instance to flash after placing it from the drawer. */
 	highlight = $state<string | null>(null);
 	reducedMotion = $state(false);
+	/** Live companion server status; the page calls `companion.start()` on mount. */
+	readonly companion = new CompanionWatch();
 
 	#noticeTimer: ReturnType<typeof setTimeout> | null = null;
 	#highlightTimer: ReturnType<typeof setTimeout> | null = null;

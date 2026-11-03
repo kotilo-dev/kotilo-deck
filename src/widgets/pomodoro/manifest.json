@@ -1,0 +1,15 @@
+{
+	"id": "pomodoro",
+	"name": "Pomodoro",
+	"icon": "timer",
+	"sizes": ["2x1", "2x2", "4x2"],
+	"defaultSize": "2x2",
+	"capabilities": [],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"suggestions": { "type": "boolean", "title": "Show companion focus suggestions", "default": true }
+		}
+	}
+}

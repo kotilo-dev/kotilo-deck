@@ -28,6 +28,7 @@ export const ICONS = {
 	trash: ['M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6'],
 	resize: ['M20 4 4 20M20 12l-8 8'],
 	chevronDown: ['m6 9 6 6 6-6'],
+	chevronUp: ['m18 15-6-6-6 6'],
 	alert: ['M12 3 2 20h20Z', 'M12 10v4M12 17h.01'],
 	refresh: ['M21 12a9 9 0 1 1-2.6-6.4L21 8', 'M21 3v5h-5'],
 	copy: ['M9 9h11v11H9Z', 'M5 15H4V4h11v1'],

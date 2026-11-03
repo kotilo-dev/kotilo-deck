@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
 	 * Workspaces (SPEC §4.1, §7): list with rename / duplicate / reset / export / delete, import, grid
-	 * density, and the default workspace per monitor. Auto-switch rules are Phase 3 (not shown).
+	 * density, the default workspace per monitor and the auto-switch rules (SPEC §4.1).
 	 * Every write reaches the deck through `workspace://changed` / `settings://changed`.
 	 */
 	import type { Workspace } from '#lib/ipc/index.ts';
@@ -14,6 +14,7 @@
 	import { errText, getSettingsContext } from './context.svelte';
 	import Head from './Head.svelte';
 	import WorkspaceAppearance from './WorkspaceAppearance.svelte';
+	import AutoSwitchRules from './AutoSwitchRules.svelte';
 
 	const { store, ui, env } = getSettingsContext();
 
@@ -187,6 +188,8 @@
 			{/each}
 		</ul>
 	</div>
+
+	<AutoSwitchRules />
 
 	<div class="s-group">
 		<h2 class="s-eyebrow">{t('settings.workspaces.perMonitor')}</h2>

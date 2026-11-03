@@ -29,6 +29,14 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Backend: borderless fullscreen on the chosen monitor (remembered by name, re-attaches on reconnect), tray menu (show/hide, workspaces, monitor, quit), global hotkeys (Ctrl+Alt+K toggle, Ctrl+Alt+←/→ workspace), single instance, settings store, workspace files under `~/.kotilo/deck/workspaces/` with atomic saves and `schemaVersion` migrations, `tracing` logs with daily rotation and `--verbose`.
 - System sampler (1 Hz, runs only while subscribed and the deck is visible) with Windows GPU utilisation via PDH; Open-Meteo weather and geocoding with a 15 min memory + disk cache and stale fallback.
 - Themes: Dracula, Nord, Tokyo Night; per-workspace theme override; contrast test (text and text-muted ≥ 4.5:1 on surface and bg) for every bundled theme.
+- Companion server (`ws://127.0.0.1:47831`, protocol v1 in `protocol.md`) with token auth, single-client replace, keep-alive and a reference client `scripts/mock-desktop.mjs`.
+- Pomodoro widget (2×1/2×2/4×2) on a backend-owned timer with session history, daily goal ring, OS notifications and companion suggestions.
+- Agent Status widget (2×1/2×2/4×2): agents, approval queue with Approve/Deny reaching the desktop, usage/cost bar, graceful "desktop not running" state.
+- Calendar widget (4×2/4×4) backed by ICS feeds (https/webcal) with recurrence, Windows/IANA time zones, offline cache and per-feed errors.
+- Settings: Companion page, ICS feed manager, Pomodoro page, workspace auto-switch rules (time, pomodoro start/end, calendar event start).
+- Top bar companion status; presets updated with the Phase 3 widgets.
 
 ### Changed
 - GPU is sampled every 3 s; deck widgets and timers pause while the deck is hidden; logs keep 14 days.
+- System 4×2: the CPU sparkline fills the tile and the per-core strip grows on large displays.
+- Settings dialogs are centred (Tailwind preflight zeroed dialog margins).

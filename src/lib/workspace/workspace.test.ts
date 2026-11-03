@@ -27,7 +27,11 @@ const SIZES: Record<string, string[]> = {
 	system: ['2x2', '4x2'],
 	todo: ['2x2', '4x2', '4x4'],
 	media: ['4x1', '4x2'],
-	volume: ['2x1', '2x2']
+	volume: ['2x1', '2x2'],
+	// Phase 3: listed here so the tests don't depend on the widget registry.
+	pomodoro: ['2x1', '2x2', '4x2'],
+	agents: ['2x1', '2x2', '4x2'],
+	calendar: ['4x2', '4x4']
 };
 const sizesOf = (id: string) =>
 	SIZES[id]?.map((s) => {
@@ -64,7 +68,7 @@ describe('validation', () => {
 		};
 		const ws = parseWorkspace(spec);
 		expect(ws.schemaVersion).toBe(1);
-		expect(ws.widgets[0].widget).toBe('pomodoro'); // unknown widget ids are kept
+		expect(ws.widgets[0].widget).toBe('pomodoro'); // widget ids aren't checked against the registry
 	});
 
 	it.each([
@@ -124,10 +128,17 @@ describe('presets', () => {
 		for (const w of ws.widgets) expect(SIZES[w.widget]).toContain(`${w.w}x${w.h}`);
 	});
 
-	it('Full places a widget twice with different sizes', () => {
-		const clocks = makePreset('full').widgets.filter((w) => w.widget === 'clock');
-		expect(clocks).toHaveLength(2);
-		expect(new Set(clocks.map((c) => `${c.w}x${c.h}`)).size).toBe(2);
+	it('Full places every widget once', () => {
+		const ids = makePreset('full').widgets.map((w) => w.widget);
+		expect([...ids].sort()).toEqual(Object.keys(SIZES).sort());
+	});
+
+	it('follow SPEC §4.1: Focus, Ops and Agents carry their core widgets', () => {
+		const has = (id: 'focus' | 'ops' | 'agents', widgets: string[]) =>
+			expect(makePreset(id).widgets.map((w) => w.widget)).toEqual(expect.arrayContaining(widgets));
+		has('focus', ['clock', 'pomodoro', 'todo']);
+		has('ops', ['system', 'media', 'calendar']);
+		has('agents', ['agents', 'pomodoro', 'todo']);
 	});
 
 	it('presets are distinct layouts', () => {
@@ -266,18 +277,30 @@ describe('WorkspaceStore', () => {
 		await store.init();
 		const ws = makePreset('focus');
 		ws.name = 'Imported';
-		ws.widgets.push({ instance: 'pomodoro-1', widget: 'pomodoro', x: 4, y: 2, w: 2, h: 2, settings: { list: 'x' } });
+		ws.widgets.push({ instance: 'nonexistent-widget-1', widget: 'nonexistent-widget', x: 6, y: 2, w: 2, h: 2, settings: { list: 'x' } });
 		store.importJson(JSON.stringify(ws));
-		expect(store.active.widgets.find((w) => w.widget === 'pomodoro')).toMatchObject({ x: 4, y: 2, settings: { list: 'x' } });
+		expect(store.active.widgets.find((w) => w.widget === 'nonexistent-widget')).toMatchObject({ x: 6, y: 2, settings: { list: 'x' } });
 	});
 
 	it('adds widgets in the first free slot and reports a full grid', async () => {
 		const { store } = setup();
 		await store.init();
-		const placed = store.addWidget('clock', { w: 4, h: 2 })!;
-		expect(placed).toMatchObject({ instance: 'clock-2', x: 4, y: 2 });
+		// Focus leaves 6,2 (2×1) and the 4×1 strip at 4,3 free.
 		expect(store.addWidget('clock', { w: 4, h: 2 })).toBeNull();
-		expect(store.addWidget('date', { w: 2, h: 1 })).toMatchObject({ x: 6, y: 1 });
+		expect(store.addWidget('clock', { w: 2, h: 1 })).toMatchObject({ instance: 'clock-2', x: 6, y: 2 });
+		expect(store.addWidget('media', { w: 4, h: 1 })).toMatchObject({ x: 4, y: 3 });
+		expect(store.addWidget('date', { w: 2, h: 1 })).toBeNull();
+	});
+
+	it('places the same widget twice at different sizes (Phase 1 acceptance)', async () => {
+		const { store } = setup();
+		await store.init();
+		store.create('Blank');
+		store.addWidget('clock', { w: 4, h: 2 });
+		store.addWidget('clock', { w: 2, h: 1 });
+		const clocks = store.active.widgets.filter((w) => w.widget === 'clock');
+		expect(clocks.map((c) => c.instance)).toEqual(['clock-1', 'clock-2']);
+		expect(new Set(clocks.map((c) => `${c.w}x${c.h}`)).size).toBe(2);
 	});
 
 	it('density change reflows and lists what does not fit, keeping it', async () => {
@@ -309,6 +332,8 @@ describe('WorkspaceStore', () => {
 		const { store } = setup({ width: 600, height: 1024 });
 		await store.init();
 		expect(store.active.grid).toEqual({ cols: 4, rows: 8 });
+		for (const ws of store.workspaces) expect(layout(ws.widgets, ws.grid).unplaced).toEqual([]);
+		expect(Object.values(store.unplaced).flat()).toEqual([]);
 	});
 
 	it('restores the per-monitor workspace when the monitor changes', async () => {
@@ -483,6 +508,9 @@ describe('WorkspaceStore', () => {
 	it('undo restores a removed widget in place, or in the first free slot', async () => {
 		const { store } = setup();
 		await store.init();
+		store.create('Blank');
+		store.addWidget('clock', { w: 4, h: 2 });
+		store.addWidget('todo', { w: 2, h: 2 });
 		const before = JSON.parse(JSON.stringify(store.active.widgets)) as Workspace['widgets'];
 		const removed = store.removeWidget('clock-1')!;
 		expect(removed.widget.instance).toBe('clock-1');

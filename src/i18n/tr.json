@@ -5,8 +5,11 @@
 			"workspaces": "Çalışma alanları",
 			"edit": "Düzeni düzenle",
 			"companionOff": "Kotilo masaüstü çalışmıyor",
-			"companionOn": "Kotilo masaüstü bağlı",
-			"themeChip": "Tema: {name}"
+			"companionOn": "Kotilo desktop",
+			"themeChip": "Tema: {name}",
+			"companionDisabled": "Eşlikçi kapalı",
+			"companionVersion": "Kotilo desktop {version} bağlı",
+			"companionOpen": "{status}. Eşlikçi ayarlarını aç"
 		},
 		"theme": {
 			"title": "Tema",
@@ -116,6 +119,9 @@
 		},
 		"screensaver": {
 			"wake": "Ekranı uyandır"
+		},
+		"autoSwitch": {
+			"switched": "{name} çalışma alanına geçildi (kural)"
 		}
 	},
 	"widgets": {
@@ -329,9 +335,106 @@
 				"showCompleted": "Tamamlanan görevleri göster"
 			}
 		},
-		"pomodoro": {},
-		"agents": {},
-		"calendar": {}
+		"pomodoro": {
+			"title": "Pomodoro",
+			"name": "Pomodoro",
+			"focus": "Odak",
+			"shortBreak": "Kısa mola",
+			"longBreak": "Uzun mola",
+			"of": "/ {time}",
+			"ready": "Hazır",
+			"paused": "Duraklatıldı",
+			"start": "Başlat",
+			"pause": "Duraklat",
+			"resume": "Sürdür",
+			"reset": "Sıfırla",
+			"skipToBreak": "Molaya geç",
+			"skipToFocus": "Odağa geç",
+			"timerLabel": "{phase}: {time} kaldı",
+			"today": "Bugün",
+			"sessionsToday": "bugünkü oturum",
+			"focusToday": "bugün odak",
+			"min": "dk",
+			"sessionsLabel": "Bugün {goal} odak oturumundan {n} tanesi tamamlandı",
+			"suggestQuestion": "odak bloğu başlatılsın mı?",
+			"suggestFallback": "Odak bloğu başlatılsın mı?",
+			"suggestStartLabel": "Odak bloğu başlat",
+			"suggestStartMinutes": "{n} dakikalık odak bloğu başlat",
+			"suggestDismiss": "Öneriyi kapat",
+			"error": "Zamanlayıcı yüklenemedi",
+			"actionFailed": "Zamanlayıcıya ulaşılamadı",
+			"settings": {
+				"suggestions": "Eşlikçi odak önerilerini göster"
+			}
+		},
+		"agents": {
+			"title": "Ajanlar",
+			"name": "Ajan Durumu",
+			"runningOne": "1 ajan çalışıyor",
+			"runningMany": "{n} ajan çalışıyor",
+			"idleOne": "1 ajan boşta",
+			"idleMany": "{n} ajan boşta",
+			"none": "Ajan yok",
+			"today": "bugün {cost}",
+			"idle": "Boşta",
+			"working": "Çalışıyor",
+			"workingTask": "Çalışıyor: {task}",
+			"waitingTask": "Onay bekliyor: {task}",
+			"approval": "onay",
+			"minutes": "{n} dk",
+			"approve": "Onayla",
+			"deny": "Reddet",
+			"approveLabel": "Onayla: {summary}",
+			"denyLabel": "Reddet: {summary}",
+			"respondFailed": "Gönderilemedi — tekrar deneyin",
+			"list": "Ajanlar",
+			"queue": "Bekleyen onaylar",
+			"noAgents": "Bağlı ajan yok",
+			"noApprovals": "Bekleyen onay yok",
+			"moreAgents": "+{n} daha",
+			"moreApprovals": "+{n} daha bekliyor",
+			"usage": "Bugün",
+			"tokens": "{n} token",
+			"budget": "Bugünkü bütçeye göre harcama",
+			"disconnected": "Kotilo masaüstü çalışmıyor — açın",
+			"open": "Aç",
+			"openFailed": "Kotilo masaüstü açılamadı — yüklü mü?",
+			"off": "Eşlikçi kapalı",
+			"error": "Eşlikçiye ulaşılamadı",
+			"settings": {
+				"showIdle": "Boştaki ajanları göster"
+			}
+		},
+		"calendar": {
+			"title": "Sıradaki",
+			"name": "Takvim",
+			"feedsOne": "1 takvim",
+			"feedsMany": "{n} takvim",
+			"feed": "Bir takvim",
+			"allDay": "Tüm gün",
+			"today": "Bugün",
+			"tomorrow": "Yarın",
+			"inMin": "{n} dk sonra",
+			"inHours": "{h} sa {m} dk sonra",
+			"inHoursExact": "{h} sa sonra",
+			"inDays": "{n} gün sonra",
+			"now": "şimdi",
+			"over": "+{n} dk aştı",
+			"stale": "eski",
+			"noFeeds": "Takvim akışı yok",
+			"noFeedsHint": "Ayarlar ▸ Hava durumu ve takvim bölümünden bir ICS akışı ekleyin",
+			"openSettings": "Ayarları aç",
+			"empty": "Yaklaşan etkinlik yok",
+			"emptyHint": "Önümüzdeki {n} gün boş",
+			"browserPreview": "Takvim için masaüstü uygulaması gerekir",
+			"error": "Takvim yüklenemedi",
+			"feedError": "{name} yenilenemedi",
+			"feedErrors": "{n} takvim yenilenemedi",
+			"events": "Yaklaşan etkinlikler",
+			"settings": {
+				"allDay": "Tüm gün etkinliklerini göster"
+			}
+		}
 	},
 	"settings": {
 		"window": {
@@ -347,6 +450,7 @@
 			"themes": "Temalar",
 			"workspaces": "Çalışma alanları",
 			"weather": "Hava durumu ve takvim",
+			"pomodoro": "Pomodoro",
 			"companion": "Eşlikçi",
 			"burnin": "Ekran yanması ve gece",
 			"about": "Hakkında · MIT"
@@ -356,7 +460,8 @@
 			"save": "Kaydet",
 			"saveFailed": "Kaydedilemedi: {message}",
 			"desktopOnly": "Kotilo Deck masaüstü uygulamasında kullanılabilir.",
-			"later": "Sonraki bir sürümde gelecek."
+			"decrease": "{name} azalt",
+			"increase": "{name} artır"
 		},
 		"general": {
 			"title": "Genel",
@@ -491,19 +596,134 @@
 			"own": "Kendi değeri",
 			"ownValue": "Bu çalışma alanı için kendi {what} değeri"
 		},
+		"rules": {
+			"title": "Otomatik geçiş kuralları · {count}",
+			"add": "Kural ekle",
+			"empty": "Kural yok. Deck seçtiğiniz çalışma alanında kalır.",
+			"help": "Kural, tetikleyicisi gerçekleşince geçiş yapar. Elle seçtiğiniz çalışma alanı bir sonraki tetikleyiciye kadar kalır. Saat kuralları deck gizliyken de uygulanır.",
+			"ruleN": "Kural {n}",
+			"enableN": "Kural {n} etkin",
+			"deleteN": "Kural {n} sil",
+			"delete": "Kuralı sil",
+			"removed": "Kural kaldırıldı",
+			"when": "Ne zaman",
+			"target": "Geçilecek alan",
+			"types": {
+				"time": "Günün bir saatinde",
+				"pomodoro-start": "Pomodoro odağı başlayınca",
+				"pomodoro-end": "Pomodoro odağı bitince",
+				"calendar-start": "Takvim etkinliği başlayınca"
+			},
+			"at": "Saat",
+			"days": "Günler",
+			"feed": "Besleme",
+			"anyFeed": "Herhangi bir besleme",
+			"calendarHelp": "Yalnızca saatli etkinlikler, tüm gün olanlar değil",
+			"missingWorkspace": "Hedef çalışma alanı artık yok, bu yüzden kural yok sayılıyor.",
+			"missingFeed": "Bu besleme kaldırıldı, bu yüzden kural hiç tetiklenmez.",
+			"missingOption": "Eksik: {id}"
+		},
 		"weather": {
 			"title": "Hava durumu ve takvim",
 			"text": "Hava durumu ve takvim bileşenleri için varsayılanlar.",
 			"weather": "Hava durumu",
-			"location": "Her hava durumu bileşeni konumunu düzenleme modunda dişli simgesinden seçer.",
-			"calendar": "Takvim",
-			"feeds": "Takvim beslemeleri (ICS)"
+			"location": "Her hava durumu bileşeni konumunu düzenleme modunda dişli simgesinden seçer."
+		},
+		"feeds": {
+			"list": "Takvim beslemeleri (ICS) · {count}",
+			"refresh": "Şimdi yenile",
+			"refreshed": "Takvim yenilendi",
+			"refreshFailed": "Yenilenemedi: {message}",
+			"add": "Besleme ekle",
+			"addTitle": "Takvim beslemesi ekle",
+			"editTitle": "{name} düzenle",
+			"edit": "Düzenle",
+			"editOne": "{name} düzenle",
+			"delete": "Sil",
+			"deleteOne": "{name} sil",
+			"enableOne": "{name} kullan",
+			"moveUp": "{name} yukarı taşı",
+			"moveDown": "{name} aşağı taşı",
+			"added": "{name} eklendi",
+			"removed": "{name} kaldırıldı",
+			"empty": "Henüz besleme yok. Google Takvim, Outlook veya iCloud’dan ICS bağlantısını ekleyin.",
+			"help": "Bağlantılar yalnızca sunucu adıyla gösterilir: çoğu zaman gizli bir anahtar içerirler.",
+			"name": "Ad",
+			"url": "ICS bağlantısı",
+			"urlHelp": "https:// veya webcal:// ile başlar",
+			"urlKeep": "{host} adresini korumak için boş bırakın",
+			"urlErrors": {
+				"empty": "Besleme bağlantısını yapıştırın.",
+				"scheme": "https:// veya webcal:// bağlantısı kullanın.",
+				"invalid": "Bu geçerli bir bağlantı değil."
+			},
+			"color": "Renk",
+			"colors": {
+				"accent": "Vurgu",
+				"accent-2": "İkinci vurgu",
+				"success": "Başarı",
+				"warning": "Uyarı",
+				"danger": "Tehlike",
+				"info": "Bilgi"
+			},
+			"statusOff": "Kapalı",
+			"statusPending": "Henüz alınmadı",
+			"statusOk": "Güncel",
+			"statusStale": "Önbellekteki etkinlikler gösteriliyor",
+			"statusError": "Hata: {message}"
+		},
+		"pomodoro": {
+			"title": "Pomodoro",
+			"text": "Tüm pomodoro bileşenleri için tek, ortak zamanlayıcı.",
+			"timer": "Zamanlayıcı",
+			"focus": "Odak",
+			"focusHelp": "{min}–{max} dakika",
+			"shortBreak": "Kısa mola",
+			"shortBreakHelp": "{min}–{max} dakika",
+			"longBreak": "Uzun mola",
+			"longBreakHelp": "Tam bir döngüden sonra · {min}–{max} dakika",
+			"sessionsPerCycle": "Döngü başına oturum",
+			"sessionsPerCycleHelp": "Uzun moladan önceki odak oturumları · {min}–{max}",
+			"min": "dk",
+			"autoStart": "Sonraki aşamayı otomatik başlat",
+			"autoStartHelp": "Odaktan sonra molayı, moladan sonra sıradaki odağı başlatır",
+			"today": "Günlük hedef",
+			"dailyGoal": "Günlük odak oturumu",
+			"dailyGoalHelp": "Büyük pomodoro bileşenindeki günlük halkayı doldurur",
+			"note": "Pomodoro bildirim sesi: Genel ▸ Birimler ve bildirimler."
 		},
 		"companion": {
 			"title": "Eşlikçi",
-			"text": "Kotilo masaüstü uygulamasıyla bağlantı (ajan durumu, pomodoro eşitleme).",
-			"status": "Kotilo masaüstü",
-			"statusOff": "Bağlı değil"
+			"text": "Kotilo masaüstü uygulamasıyla bağlantı (ajan durumu, onaylar, pomodoro eşitleme).",
+			"server": "Sunucu",
+			"enable": "Eşlikçi sunucusu",
+			"enableHelp": "Yalnızca bu bilgisayarda dinler (127.0.0.1)",
+			"view": {
+				"off": "Eşlikçi kapalı",
+				"connected": "Bağlı",
+				"waiting": "Kotilo desktop çalışmıyor",
+				"error": "Eşlikçi sunucusu başlatılamadı"
+			},
+			"connected": "Kotilo desktop bağlı",
+			"connectedVersion": "Kotilo desktop {version} bağlı",
+			"connectedHelp": "Ajan durumu, onaylar ve pomodoro eşitleme canlı.",
+			"waitingHelp": "Kotilo masaüstü uygulamasını açın; kendiliğinden bağlanır.",
+			"offHelp": "Deck onsuz da tam çalışır; Ajan Durumu masaüstünü çalışmıyor olarak gösterir.",
+			"errorHelp": "Neden: {message}",
+			"listening": "Sunucu",
+			"notListening": "Bu portta dinlemiyor",
+			"client": "İstemci",
+			"noClient": "Bağlı istemci yok",
+			"permissions": "İzinler",
+			"allowSwitch": "Masaüstü çalışma alanını değiştirebilsin",
+			"allowSwitchHelp": "Örneğin bir onay beklerken Ajanlar alanına",
+			"notify": "Onaylar için bildir",
+			"notifyHelp": "Bir ajan onayınızı beklediğinde sistem bildirimi",
+			"pairing": "Eşleştirme",
+			"auto": "Kotilo desktop otomatik bağlanır",
+			"autoHelp": "İki uygulama da bu bilgisayardaki aynı jeton dosyasını okur; önce başlayan oluşturur. Kopyalayıp yapıştıracak bir şey yok.",
+			"tokenFile": "Jeton dosyası",
+			"tokenSecret": "Bu dosyayı gizli tutun: onu okuyabilen her şey deck ile konuşabilir."
 		},
 		"burnin": {
 			"title": "Ekran yanması ve gece",

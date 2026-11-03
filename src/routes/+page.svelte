@@ -7,10 +7,11 @@
 	import { onMount, untrack } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import { convertFileSrc } from '@tauri-apps/api/core';
-	import { isTauri, on, settingsOpen, wallpaperList, type Wallpaper } from '#lib/ipc/index.ts';
+	import { calendarUpcoming, isTauri, on, pomodoroState, wallpaperList, type Wallpaper } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { applyTheme, effectiveThemeId, getTheme, pairFor, themes } from '#lib/theme/index.ts';
-	import { defaultBackend, WorkspaceStore } from '#lib/workspace/index.ts';
+	import { AutoSwitcher, defaultBackend, needsCalendar, WorkspaceStore } from '#lib/workspace/index.ts';
+	import { subscribeTick } from '#lib/time/index.ts';
 	import {
 		Ambient,
 		backdropValue,
@@ -20,6 +21,7 @@
 		resolveSurfaceOpacity
 	} from '#lib/settings/index.ts';
 	import { DeckUi, setDeck, sizesOf } from '#lib/ui/deck.svelte.ts';
+	import { openSettingsAt } from '#lib/ui/companion.svelte.ts';
 	import ClockFace from '#lib/ui/ClockFace.svelte';
 	import DeckGrid from '#lib/ui/DeckGrid.svelte';
 	import SettingsSheet from '#lib/ui/SettingsSheet.svelte';
@@ -36,6 +38,65 @@
 	});
 	const ambient = new Ambient({ settings: () => store.settings });
 	setDeck({ store, ui });
+
+	// Auto-switch rules (SPEC §4.1): evaluated here on the shared minute tick and pomodoro/calendar events.
+	const AUTO_SWITCH_KEY = 'kotilo-deck:autoswitch-last';
+	const switcher = new AutoSwitcher({
+		rules: () => store.settings.autoSwitch,
+		hasWorkspace: (id) => store.workspaces.some((w) => w.id === id),
+		activeId: () => store.activeId,
+		switchTo: (id) => {
+			// Never yank the layout away mid-edit; the trigger is simply skipped.
+			if (ui.editing) return;
+			store.switchTo(id);
+			const name = store.workspaces.find((w) => w.id === id)?.name ?? id;
+			ui.say(t('shell.autoSwitch.switched', { name }));
+		},
+		loadLast: () => {
+			try {
+				const v = Number(localStorage.getItem(AUTO_SWITCH_KEY));
+				return Number.isFinite(v) && v > 0 ? v : null;
+			} catch {
+				return null;
+			}
+		},
+		saveLast: (ms) => {
+			try {
+				localStorage.setItem(AUTO_SWITCH_KEY, String(ms));
+			} catch {
+				// Without storage a restart may catch up once more; harmless.
+			}
+		}
+	});
+	const wantsCalendar = $derived(needsCalendar(store.settings.autoSwitch));
+
+	async function loadEvents() {
+		if (!isTauri() || !wantsCalendar) {
+			switcher.setEvents([]);
+			return;
+		}
+		try {
+			switcher.setEvents((await calendarUpcoming(20, 1)).events);
+		} catch {
+			// Feed errors show in the calendar widget / settings; rules just don't fire meanwhile.
+		}
+	}
+
+	$effect(() => {
+		if (!store.ready) return;
+		void wantsCalendar;
+		untrack(() => void loadEvents());
+	});
+
+	$effect(() => {
+		if (!store.ready) return;
+		return untrack(() => {
+			switcher.start(Date.now());
+			// Minute tick: paused while hidden and fired right after showing, which is when the switcher
+			// catches up on the latest due rule.
+			return subscribeTick((now) => switcher.evaluate(now.getTime()));
+		});
+	});
 
 	let wallpapers = $state<Wallpaper[]>([]);
 
@@ -117,6 +178,8 @@
 		onMotion();
 		motion.addEventListener('change', onMotion);
 		const stopAmbient = ambient.start();
+		const stopCompanion = ui.companion.start();
+		if (isTauri()) void pomodoroState().then((s) => switcher.seedPomodoro(s), () => switcher.seedPomodoro(null));
 
 		void store.init();
 		void loadUserThemes();
@@ -143,6 +206,10 @@
 				store.applyViewport();
 			}),
 			on('theme://user-changed', () => void loadUserThemes()),
+			// Before the store is ready the switcher sees no workspaces, so these only record the state.
+			on('pomodoro://state', (s) => switcher.pomodoroState(s)),
+			on('pomodoro://phase-end', ({ phase }) => switcher.phaseEnd(phase)),
+			on('calendar://changed', () => store.ready && void loadEvents()),
 			// Tray Quit: the backend hides the windows and exits ~500 ms later; write pending edits now.
 			on('deck://quitting', () => void store.flush())
 		];
@@ -163,6 +230,7 @@
 		return () => {
 			motion.removeEventListener('change', onMotion);
 			stopAmbient();
+			stopCompanion();
 			unwatch();
 			for (const p of unlisten) void p.then((off) => off());
 			clearTimeout(resizeTimer);
@@ -184,8 +252,7 @@
 	}
 
 	function openSettings() {
-		if (isTauri()) void settingsOpen().catch((e) => ui.say(String(e), 'warning'));
-		else window.open('/settings', 'kotilo-deck-settings', 'width=960,height=680');
+		void openSettingsAt().catch((e) => ui.say(String(e), 'warning'));
 	}
 
 	function onkeydown(e: KeyboardEvent) {

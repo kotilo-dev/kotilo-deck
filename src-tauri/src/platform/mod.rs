@@ -243,6 +243,13 @@ pub trait Platform: Send + Sync {
     fn set_window_opacity(&self, _window: NativeWindow, _opacity: f64) -> Result<()> {
         Err(PlatformError::Unsupported(Capability::Transparency))
     }
+
+    // Phase 3: Agent Status "open Kotilo desktop".
+    /// Opens a custom-scheme URL (e.g. `kotilo://open`) with its registered handler. Errors
+    /// (`Os`) when no app is registered for the scheme instead of showing an OS picker.
+    fn open_url_scheme(&self, _url: &str) -> Result<()> {
+        Err(PlatformError::Unsupported(Capability::Companion))
+    }
 }
 
 /// The implementation for the OS this binary was built for.
@@ -461,6 +468,14 @@ mod tests {
         assert!(matches!(
             Bare.set_window_opacity(NativeWindow(0), 0.5),
             Err(PlatformError::Unsupported(Capability::Transparency))
+        ));
+    }
+
+    #[test]
+    fn open_url_scheme_defaults_to_unsupported() {
+        assert!(matches!(
+            Bare.open_url_scheme("kotilo://open"),
+            Err(PlatformError::Unsupported(Capability::Companion))
         ));
     }
 

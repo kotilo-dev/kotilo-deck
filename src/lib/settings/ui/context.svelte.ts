@@ -27,6 +27,7 @@ export const SECTIONS = [
 	'themes',
 	'workspaces',
 	'weather',
+	'pomodoro',
 	'companion',
 	'burnin',
 	'about'
@@ -52,6 +53,8 @@ export class SettingsEnv {
 	workspacesPath = $state('~/.kotilo/deck/workspaces');
 	themesPath = $state('~/.kotilo/themes');
 	wallpapersPath = $state('~/.kotilo/deck/wallpapers');
+	/** protocol.md §2 shared secret file. Only the path is ever shown, never the token. */
+	tokenPath = $state('~/.kotilo/companion.token');
 	capabilities = $state<ReadonlySet<Capability> | null>(null);
 	monitors = $state<MonitorInfo[]>([]);
 	monitorsLoaded = $state(false);
@@ -82,6 +85,7 @@ export class SettingsEnv {
 			this.workspacesPath = await join(deck, 'workspaces');
 			this.wallpapersPath = await join(deck, 'wallpapers');
 			this.themesPath = await join(home, '.kotilo', 'themes');
+			this.tokenPath = await join(home, '.kotilo', 'companion.token');
 			// tauri-plugin-store keeps settings.json in the app data dir.
 			this.settingsPath = await join(await appDataDir(), 'settings.json');
 		} catch {

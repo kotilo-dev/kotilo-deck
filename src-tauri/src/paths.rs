@@ -56,3 +56,16 @@ pub fn file_label(path: &std::path::Path) -> String {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default()
 }
+
+/// `~/.kotilo`, shared by every Kotilo app.
+pub fn kotilo_dir() -> PathBuf {
+    deck_dir()
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+/// Companion shared secret (protocol.md §2), shared with the Kotilo desktop app.
+pub fn companion_token_file() -> PathBuf {
+    kotilo_dir().join("companion.token")
+}

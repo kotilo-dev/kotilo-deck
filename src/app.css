@@ -213,6 +213,8 @@ button:disabled {
 	color: var(--k-text);
 	max-width: min(440px, calc(100vw - 32px));
 	width: 100%;
+	/* Tailwind preflight zeroes margins; modal dialogs centre with `auto` (sheets override it). */
+	margin: auto;
 }
 .k-dialog::backdrop {
 	background: color-mix(in srgb, var(--k-bg) 65%, transparent);

@@ -97,8 +97,17 @@
 	);
 </script>
 
-{#snippet spark(height: number, warn: boolean)}
-	<svg class="spark" class:warn style="height: {height}px" viewBox="0 0 240 {height}" preserveAspectRatio="none" aria-hidden="true">
+{#snippet spark(height: number, warn: boolean, fill = false)}
+	<!-- `fill`: the 4×2 tile sparkline stretches to the tile's free height (non-scaling 2 px stroke). -->
+	<svg
+		class="spark"
+		class:warn
+		class:fill
+		style:height={fill ? undefined : `${height}px`}
+		viewBox="0 0 240 {height}"
+		preserveAspectRatio="none"
+		aria-hidden="true"
+	>
 		<polyline points={sparklinePoints(history, 240, height)} />
 	</svg>
 {/snippet}
@@ -156,7 +165,7 @@
 				<div class="tile" class:warn={cpuWarn.warn}>
 					<span class="tiny">{tileLabel('widgets.system.cpu', cpuWarn.warn)}</span>
 					<span class="mono val-l">{cpuPct}<span class="unit">%</span></span>
-					{@render spark(28, cpuWarn.warn)}
+					{@render spark(40, cpuWarn.warn, true)}
 				</div>
 				<div class="tile" class:warn={memWarn.warn}>
 					<span class="tiny">{tileLabel('widgets.system.memory', memWarn.warn)}</span>
@@ -280,6 +289,11 @@
 		width: 100%;
 		flex-shrink: 0;
 	}
+	.spark.fill {
+		flex: 1 1 auto;
+		min-height: 24px;
+		height: auto;
+	}
 	.spark polyline {
 		fill: none;
 		stroke: var(--k-accent);
@@ -370,7 +384,8 @@
 		display: flex;
 		align-items: flex-end;
 		gap: 4px;
-		height: 40px;
+		/* 40 px at 1280×720 (DESIGN §5.5); grows with taller cards up to ~25 % of the card (1920×1080). */
+		height: clamp(40px, calc((100cqh - 220px) / 2), 25cqh);
 		flex-shrink: 0;
 	}
 	.cores.dense {

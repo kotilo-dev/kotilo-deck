@@ -4,7 +4,7 @@
 //! version `i` to `i + 1`. A document without `schemaVersion` is v0. Documents from a
 //! future version are rejected (callers skip them and leave the file untouched).
 //!
-//! The SQLite database (`deck.db`, todos) uses the same idea with `PRAGMA user_version`
+//! The SQLite database (`deck.db`: todos, pomodoro) uses the same idea with `PRAGMA user_version`
 //! as its schemaVersion and [`DB_STEPS`] as the ordered list of SQL migrations.
 
 use serde_json::{Map, Value};
@@ -27,6 +27,21 @@ pub const DB_STEPS: &[&str] = &[
         completed_at INTEGER
     );
     CREATE INDEX todos_remind_at ON todos (remind_at) WHERE remind_at IS NOT NULL AND done = 0;",
+    // v2: pomodoro history + the live timer (Phase 3). `pomodoro_timer` holds one row
+    // (id = 1) with the timer as JSON so a restart resumes it.
+    "CREATE TABLE pomodoro_sessions (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        started_at INTEGER NOT NULL,
+        ended_at   INTEGER NOT NULL,
+        phase      TEXT    NOT NULL,
+        completed  INTEGER NOT NULL,
+        duration_s INTEGER NOT NULL
+    );
+    CREATE INDEX pomodoro_sessions_ended_at ON pomodoro_sessions (ended_at);
+    CREATE TABLE pomodoro_timer (
+        id    INTEGER PRIMARY KEY CHECK (id = 1),
+        state TEXT    NOT NULL
+    );",
 ];
 
 pub const DB_VERSION: i64 = DB_STEPS.len() as i64;
@@ -174,6 +189,41 @@ mod tests {
         conn.pragma_update(None, "user_version", DB_VERSION + 1)
             .unwrap();
         assert!(migrate_db(&mut conn).is_err());
+    }
+
+    #[test]
+    fn phase2_db_gains_pomodoro_tables_and_keeps_todos() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(DB_STEPS[0]).unwrap();
+        conn.pragma_update(None, "user_version", 1).unwrap();
+        conn.execute(
+            "INSERT INTO todos (text, position, created_at) VALUES ('keep', 0, 1)",
+            [],
+        )
+        .unwrap();
+        assert_eq!(migrate_db(&mut conn).unwrap(), 1);
+        let text: String = conn
+            .query_row("SELECT text FROM todos", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(text, "keep");
+        conn.execute(
+            "INSERT INTO pomodoro_sessions (started_at, ended_at, phase, completed, duration_s)
+             VALUES (1, 2, 'focus', 1, 1500)",
+            [],
+        )
+        .unwrap();
+        // Only one live timer row.
+        conn.execute(
+            "INSERT INTO pomodoro_timer (id, state) VALUES (1, '{}')",
+            [],
+        )
+        .unwrap();
+        assert!(conn
+            .execute(
+                "INSERT INTO pomodoro_timer (id, state) VALUES (2, '{}')",
+                []
+            )
+            .is_err());
     }
 
     #[test]

@@ -3,6 +3,7 @@
 pub mod audio;
 pub mod calendar;
 pub mod media;
+pub mod pomodoro;
 pub mod system;
 pub mod todo;
 

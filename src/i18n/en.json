@@ -5,8 +5,11 @@
 			"workspaces": "Workspaces",
 			"edit": "Edit layout",
 			"companionOff": "Kotilo desktop not running",
-			"companionOn": "Kotilo desktop connected",
-			"themeChip": "Theme: {name}"
+			"companionOn": "Kotilo desktop",
+			"themeChip": "Theme: {name}",
+			"companionDisabled": "Companion off",
+			"companionVersion": "Kotilo desktop {version} connected",
+			"companionOpen": "{status}. Open companion settings"
 		},
 		"theme": {
 			"title": "Theme",
@@ -116,6 +119,9 @@
 		},
 		"screensaver": {
 			"wake": "Wake the deck"
+		},
+		"autoSwitch": {
+			"switched": "Switched to {name} (rule)"
 		}
 	},
 	"widgets": {
@@ -329,9 +335,106 @@
 				"showCompleted": "Show completed tasks"
 			}
 		},
-		"pomodoro": {},
-		"agents": {},
-		"calendar": {}
+		"pomodoro": {
+			"title": "Pomodoro",
+			"name": "Pomodoro",
+			"focus": "Focus",
+			"shortBreak": "Short break",
+			"longBreak": "Long break",
+			"of": "of {time}",
+			"ready": "Ready",
+			"paused": "Paused",
+			"start": "Start",
+			"pause": "Pause",
+			"resume": "Resume",
+			"reset": "Reset",
+			"skipToBreak": "Skip to break",
+			"skipToFocus": "Skip to focus",
+			"timerLabel": "{phase}: {time} left",
+			"today": "Today",
+			"sessionsToday": "sessions today",
+			"focusToday": "focus today",
+			"min": "min",
+			"sessionsLabel": "{n} of {goal} focus sessions today",
+			"suggestQuestion": "start a focus block?",
+			"suggestFallback": "Start a focus block?",
+			"suggestStartLabel": "Start a focus block",
+			"suggestStartMinutes": "Start a {n} min focus block",
+			"suggestDismiss": "Dismiss suggestion",
+			"error": "Couldn't load the timer",
+			"actionFailed": "Couldn't reach the timer",
+			"settings": {
+				"suggestions": "Show companion focus suggestions"
+			}
+		},
+		"agents": {
+			"title": "Agents",
+			"name": "Agent Status",
+			"runningOne": "1 agent running",
+			"runningMany": "{n} agents running",
+			"idleOne": "1 agent idle",
+			"idleMany": "{n} agents idle",
+			"none": "No agents",
+			"today": "{cost} today",
+			"idle": "Idle",
+			"working": "Working",
+			"workingTask": "Working: {task}",
+			"waitingTask": "Waiting approval: {task}",
+			"approval": "approval",
+			"minutes": "{n} min",
+			"approve": "Approve",
+			"deny": "Deny",
+			"approveLabel": "Approve: {summary}",
+			"denyLabel": "Deny: {summary}",
+			"respondFailed": "Couldn't send — try again",
+			"list": "Agents",
+			"queue": "Pending approvals",
+			"noAgents": "No agents connected",
+			"noApprovals": "No approvals pending",
+			"moreAgents": "+{n} more",
+			"moreApprovals": "+{n} more waiting",
+			"usage": "Today",
+			"tokens": "{n} tokens",
+			"budget": "Spend against today's budget",
+			"disconnected": "Kotilo desktop not running — open it",
+			"open": "Open",
+			"openFailed": "Couldn't open Kotilo desktop — is it installed?",
+			"off": "Companion off",
+			"error": "Couldn't reach the companion",
+			"settings": {
+				"showIdle": "Show idle agents"
+			}
+		},
+		"calendar": {
+			"title": "Up next",
+			"name": "Calendar",
+			"feedsOne": "1 feed",
+			"feedsMany": "{n} feeds",
+			"feed": "A feed",
+			"allDay": "All day",
+			"today": "Today",
+			"tomorrow": "Tomorrow",
+			"inMin": "in {n} min",
+			"inHours": "in {h} h {m} min",
+			"inHoursExact": "in {h} h",
+			"inDays": "in {n} d",
+			"now": "now",
+			"over": "+{n} min over",
+			"stale": "stale",
+			"noFeeds": "No calendar feeds",
+			"noFeedsHint": "Add an ICS feed in Settings ▸ Weather & calendar",
+			"openSettings": "Open settings",
+			"empty": "Nothing coming up",
+			"emptyHint": "The next {n} days are clear",
+			"browserPreview": "Calendar needs the desktop app",
+			"error": "Couldn't load the calendar",
+			"feedError": "{name} couldn't refresh",
+			"feedErrors": "{n} feeds couldn't refresh",
+			"events": "Upcoming events",
+			"settings": {
+				"allDay": "Show all-day events"
+			}
+		}
 	},
 	"settings": {
 		"window": {
@@ -347,6 +450,7 @@
 			"themes": "Themes",
 			"workspaces": "Workspaces",
 			"weather": "Weather & calendar",
+			"pomodoro": "Pomodoro",
 			"companion": "Companion",
 			"burnin": "Burn-in & night",
 			"about": "About · MIT"
@@ -356,7 +460,8 @@
 			"save": "Save",
 			"saveFailed": "Couldn't save: {message}",
 			"desktopOnly": "Available in the Kotilo Deck desktop app.",
-			"later": "Coming in a later version."
+			"decrease": "Decrease {name}",
+			"increase": "Increase {name}"
 		},
 		"general": {
 			"title": "General",
@@ -491,19 +596,134 @@
 			"own": "Own value",
 			"ownValue": "Own {what} for this workspace"
 		},
+		"rules": {
+			"title": "Auto-switch rules · {count}",
+			"add": "Add rule",
+			"empty": "No rules. The deck stays on the workspace you pick.",
+			"help": "A rule switches when its trigger happens. A workspace you pick by hand stays until the next trigger. Time rules also apply while the deck is hidden.",
+			"ruleN": "Rule {n}",
+			"enableN": "Enable rule {n}",
+			"deleteN": "Delete rule {n}",
+			"delete": "Delete rule",
+			"removed": "Rule removed",
+			"when": "When",
+			"target": "Switch to",
+			"types": {
+				"time": "At a time of day",
+				"pomodoro-start": "Pomodoro focus starts",
+				"pomodoro-end": "Pomodoro focus ends",
+				"calendar-start": "Calendar event starts"
+			},
+			"at": "At",
+			"days": "Days",
+			"feed": "Feed",
+			"anyFeed": "Any feed",
+			"calendarHelp": "Timed events only, not all-day ones",
+			"missingWorkspace": "The target workspace no longer exists, so this rule is ignored.",
+			"missingFeed": "This feed was removed, so this rule never fires.",
+			"missingOption": "Missing: {id}"
+		},
 		"weather": {
 			"title": "Weather & calendar",
 			"text": "Defaults for weather and calendar widgets.",
 			"weather": "Weather",
-			"location": "Each weather widget picks its own location from its gear in edit mode.",
-			"calendar": "Calendar",
-			"feeds": "Calendar feeds (ICS)"
+			"location": "Each weather widget picks its own location from its gear in edit mode."
+		},
+		"feeds": {
+			"list": "Calendar feeds (ICS) · {count}",
+			"refresh": "Refresh now",
+			"refreshed": "Calendar refreshed",
+			"refreshFailed": "Couldn't refresh: {message}",
+			"add": "Add feed",
+			"addTitle": "Add calendar feed",
+			"editTitle": "Edit {name}",
+			"edit": "Edit",
+			"editOne": "Edit {name}",
+			"delete": "Delete",
+			"deleteOne": "Delete {name}",
+			"enableOne": "Use {name}",
+			"moveUp": "Move {name} up",
+			"moveDown": "Move {name} down",
+			"added": "{name} added",
+			"removed": "{name} removed",
+			"empty": "No feeds yet. Add the ICS link from Google Calendar, Outlook or iCloud.",
+			"help": "Links show only their host: they often contain a private key.",
+			"name": "Name",
+			"url": "ICS link",
+			"urlHelp": "Starts with https:// or webcal://",
+			"urlKeep": "Leave empty to keep {host}",
+			"urlErrors": {
+				"empty": "Paste the feed link.",
+				"scheme": "Use an https:// or webcal:// link.",
+				"invalid": "This isn't a valid link."
+			},
+			"color": "Colour",
+			"colors": {
+				"accent": "Accent",
+				"accent-2": "Second accent",
+				"success": "Success",
+				"warning": "Warning",
+				"danger": "Danger",
+				"info": "Info"
+			},
+			"statusOff": "Off",
+			"statusPending": "Not fetched yet",
+			"statusOk": "Up to date",
+			"statusStale": "Showing cached events",
+			"statusError": "Error: {message}"
+		},
+		"pomodoro": {
+			"title": "Pomodoro",
+			"text": "One shared timer for every pomodoro widget.",
+			"timer": "Timer",
+			"focus": "Focus",
+			"focusHelp": "{min}–{max} minutes",
+			"shortBreak": "Short break",
+			"shortBreakHelp": "{min}–{max} minutes",
+			"longBreak": "Long break",
+			"longBreakHelp": "After a full cycle · {min}–{max} minutes",
+			"sessionsPerCycle": "Sessions per cycle",
+			"sessionsPerCycleHelp": "Focus sessions before a long break · {min}–{max}",
+			"min": "min",
+			"autoStart": "Auto-start next phase",
+			"autoStartHelp": "Starts the break after focus and the next focus after a break",
+			"today": "Daily goal",
+			"dailyGoal": "Focus sessions per day",
+			"dailyGoalHelp": "Fills the daily ring on the large pomodoro widget",
+			"note": "Sound for pomodoro notifications: General ▸ Units & notifications."
 		},
 		"companion": {
 			"title": "Companion",
-			"text": "Connection to the Kotilo desktop app (agent status, pomodoro sync).",
-			"status": "Kotilo desktop",
-			"statusOff": "Not connected"
+			"text": "Connection to the Kotilo desktop app (agent status, approvals, pomodoro sync).",
+			"server": "Server",
+			"enable": "Companion server",
+			"enableHelp": "Listens on this computer only (127.0.0.1)",
+			"view": {
+				"off": "Companion off",
+				"connected": "Connected",
+				"waiting": "Kotilo desktop not running",
+				"error": "Couldn't start the companion server"
+			},
+			"connected": "Connected to Kotilo desktop",
+			"connectedVersion": "Connected to Kotilo desktop {version}",
+			"connectedHelp": "Agent status, approvals and pomodoro sync are live.",
+			"waitingHelp": "Open the Kotilo desktop app; it connects on its own.",
+			"offHelp": "The deck works fully without it; Agent Status shows the desktop as not running.",
+			"errorHelp": "Reason: {message}",
+			"listening": "Server",
+			"notListening": "Not listening on port",
+			"client": "Client",
+			"noClient": "None connected",
+			"permissions": "Permissions",
+			"allowSwitch": "Allow desktop to switch workspace",
+			"allowSwitchHelp": "For example to Agents while an approval is waiting",
+			"notify": "Notify me about approvals",
+			"notifyHelp": "OS notification when an agent waits for your approval",
+			"pairing": "Pairing",
+			"auto": "Kotilo desktop connects automatically",
+			"autoHelp": "Both apps read the same token file on this computer; whichever starts first creates it. Nothing to copy or paste.",
+			"tokenFile": "Token file",
+			"tokenSecret": "Keep this file private: anything that can read it can talk to the deck."
 		},
 		"burnin": {
 			"title": "Burn-in & night",

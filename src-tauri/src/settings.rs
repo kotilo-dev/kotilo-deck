@@ -3,7 +3,9 @@
 //!
 //! Corruption handling: every stored top-level key is applied on top of the defaults only
 //! if it still deserialises and validates. The nested objects (`appearance`, `burnIn`,
-//! `themeAuto`) are checked leaf by leaf, so one bad nested value only resets itself.
+//! `themeAuto`, `companion`, `pomodoro`) are checked leaf by leaf, so one bad nested value
+//! only resets itself. Arrays (`calendarFeeds`, `autoSwitch`) are replaced on patch and
+//! fall back as a whole.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -22,7 +24,7 @@ pub const EVENT_SETTINGS_CHANGED: &str = "settings://changed";
 
 /// Top-level keys holding plain structs: patches merge into them key by key and stored
 /// values fall back leaf by leaf. (`activeWorkspace` is a map and is replaced as a whole.)
-const NESTED_KEYS: &[&str] = &["appearance", "burnIn", "themeAuto"];
+const NESTED_KEYS: &[&str] = &["appearance", "burnIn", "themeAuto", "companion", "pomodoro"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -144,6 +146,113 @@ pub enum TemperatureUnit {
     F,
 }
 
+/// Companion server (protocol.md).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompanionSettings {
+    pub enabled: bool,
+    pub allow_workspace_switch: bool,
+    pub notify_approvals: bool,
+}
+
+impl Default for CompanionSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            allow_workspace_switch: false,
+            notify_approvals: true,
+        }
+    }
+}
+
+/// Lengths in minutes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PomodoroSettings {
+    pub focus: u32,
+    pub short_break: u32,
+    pub long_break: u32,
+    pub sessions_per_cycle: u32,
+    pub auto_start_next: bool,
+    pub daily_goal: u32,
+}
+
+impl Default for PomodoroSettings {
+    fn default() -> Self {
+        Self {
+            focus: 25,
+            short_break: 5,
+            long_break: 15,
+            sessions_per_cycle: 4,
+            auto_start_next: false,
+            daily_goal: 8,
+        }
+    }
+}
+
+/// Theme token names (never a hex).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FeedColor {
+    Accent,
+    #[serde(rename = "accent-2")]
+    Accent2,
+    Success,
+    Warning,
+    Danger,
+    Info,
+}
+
+/// The URL may carry a secret: never log it (`Debug` omits it).
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarFeed {
+    pub id: String,
+    pub name: String,
+    pub url: String,
+    pub color: FeedColor,
+    pub enabled: bool,
+}
+
+impl std::fmt::Debug for CalendarFeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CalendarFeed")
+            .field("id", &self.id)
+            .field("color", &self.color)
+            .field("enabled", &self.enabled)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(
+    tag = "type",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
+pub enum AutoSwitchTrigger {
+    /// `at` "HH:MM"; `days` 0 = Sun … 6 = Sat, empty = every day.
+    Time {
+        at: String,
+        days: Vec<u8>,
+    },
+    PomodoroStart,
+    PomodoroEnd,
+    /// `None` = any feed.
+    CalendarStart {
+        feed_id: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoSwitchRule {
+    pub id: String,
+    pub enabled: bool,
+    pub trigger: AutoSwitchTrigger,
+    pub workspace: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeckSettings {
@@ -161,6 +270,11 @@ pub struct DeckSettings {
     pub theme_auto: ThemeAuto,
     pub temperature_unit: TemperatureUnit,
     pub notification_sound: bool,
+    // Phase 3 (additive, still schemaVersion 1).
+    pub companion: CompanionSettings,
+    pub pomodoro: PomodoroSettings,
+    pub calendar_feeds: Vec<CalendarFeed>,
+    pub auto_switch: Vec<AutoSwitchRule>,
 }
 
 impl Default for DeckSettings {
@@ -179,6 +293,10 @@ impl Default for DeckSettings {
             theme_auto: ThemeAuto::default(),
             temperature_unit: TemperatureUnit::C,
             notification_sound: true,
+            companion: CompanionSettings::default(),
+            pomodoro: PomodoroSettings::default(),
+            calendar_feeds: Vec::new(),
+            auto_switch: Vec::new(),
         }
     }
 }
@@ -205,6 +323,87 @@ pub fn valid_file_name(s: &str) -> bool {
         && s.len() <= 255
         && !s.starts_with('.')
         && !s.chars().any(|c| RESERVED.contains(&c) || c.is_control())
+}
+
+/// Calendar feed URL: `https://` or `webcal://` (any case) with a host, no whitespace.
+pub fn valid_feed_url(url: &str) -> bool {
+    let lower = url.get(..9).unwrap_or(url).to_ascii_lowercase();
+    let rest = if lower.starts_with("https://") {
+        &url[8..]
+    } else if lower.starts_with("webcal://") {
+        &url[9..]
+    } else {
+        return false;
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let host = authority.rsplit('@').next().unwrap_or("");
+    url.len() <= 2048
+        && !host.is_empty()
+        && !url.chars().any(|c| c.is_whitespace() || c.is_control())
+}
+
+fn validate_phase3(s: &DeckSettings) -> Result<(), String> {
+    let p = &s.pomodoro;
+    for (name, v, lo, hi) in [
+        ("pomodoro.focus", p.focus, 1, 180),
+        ("pomodoro.shortBreak", p.short_break, 1, 60),
+        ("pomodoro.longBreak", p.long_break, 1, 120),
+        ("pomodoro.sessionsPerCycle", p.sessions_per_cycle, 1, 12),
+        ("pomodoro.dailyGoal", p.daily_goal, 1, 24),
+    ] {
+        if !(lo..=hi).contains(&v) {
+            return Err(format!("{name} must be between {lo} and {hi}"));
+        }
+    }
+    let mut ids = std::collections::HashSet::new();
+    for (i, f) in s.calendar_feeds.iter().enumerate() {
+        if !crate::workspace::valid_id(&f.id) {
+            return Err(format!("calendarFeeds[{i}].id must be a slug [a-z0-9-]"));
+        }
+        if !ids.insert(f.id.as_str()) {
+            return Err(format!("calendarFeeds[{i}].id is a duplicate"));
+        }
+        if f.name.chars().count() > 200 {
+            return Err(format!("calendarFeeds[{i}].name is too long"));
+        }
+        if !valid_feed_url(&f.url) {
+            // The URL itself is never echoed (it may carry a secret).
+            return Err(format!(
+                "calendarFeeds[{i}].url must start with https:// or webcal://"
+            ));
+        }
+    }
+    let mut ids = std::collections::HashSet::new();
+    for (i, r) in s.auto_switch.iter().enumerate() {
+        if r.id.is_empty() || r.id.chars().count() > 64 {
+            return Err(format!("autoSwitch[{i}].id must be 1-64 characters"));
+        }
+        if !ids.insert(r.id.as_str()) {
+            return Err(format!("autoSwitch[{i}].id is a duplicate"));
+        }
+        if !crate::workspace::valid_id(&r.workspace) {
+            return Err(format!("autoSwitch[{i}].workspace must be a workspace id"));
+        }
+        match &r.trigger {
+            AutoSwitchTrigger::Time { at, days } => {
+                if !valid_hhmm(at) {
+                    return Err(format!("autoSwitch[{i}].trigger.at must be \"HH:MM\""));
+                }
+                if days.iter().any(|d| *d > 6) {
+                    return Err(format!("autoSwitch[{i}].trigger.days must be 0-6"));
+                }
+            }
+            AutoSwitchTrigger::CalendarStart { feed_id: Some(id) } => {
+                if !crate::workspace::valid_id(id) {
+                    return Err(format!("autoSwitch[{i}].trigger.feedId must be a feed id"));
+                }
+            }
+            AutoSwitchTrigger::PomodoroStart
+            | AutoSwitchTrigger::PomodoroEnd
+            | AutoSwitchTrigger::CalendarStart { feed_id: None } => {}
+        }
+    }
+    Ok(())
 }
 
 /// Range and format checks serde cannot express.
@@ -250,7 +449,7 @@ pub fn validate(s: &DeckSettings) -> Result<(), String> {
     range("burnIn.idle.dim", b.idle.dim, 0.3, 1.0)?;
     hhmm("themeAuto.lightFrom", &s.theme_auto.light_from)?;
     hhmm("themeAuto.darkFrom", &s.theme_auto.dark_from)?;
-    Ok(())
+    validate_phase3(s)
 }
 
 pub fn to_map(s: &DeckSettings) -> Map<String, Value> {
@@ -461,6 +660,12 @@ pub fn apply_patch(app: &AppHandle, patch: &Map<String, Value>) -> Result<DeckSe
             return Err(e);
         }
     };
+    if old.companion.enabled != new.companion.enabled {
+        crate::companion::set_enabled(app, new.companion.enabled);
+    }
+    if old.pomodoro != new.pomodoro {
+        crate::widgets::pomodoro::settings_changed(app, &new.pomodoro);
+    }
     if old.monitor != new.monitor || old.display_mode != new.display_mode {
         crate::window::attach(app);
     } else if old.always_on_top != new.always_on_top
@@ -515,7 +720,14 @@ mod tests {
                 },
                 "themeAuto": {"mode": "off", "lightFrom": "07:00", "darkFrom": "19:00"},
                 "temperatureUnit": "c",
-                "notificationSound": true
+                "notificationSound": true,
+                "companion": {"enabled": true, "allowWorkspaceSwitch": false, "notifyApprovals": true},
+                "pomodoro": {
+                    "focus": 25, "shortBreak": 5, "longBreak": 15, "sessionsPerCycle": 4,
+                    "autoStartNext": false, "dailyGoal": 8
+                },
+                "calendarFeeds": [],
+                "autoSwitch": []
             })
         );
         assert!(validate(&DeckSettings::default()).is_ok());
@@ -628,6 +840,171 @@ mod tests {
         assert_eq!(s.theme_auto.light_from, "06:00");
         assert_eq!(s.theme_auto.dark_from, "19:00");
         assert!(!s.notification_sound);
+    }
+
+    fn feed(id: &str, url: &str) -> Value {
+        json!({"id": id, "name": "Work", "url": url, "color": "accent-2", "enabled": true})
+    }
+
+    #[test]
+    fn phase3_partial_patches_and_ranges() {
+        let d = DeckSettings::default();
+        let s = merge(
+            &d,
+            &obj(json!({"pomodoro": {"focus": 50}, "companion": {"allowWorkspaceSwitch": true}})),
+        )
+        .unwrap();
+        assert_eq!(s.pomodoro.focus, 50);
+        assert_eq!(s.pomodoro.short_break, 5);
+        assert!(s.companion.enabled && s.companion.allow_workspace_switch);
+        for bad in [
+            json!({"pomodoro": {"focus": 0}}),
+            json!({"pomodoro": {"focus": 181}}),
+            json!({"pomodoro": {"shortBreak": 61}}),
+            json!({"pomodoro": {"longBreak": 121}}),
+            json!({"pomodoro": {"sessionsPerCycle": 13}}),
+            json!({"pomodoro": {"sessionsPerCycle": 0}}),
+            json!({"pomodoro": {"dailyGoal": 25}}),
+            json!({"pomodoro": {"dailyGoal": 0}}),
+            json!({"pomodoro": {"focus": 2.5}}),
+            json!({"pomodoro": 5}),
+            json!({"companion": {"enabled": "yes"}}),
+        ] {
+            assert!(merge(&d, &obj(bad.clone())).is_err(), "{bad}");
+        }
+        let edge = merge(
+            &d,
+            &obj(
+                json!({"pomodoro": {"focus": 180, "shortBreak": 60, "longBreak": 120,
+                "sessionsPerCycle": 12, "dailyGoal": 24}}),
+            ),
+        )
+        .unwrap();
+        assert_eq!(edge.pomodoro.sessions_per_cycle, 12);
+    }
+
+    #[test]
+    fn calendar_feeds_are_validated_and_replaced() {
+        let d = DeckSettings::default();
+        let s = merge(
+            &d,
+            &obj(json!({"calendarFeeds": [
+                feed("work", "https://example.com/a.ics"),
+                feed("home-2", "webcal://cal.example.org/x?token=s3cret"),
+            ]})),
+        )
+        .unwrap();
+        assert_eq!(s.calendar_feeds.len(), 2);
+        assert_eq!(s.calendar_feeds[0].color, FeedColor::Accent2);
+        // Arrays are replaced wholesale.
+        let s2 = merge(
+            &s,
+            &obj(json!({"calendarFeeds": [feed("x", "HTTPS://e.com/c.ics")]})),
+        )
+        .unwrap();
+        assert_eq!(s2.calendar_feeds.len(), 1);
+        assert_eq!(s2.calendar_feeds[0].id, "x");
+        for bad in [
+            json!([feed("Work", "https://e.com/a.ics")]),
+            json!([feed("", "https://e.com/a.ics")]),
+            json!([feed("a", "http://e.com/a.ics?k=s3cret")]),
+            json!([feed("a", "file:///c:/a.ics")]),
+            json!([feed("a", "https://")]),
+            json!([feed("a", "https://user@/x")]),
+            json!([feed("a", "https://e.com/a b.ics")]),
+            json!([
+                feed("a", "https://e.com/a.ics"),
+                feed("a", "https://e.com/b.ics")
+            ]),
+            json!([{"id": "a", "name": "x", "url": "https://e.com", "color": "#ff0000", "enabled": true}]),
+            json!([{"id": "a", "name": "x", "url": "https://e.com", "color": "purple", "enabled": true}]),
+            json!({"id": "a"}),
+        ] {
+            let e = merge(&d, &obj(json!({ "calendarFeeds": bad.clone() })));
+            assert!(e.is_err(), "{bad}");
+            assert!(!e.unwrap_err().contains("s3cret"));
+        }
+        // Debug output never carries the URL.
+        assert!(!format!("{:?}", s.calendar_feeds).contains("s3cret"));
+    }
+
+    #[test]
+    fn auto_switch_rules_are_validated() {
+        let d = DeckSettings::default();
+        let s = merge(
+            &d,
+            &obj(json!({"autoSwitch": [
+                {"id": "r1", "enabled": true, "trigger": {"type": "time", "at": "09:00", "days": [1, 2, 3, 4, 5]}, "workspace": "focus"},
+                {"id": "r2", "enabled": false, "trigger": {"type": "pomodoro-start"}, "workspace": "focus"},
+                {"id": "r3", "enabled": true, "trigger": {"type": "pomodoro-end"}, "workspace": "ops"},
+                {"id": "r4", "enabled": true, "trigger": {"type": "calendar-start", "feedId": null}, "workspace": "ops"},
+                {"id": "r5", "enabled": true, "trigger": {"type": "calendar-start", "feedId": "work"}, "workspace": "ops"},
+            ]})),
+        )
+        .unwrap();
+        assert_eq!(s.auto_switch.len(), 5);
+        assert_eq!(
+            s.auto_switch[4].trigger,
+            AutoSwitchTrigger::CalendarStart {
+                feed_id: Some("work".into())
+            }
+        );
+        // Serialises back to the TS shape.
+        let v = serde_json::to_value(&s.auto_switch).unwrap();
+        assert_eq!(
+            v[0]["trigger"],
+            json!({"type": "time", "at": "09:00", "days": [1, 2, 3, 4, 5]})
+        );
+        assert_eq!(
+            v[3]["trigger"],
+            json!({"type": "calendar-start", "feedId": null})
+        );
+        assert_eq!(v[1]["trigger"], json!({"type": "pomodoro-start"}));
+        let rule =
+            |t: Value| json!([{"id": "r", "enabled": true, "trigger": t, "workspace": "focus"}]);
+        for bad in [
+            rule(json!({"type": "time", "at": "9:00", "days": []})),
+            rule(json!({"type": "time", "at": "09:00", "days": [7]})),
+            rule(json!({"type": "time", "at": "09:00", "days": [-1]})),
+            rule(json!({"type": "time", "at": "09:00"})),
+            rule(json!({"type": "sunrise"})),
+            rule(json!({"type": "calendar-start", "feedId": "Bad Id"})),
+            json!([{"id": "", "enabled": true, "trigger": {"type": "pomodoro-end"}, "workspace": "focus"}]),
+            json!([{"id": "r", "enabled": true, "trigger": {"type": "pomodoro-end"}, "workspace": "Not A Slug"}]),
+            json!([
+                {"id": "r", "enabled": true, "trigger": {"type": "pomodoro-end"}, "workspace": "a"},
+                {"id": "r", "enabled": true, "trigger": {"type": "pomodoro-end"}, "workspace": "b"}
+            ]),
+        ] {
+            assert!(
+                merge(&d, &obj(json!({ "autoSwitch": bad.clone() }))).is_err(),
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn phase3_stored_corruption_falls_back_per_key() {
+        let s = from_stored(obj(json!({
+            "pomodoro": {"focus": 500, "shortBreak": 10, "autoStartNext": "x"},
+            "companion": {"enabled": false, "notifyApprovals": 3},
+            "calendarFeeds": [feed("ok", "https://e.com/a.ics"), feed("BAD", "https://e.com")],
+            "autoSwitch": "garbage",
+            "theme": "nord"
+        })));
+        assert_eq!(s.pomodoro.focus, 25);
+        assert_eq!(s.pomodoro.short_break, 10);
+        assert!(!s.pomodoro.auto_start_next);
+        assert!(!s.companion.enabled);
+        assert!(s.companion.notify_approvals);
+        // A bad array element resets the whole array.
+        assert!(s.calendar_feeds.is_empty());
+        assert!(s.auto_switch.is_empty());
+        assert_eq!(s.theme.as_deref(), Some("nord"));
+        // A Phase 2 store gets the Phase 3 defaults.
+        let p2 = from_stored(obj(json!({"schemaVersion": 1, "notificationSound": false})));
+        assert_eq!(p2.pomodoro, PomodoroSettings::default());
+        assert_eq!(p2.companion, CompanionSettings::default());
     }
 
     #[test]
