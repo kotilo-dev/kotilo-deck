@@ -474,14 +474,12 @@ pub fn spawn_scheduler(app: AppHandle) {
                 tracing::warn!("cannot read next reminder: {e}");
                 Some(now + MAX_SLEEP.as_millis() as i64)
             });
-            match sleep_for(next, now_ms()) {
-                Some(d) => {
-                    tokio::select! {
-                        _ = tokio::time::sleep(d) => {}
-                        _ = todos.wake.notified() => {}
-                    }
-                }
-                None => todos.wake.notified().await,
+            // No pending reminder still re-checks every MAX_SLEEP: rows can appear without a
+            // wake (import, another process, clock change); one indexed query a minute is free.
+            let d = sleep_for(next, now_ms()).unwrap_or(MAX_SLEEP);
+            tokio::select! {
+                _ = tokio::time::sleep(d) => {}
+                _ = todos.wake.notified() => {}
             }
         }
     });

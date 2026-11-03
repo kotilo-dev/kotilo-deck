@@ -37,6 +37,8 @@ impl Platform for WindowsPlatform {
             Capability::Transparency,
             Capability::Audio,
             Capability::Media,
+            // tauri-plugin-notification (todo reminders).
+            Capability::Notifications,
         ]
     }
 

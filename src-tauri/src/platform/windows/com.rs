@@ -114,6 +114,11 @@ impl Worker {
         match rrx.recv_timeout(JOB_TIMEOUT) {
             Ok(r) => r,
             Err(mpsc::RecvTimeoutError::Timeout) => {
+                // The job is stuck inside an OS call (e.g. a hung media app). Abandon this worker
+                // so later calls get a fresh thread instead of queueing behind it forever; the
+                // stuck thread exits on its own once the call returns and its channel is closed.
+                *self.tx.lock().unwrap_or_else(|p| p.into_inner()) = None;
+                tracing::warn!(worker = self.name, "COM call timed out; respawning worker");
                 Err(PlatformError::Os(format!("{} call timed out", self.name)))
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
