@@ -41,6 +41,8 @@ pub fn run() {
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Started {
                 webview.state::<widgets::system::Sampler>().reset();
+                webview.state::<widgets::audio::AudioHub>().reset();
+                webview.state::<widgets::media::MediaHub>().reset();
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -59,6 +61,20 @@ pub fn run() {
             widgets::system::system_top_processes,
             widgets::weather::weather_geocode,
             widgets::weather::weather_get,
+            widgets::audio::audio_state,
+            widgets::audio::audio_set_volume,
+            widgets::audio::audio_set_muted,
+            widgets::audio::audio_set_default_device,
+            widgets::audio::audio_sessions,
+            widgets::audio::audio_set_session_volume,
+            widgets::audio::audio_set_session_muted,
+            widgets::audio::audio_subscribe,
+            widgets::audio::audio_unsubscribe,
+            widgets::media::media_state,
+            widgets::media::media_control,
+            widgets::media::media_seek,
+            widgets::media::media_subscribe,
+            widgets::media::media_unsubscribe,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {

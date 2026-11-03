@@ -12,6 +12,8 @@ pub fn manage(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry>
         .manage(window::Placement::default())
         .manage(tray::TrayState::default())
         .manage(widgets::system::Sampler::default())
+        .manage(widgets::audio::AudioHub::default())
+        .manage(widgets::media::MediaHub::default())
         .manage(widgets::weather::Weather::new(paths::weather_cache_dir()))
 }
 
