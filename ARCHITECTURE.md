@@ -57,8 +57,10 @@ pub fn current() -> &'static dyn Platform;              // cfg-selected impl
   - `monitor_list() / monitor_select(name)`, `tray_set_workspaces(items, active)`
   - `system_info() / system_subscribe() / system_unsubscribe() / system_top_processes()` — sampler runs only while subscribed
   - `weather_geocode(query) / weather_get(latitude, longitude, unit)` — Open-Meteo, 15 min cache, stale fallback
+  - Phase 2: `settings_open / settings_export_all / settings_import_all`, `wallpaper_list / wallpaper_import`, `theme_user_list`, `file_save_as / file_open_text`, `audio_*`, `media_*`, `todo_*` (todos live in a backend-owned SQLite so reminders fire while the UI is hidden)
 - Backend → frontend: Tauri events named `<area>://<event>` for pushed data, so the UI never polls:
-  `system://sample`, `workspace://cycle`, `workspace://switch`, `monitor://changed`.
+  `system://sample`, `workspace://cycle`, `workspace://switch`, `monitor://changed`; Phase 2: `settings://changed`, `deck://visibility`, `audio://state`, `media://state`, `todo://changed`, `todo://reminder`, `theme://user-changed`, `workspace://changed`.
+- Windows: `deck` (fullscreen/overlay) and `settings` (960×680 normal window, route `/settings`), same SPA.
 - Widgets: `src/widgets/index.ts` globs every `<id>/manifest.json` + `Widget.svelte` (+ optional `settings.ts`, `Settings.svelte`); contract types in `src/widgets/types.ts`.
 - Companion (Phase 3): `protocol.md`.
 

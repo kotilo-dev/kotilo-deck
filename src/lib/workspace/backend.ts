@@ -23,7 +23,18 @@ export const DEFAULT_SETTINGS: DeckSettings = {
 	monitor: null,
 	activeWorkspace: {},
 	alwaysOnTop: false,
-	hotkey: 'Ctrl+Alt+K'
+	hotkey: 'Ctrl+Alt+K',
+	autostart: false,
+	displayMode: 'fullscreen',
+	appearance: { background: 'solid', wallpaper: null, surfaceOpacity: null, blur: 0, windowOpacity: 1 },
+	burnIn: {
+		shiftMinutes: 10,
+		night: { enabled: false, from: '22:00', to: '07:00', dim: 0.5 },
+		idle: { enabled: false, minutes: 15, dim: 0.4, clockFace: true }
+	},
+	themeAuto: { mode: 'off', lightFrom: '07:00', darkFrom: '19:00' },
+	temperatureUnit: 'c',
+	notificationSound: true
 };
 
 /** Monitor key used for `settings.activeWorkspace` outside Tauri. */

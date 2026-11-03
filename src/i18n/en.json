@@ -207,6 +207,10 @@
 			"procMem": "RAM",
 			"noProcesses": "No process data",
 			"processesFailed": "Couldn't read processes"
-		}
-	}
+		},
+		"volume": {},
+		"media": {},
+		"todo": {}
+	},
+	"settings": {}
 }

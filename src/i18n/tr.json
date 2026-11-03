@@ -207,6 +207,10 @@
 			"procMem": "RAM",
 			"noProcesses": "İşlem verisi yok",
 			"processesFailed": "İşlemler okunamadı"
-		}
-	}
+		},
+		"volume": {},
+		"media": {},
+		"todo": {}
+	},
+	"settings": {}
 }
