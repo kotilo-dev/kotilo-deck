@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- Volume widget (2×1, 2×2): master slider, mute, output device switcher, per-app mixer (Windows Core Audio).
+- Media widget (4×1, 4×2): artwork, title/artist/source, progress with seek, prev/play-pause/next, shuffle/repeat (Windows media transport controls; works with Spotify and browsers).
+- Todo widget (2×2, 4×2, 4×4): add/complete/reorder/delete, due dates, English + Turkish quick-add parser, reminders as OS notifications that fire while the deck is hidden, snooze 10 min.
+- Settings window (General, Display & monitor, Appearance, Themes, Workspaces, Weather, Burn-in & night, About) with import/export of all settings.
+- Appearance layers: solid / wallpaper (image or video) / transparent background, surface opacity per instance/workspace/global, backdrop blur, overlay mode with window opacity.
+- Burn-in protection: pixel shift, night schedule and idle dim, screensaver clock face.
+- 26 more bundled themes (31 total), light/dark auto switch (OS or schedule), user themes from `~/.kotilo/themes/` with hot reload.
+- Undo for widget removal; gesture opt-out for sliders, sheets and menus.
 - Phase 0 bootstrap: Tauri 2 + SvelteKit 3 + Tailwind 4 scaffold with an empty themed deck window.
 - Theme loader with the shared Kotilo token contract and Catppuccin Mocha/Latte.
 - `Platform` trait with Windows, Linux and stub implementations.
@@ -21,3 +29,6 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Backend: borderless fullscreen on the chosen monitor (remembered by name, re-attaches on reconnect), tray menu (show/hide, workspaces, monitor, quit), global hotkeys (Ctrl+Alt+K toggle, Ctrl+Alt+←/→ workspace), single instance, settings store, workspace files under `~/.kotilo/deck/workspaces/` with atomic saves and `schemaVersion` migrations, `tracing` logs with daily rotation and `--verbose`.
 - System sampler (1 Hz, runs only while subscribed and the deck is visible) with Windows GPU utilisation via PDH; Open-Meteo weather and geocoding with a 15 min memory + disk cache and stale fallback.
 - Themes: Dracula, Nord, Tokyo Night; per-workspace theme override; contrast test (text and text-muted ≥ 4.5:1 on surface and bg) for every bundled theme.
+
+### Changed
+- GPU is sampled every 3 s; deck widgets and timers pause while the deck is hidden; logs keep 14 days.
