@@ -1,0 +1,16 @@
+{
+	"id": "weather",
+	"name": "Weather",
+	"icon": "cloud",
+	"sizes": ["2x1", "2x2", "4x2"],
+	"defaultSize": "2x2",
+	"capabilities": [],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"unit": { "type": "string", "title": "Unit", "enum": ["c", "f"], "default": "c" },
+			"location": { "type": "object", "title": "Location" }
+		}
+	}
+}
