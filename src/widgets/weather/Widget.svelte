@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { locale, t } from '#lib/i18n/index.ts';
 	import { isTauri, weatherGet, type WeatherReport } from '#lib/ipc/index.ts';
-	import { minutesSince, subscribeTick } from '#lib/time/index.ts';
+	import { isDeckVisible, minutesSince, onDeckVisibility, subscribeTick } from '#lib/time/index.ts';
 	import type { WidgetProps } from '../types';
 	import {
 		agoKey,
@@ -37,13 +37,46 @@
 	/** Bumped whenever the location/unit changes or the widget unmounts; late responses are dropped. */
 	let generation = 0;
 
+	/** Next refresh (wall-clock ms) and what it runs; the timer is only armed while the deck is visible. */
+	let dueAt = 0;
+	let pending: (() => void) | null = null;
+	let visible = isDeckVisible();
+
 	function clearTimer() {
 		if (timer !== null) clearTimeout(timer);
 		timer = null;
 	}
 
+	function arm() {
+		clearTimer();
+		if (!pending || !visible) return;
+		// Overdue after being hidden → refresh right away.
+		timer = setTimeout(() => {
+			const run = pending;
+			pending = null;
+			timer = null;
+			run?.();
+		}, Math.max(0, dueAt - Date.now()));
+	}
+
+	function scheduleNext(delay: number, run: () => void) {
+		dueAt = Date.now() + delay;
+		pending = run;
+		arm();
+	}
+
+	// Hidden deck: no refresh timer (idle budget). On show, refresh if the 15 min (or backoff) are up.
+	$effect(() =>
+		onDeckVisibility((v) => {
+			visible = v;
+			if (v) arm();
+			else clearTimer();
+		})
+	);
+
 	async function load(lat: number, lon: number, u: 'c' | 'f', gen: number) {
 		clearTimer();
+		pending = null;
 		loading = true;
 		let next = REFRESH_MS;
 		try {
@@ -62,7 +95,7 @@
 		} finally {
 			if (gen === generation) loading = false;
 		}
-		if (gen === generation) timer = setTimeout(() => load(lat, lon, u, gen), next);
+		if (gen === generation) scheduleNext(next, () => load(lat, lon, u, gen));
 	}
 
 	$effect(() => {
@@ -76,6 +109,7 @@
 		if (tauri && la !== null && lo !== null) load(la, lo, u, gen);
 		return () => {
 			generation++;
+			pending = null;
 			clearTimer();
 		};
 	});

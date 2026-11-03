@@ -9,6 +9,7 @@
 		type SystemInfo,
 		type SystemSample
 	} from '#lib/ipc/index.ts';
+	import { isDeckVisible, onDeckVisibility } from '#lib/time/index.ts';
 	import type { WidgetProps } from '../types';
 	import { gb, gbTotal, initialWarn, percent, pushHistory, sparklinePoints, stepWarn, type WarnState } from './logic';
 	import ProcessSheet from './ProcessSheet.svelte';
@@ -39,12 +40,9 @@
 	}
 
 	// Deck hidden to tray / minimised → drop the subscription so the backend sampler stops (idle budget).
-	let visible = $state(typeof document === 'undefined' || !document.hidden);
-	$effect(() => {
-		const onVis = () => (visible = !document.hidden);
-		document.addEventListener('visibilitychange', onVis);
-		return () => document.removeEventListener('visibilitychange', onVis);
-	});
+	// `deck://visibility` is the primary signal (WebView2 may not flip document.hidden), document.hidden secondary.
+	let visible = $state(isDeckVisible());
+	$effect(() => onDeckVisibility((v) => (visible = v)));
 
 	// Backend samples only while subscribed (ref-counted): pair every subscribe with an unsubscribe.
 	$effect(() => {
