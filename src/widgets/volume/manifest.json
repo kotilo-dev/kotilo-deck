@@ -1,0 +1,16 @@
+{
+	"id": "volume",
+	"name": "Volume",
+	"icon": "volume",
+	"sizes": ["2x1", "2x2"],
+	"defaultSize": "2x1",
+	"capabilities": ["audio"],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"devicePicker": { "type": "boolean", "title": "Show output device picker", "default": true },
+			"mixer": { "type": "boolean", "title": "Show app mixer button", "default": true }
+		}
+	}
+}
