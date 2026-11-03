@@ -1,0 +1,15 @@
+{
+	"id": "date",
+	"name": "Date",
+	"icon": "calendar",
+	"sizes": ["2x1"],
+	"defaultSize": "2x1",
+	"capabilities": [],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"dayOfYear": { "type": "boolean", "title": "Show day of year", "default": false }
+		}
+	}
+}
