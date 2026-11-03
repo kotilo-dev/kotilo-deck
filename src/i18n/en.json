@@ -1,10 +1,212 @@
 {
-	"shell": {},
+	"shell": {
+		"appName": "Kotilo Deck",
+		"topbar": {
+			"workspaces": "Workspaces",
+			"edit": "Edit layout",
+			"companionOff": "Kotilo desktop not running",
+			"companionOn": "Kotilo desktop connected",
+			"themeChip": "Theme: {name}"
+		},
+		"theme": {
+			"title": "Theme",
+			"scopeGlobal": "All workspaces",
+			"scopeWorkspace": "Only {name}",
+			"useGlobal": "Use the global theme",
+			"dark": "dark",
+			"light": "light"
+		},
+		"grid": {
+			"label": "Widget grid, {name}",
+			"swipeHint": "Swipe left or right to switch workspace",
+			"empty": "This workspace is empty."
+		},
+		"edit": {
+			"editing": "Editing",
+			"hint": "Long-press to move · drag the corner to cycle sizes · drop on the bottom edge to remove",
+			"hintKeys": "Arrow keys move the focused widget · S cycles its size · Delete removes it",
+			"addWidget": "Add widget",
+			"done": "Done",
+			"density": "Grid density {cols} × {rows}, tap to change",
+			"trash": "Drop here to remove",
+			"settings": "{name} settings",
+			"resize": "Change size of {name}",
+			"noOtherSize": "no other size fits",
+			"noRoomMove": "No room to move {name} there",
+			"noRoomSize": "No other size of {name} fits here",
+			"removed": "{name} removed",
+			"unplaced": "{count} widgets don't fit this grid: {names}",
+			"widgetLabel": "{name} widget, {size}",
+			"unplacedOne": "1 widget doesn't fit this grid: {names}"
+		},
+		"drawer": {
+			"title": "Add widget",
+			"close": "Close",
+			"help": "Tap a size to place. The same widget can be placed more than once.",
+			"companion": "companion",
+			"noRoom": "No free space for {name} {size}. Remove a widget or raise the grid density.",
+			"placed": "{name} {size} added",
+			"single": "Already on this workspace",
+			"empty": "No widgets installed."
+		},
+		"sheet": {
+			"appearance": "Appearance",
+			"opacity": "Surface opacity",
+			"opacityDefault": "Workspace default",
+			"reset": "Use default",
+			"remove": "Remove widget",
+			"close": "Close",
+			"noSettings": "This widget has no settings."
+		},
+		"workspace": {
+			"menu": "Workspace actions",
+			"new": "New workspace",
+			"rename": "Rename",
+			"duplicate": "Duplicate",
+			"delete": "Delete",
+			"reset": "Reset to preset",
+			"import": "Import JSON…",
+			"export": "Export JSON",
+			"untitled": "Untitled",
+			"copyName": "{name} copy",
+			"nameLabel": "Name",
+			"create": "Create",
+			"save": "Save",
+			"cancel": "Cancel",
+			"deleteTitle": "Delete {name}?",
+			"deleteBody": "Its layout and widget settings are removed. This can't be undone.",
+			"deleteLast": "The last workspace can't be deleted.",
+			"resetTitle": "Reset {name} to a preset",
+			"resetBody": "Replaces its widgets, grid and theme. The name stays.",
+			"imported": "Imported {name}",
+			"exported": "Exported {file}"
+		},
+		"widget": {
+			"unknown": "Unknown widget",
+			"unknownBody": "“{id}” isn't installed. Its settings are kept.",
+			"error": "This widget stopped working",
+			"retry": "Retry"
+		},
+		"presets": {
+			"focus": "Focus",
+			"ops": "Ops",
+			"agents": "Agents",
+			"full": "Full"
+		},
+		"errors": {
+			"notObject": "The file doesn't contain a workspace object.",
+			"version": "Unsupported schema version {version}.",
+			"name": "A workspace needs a name.",
+			"theme": "\"theme\" must be a string or null.",
+			"grid": "\"grid\" needs whole-number cols and rows between 1 and {max}.",
+			"appearance": "\"appearance\" must be an object.",
+			"widgets": "\"widgets\" must be a list.",
+			"badWidget": "Widget {index} is invalid ({field}).",
+			"json": "The file isn't valid JSON.",
+			"notFound": "Workspace not found.",
+			"storage": "Couldn't save: {message}"
+		}
+	},
 	"widgets": {
-		"common": {},
-		"clock": {},
-		"date": {},
-		"weather": {},
-		"system": {}
+		"common": {
+			"notAvailable": "Not available on this OS",
+			"browserPreview": "Not available in browser preview",
+			"retry": "Retry",
+			"close": "Close",
+			"loading": "Loading…",
+			"week": "Week {week}",
+			"weekShort": "W{week}",
+			"day": "Day {day}"
+		},
+		"clock": {
+			"title": "Clock",
+			"analogLabel": "Analog clock showing {time}",
+			"zonesLabel": "Other time zones",
+			"settings": {
+				"primary": "Main time zone",
+				"local": "System time zone ({zone})",
+				"useLocal": "Use system time zone",
+				"extra": "Extra time zones",
+				"extraHint": "Up to {max} shown on the 4×2 clock.",
+				"add": "Add time zone",
+				"remove": "Remove {name}",
+				"label": "Label for {zone}",
+				"search": "Search time zones",
+				"noResults": "No matching time zones",
+				"change": "Change",
+				"cancel": "Cancel"
+			}
+		},
+		"date": {
+			"title": "Date"
+		},
+		"weather": {
+			"title": "Weather",
+			"justNow": "just now",
+			"minAgo": "{n} min ago",
+			"hoursAgo": "{n} h ago",
+			"stale": "stale",
+			"lastUpdate": "last update {ago}",
+			"high": "H {t}",
+			"low": "L {t}",
+			"hourly": "Next 6 hours",
+			"daily": "Next 3 days",
+			"emptyTitle": "No location yet",
+			"emptyHint": "Set a city in edit mode",
+			"browserPreview": "Weather is not available in browser preview",
+			"error": "Couldn't load weather",
+			"cond": {
+				"clear": "Clear",
+				"mainlyClear": "Mainly clear",
+				"partly": "Partly cloudy",
+				"overcast": "Overcast",
+				"fog": "Fog",
+				"drizzle": "Drizzle",
+				"rain": "Rain",
+				"showers": "Rain showers",
+				"snow": "Snow",
+				"thunder": "Thunderstorm",
+				"unknown": "Unknown"
+			},
+			"settings": {
+				"location": "Location",
+				"current": "Current: {name}",
+				"none": "No location set",
+				"search": "Search city",
+				"searchPlaceholder": "City name…",
+				"searching": "Searching…",
+				"noResults": "No cities found",
+				"searchFailed": "Search failed",
+				"browserPreview": "City search needs the desktop app",
+				"manual": "Manual coordinates",
+				"latitude": "Latitude",
+				"longitude": "Longitude",
+				"name": "Display name",
+				"useCoords": "Use coordinates",
+				"invalidCoords": "Latitude −90…90, longitude −180…180",
+				"clear": "Clear location"
+			}
+		},
+		"system": {
+			"title": "System",
+			"window": "60 s",
+			"over": "{n} samples over {x}%",
+			"cpu": "CPU",
+			"memory": "Memory",
+			"gpu": "GPU",
+			"warn": "warn",
+			"memOf": "{used} of {total} GB",
+			"memSlash": "{used} / {total} GB",
+			"cores": "{n} cores",
+			"tapHint": "tap for processes",
+			"perCore": "Per-core load",
+			"open": "Show top processes",
+			"processes": "Top processes",
+			"procName": "Process",
+			"procCpu": "CPU",
+			"procMem": "RAM",
+			"noProcesses": "No process data",
+			"processesFailed": "Couldn't read processes"
+		}
 	}
 }

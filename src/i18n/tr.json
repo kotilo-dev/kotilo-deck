@@ -1,10 +1,212 @@
 {
-	"shell": {},
+	"shell": {
+		"appName": "Kotilo Deck",
+		"topbar": {
+			"workspaces": "Çalışma alanları",
+			"edit": "Düzeni düzenle",
+			"companionOff": "Kotilo masaüstü çalışmıyor",
+			"companionOn": "Kotilo masaüstü bağlı",
+			"themeChip": "Tema: {name}"
+		},
+		"theme": {
+			"title": "Tema",
+			"scopeGlobal": "Tüm çalışma alanları",
+			"scopeWorkspace": "Yalnızca {name}",
+			"useGlobal": "Genel temayı kullan",
+			"dark": "koyu",
+			"light": "açık"
+		},
+		"grid": {
+			"label": "Bileşen ızgarası, {name}",
+			"swipeHint": "Çalışma alanını değiştirmek için sola veya sağa kaydır",
+			"empty": "Bu çalışma alanı boş."
+		},
+		"edit": {
+			"editing": "Düzenleniyor",
+			"hint": "Taşımak için basılı tut · boyut için köşeyi sürükle · kaldırmak için alt kenara bırak",
+			"hintKeys": "Ok tuşları seçili bileşeni taşır · S boyutunu değiştirir · Delete kaldırır",
+			"addWidget": "Bileşen ekle",
+			"done": "Bitti",
+			"density": "Izgara yoğunluğu {cols} × {rows}, değiştirmek için dokun",
+			"trash": "Kaldırmak için buraya bırak",
+			"settings": "{name} ayarları",
+			"resize": "{name} boyutunu değiştir",
+			"noOtherSize": "başka boyut sığmıyor",
+			"noRoomMove": "{name} oraya taşınamıyor: yer yok",
+			"noRoomSize": "{name} için burada başka boyut sığmıyor",
+			"removed": "{name} kaldırıldı",
+			"unplaced": "{count} bileşen bu ızgaraya sığmıyor: {names}",
+			"widgetLabel": "{name} bileşeni, {size}",
+			"unplacedOne": "1 bileşen bu ızgaraya sığmıyor: {names}"
+		},
+		"drawer": {
+			"title": "Bileşen ekle",
+			"close": "Kapat",
+			"help": "Yerleştirmek için bir boyuta dokun. Aynı bileşen birden fazla kez eklenebilir.",
+			"companion": "eşlikçi",
+			"noRoom": "{name} {size} için boş yer yok. Bir bileşeni kaldır ya da ızgara yoğunluğunu artır.",
+			"placed": "{name} {size} eklendi",
+			"single": "Bu çalışma alanında zaten var",
+			"empty": "Yüklü bileşen yok."
+		},
+		"sheet": {
+			"appearance": "Görünüm",
+			"opacity": "Yüzey opaklığı",
+			"opacityDefault": "Çalışma alanı varsayılanı",
+			"reset": "Varsayılanı kullan",
+			"remove": "Bileşeni kaldır",
+			"close": "Kapat",
+			"noSettings": "Bu bileşenin ayarı yok."
+		},
+		"workspace": {
+			"menu": "Çalışma alanı işlemleri",
+			"new": "Yeni çalışma alanı",
+			"rename": "Yeniden adlandır",
+			"duplicate": "Çoğalt",
+			"delete": "Sil",
+			"reset": "Hazır düzene sıfırla",
+			"import": "JSON içe aktar…",
+			"export": "JSON dışa aktar",
+			"untitled": "Adsız",
+			"copyName": "{name} kopyası",
+			"nameLabel": "Ad",
+			"create": "Oluştur",
+			"save": "Kaydet",
+			"cancel": "Vazgeç",
+			"deleteTitle": "{name} silinsin mi?",
+			"deleteBody": "Düzeni ve bileşen ayarları kaldırılır. Bu işlem geri alınamaz.",
+			"deleteLast": "Son çalışma alanı silinemez.",
+			"resetTitle": "{name} hazır bir düzene sıfırlansın",
+			"resetBody": "Bileşenleri, ızgarası ve teması değiştirilir. Adı aynı kalır.",
+			"imported": "{name} içe aktarıldı",
+			"exported": "{file} dışa aktarıldı"
+		},
+		"widget": {
+			"unknown": "Bilinmeyen bileşen",
+			"unknownBody": "“{id}” yüklü değil. Ayarları korunuyor.",
+			"error": "Bu bileşen çalışmayı durdurdu",
+			"retry": "Yeniden dene"
+		},
+		"presets": {
+			"focus": "Odak",
+			"ops": "Operasyon",
+			"agents": "Ajanlar",
+			"full": "Tam"
+		},
+		"errors": {
+			"notObject": "Dosya bir çalışma alanı nesnesi içermiyor.",
+			"version": "Desteklenmeyen şema sürümü: {version}.",
+			"name": "Çalışma alanının bir adı olmalı.",
+			"theme": "\"theme\" bir metin ya da null olmalı.",
+			"grid": "\"grid\", 1 ile {max} arasında tam sayı cols ve rows içermeli.",
+			"appearance": "\"appearance\" bir nesne olmalı.",
+			"widgets": "\"widgets\" bir liste olmalı.",
+			"badWidget": "{index}. bileşen geçersiz ({field}).",
+			"json": "Dosya geçerli bir JSON değil.",
+			"notFound": "Çalışma alanı bulunamadı.",
+			"storage": "Kaydedilemedi: {message}"
+		}
+	},
 	"widgets": {
-		"common": {},
-		"clock": {},
-		"date": {},
-		"weather": {},
-		"system": {}
+		"common": {
+			"notAvailable": "Bu işletim sisteminde kullanılamıyor",
+			"browserPreview": "Tarayıcı önizlemesinde kullanılamıyor",
+			"retry": "Yeniden dene",
+			"close": "Kapat",
+			"loading": "Yükleniyor…",
+			"week": "{week}. hafta",
+			"weekShort": "H{week}",
+			"day": "{day}. gün"
+		},
+		"clock": {
+			"title": "Saat",
+			"analogLabel": "Analog saat: {time}",
+			"zonesLabel": "Diğer saat dilimleri",
+			"settings": {
+				"primary": "Ana saat dilimi",
+				"local": "Sistem saat dilimi ({zone})",
+				"useLocal": "Sistem saat dilimini kullan",
+				"extra": "Ek saat dilimleri",
+				"extraHint": "4×2 saatte en fazla {max} tane gösterilir.",
+				"add": "Saat dilimi ekle",
+				"remove": "{name} kaldır",
+				"label": "{zone} için etiket",
+				"search": "Saat dilimi ara",
+				"noResults": "Eşleşen saat dilimi yok",
+				"change": "Değiştir",
+				"cancel": "Vazgeç"
+			}
+		},
+		"date": {
+			"title": "Tarih"
+		},
+		"weather": {
+			"title": "Hava durumu",
+			"justNow": "az önce",
+			"minAgo": "{n} dk önce",
+			"hoursAgo": "{n} sa önce",
+			"stale": "eski",
+			"lastUpdate": "son güncelleme {ago}",
+			"high": "Y {t}",
+			"low": "D {t}",
+			"hourly": "Sonraki 6 saat",
+			"daily": "Sonraki 3 gün",
+			"emptyTitle": "Henüz konum yok",
+			"emptyHint": "Düzenleme modunda bir şehir seçin",
+			"browserPreview": "Hava durumu tarayıcı önizlemesinde kullanılamıyor",
+			"error": "Hava durumu yüklenemedi",
+			"cond": {
+				"clear": "Açık",
+				"mainlyClear": "Çoğunlukla açık",
+				"partly": "Parçalı bulutlu",
+				"overcast": "Kapalı",
+				"fog": "Sis",
+				"drizzle": "Çisenti",
+				"rain": "Yağmur",
+				"showers": "Sağanak",
+				"snow": "Kar",
+				"thunder": "Gök gürültülü fırtına",
+				"unknown": "Bilinmiyor"
+			},
+			"settings": {
+				"location": "Konum",
+				"current": "Seçili: {name}",
+				"none": "Konum seçilmedi",
+				"search": "Şehir ara",
+				"searchPlaceholder": "Şehir adı…",
+				"searching": "Aranıyor…",
+				"noResults": "Şehir bulunamadı",
+				"searchFailed": "Arama başarısız",
+				"browserPreview": "Şehir araması masaüstü uygulamasını gerektirir",
+				"manual": "Elle koordinat",
+				"latitude": "Enlem",
+				"longitude": "Boylam",
+				"name": "Görünen ad",
+				"useCoords": "Koordinatları kullan",
+				"invalidCoords": "Enlem −90…90, boylam −180…180",
+				"clear": "Konumu temizle"
+			}
+		},
+		"system": {
+			"title": "Sistem",
+			"window": "60 sn",
+			"over": "{n} örnek %{x} üzerinde",
+			"cpu": "CPU",
+			"memory": "Bellek",
+			"gpu": "GPU",
+			"warn": "uyarı",
+			"memOf": "{used} / {total} GB",
+			"memSlash": "{used} / {total} GB",
+			"cores": "{n} çekirdek",
+			"tapHint": "işlemler için dokunun",
+			"perCore": "Çekirdek başına yük",
+			"open": "En çok kaynak kullanan işlemleri göster",
+			"processes": "En yoğun işlemler",
+			"procName": "İşlem",
+			"procCpu": "CPU",
+			"procMem": "RAM",
+			"noProcesses": "İşlem verisi yok",
+			"processesFailed": "İşlemler okunamadı"
+		}
 	}
 }

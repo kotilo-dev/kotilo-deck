@@ -47,9 +47,230 @@ body {
 	outline-offset: 2px;
 }
 
+/* ── Shell primitives (DESIGN §4, §6, §8). Colours only via --k-*. ───────────── */
+
+button,
+input,
+select {
+	font: inherit;
+	color: inherit;
+}
+button {
+	cursor: pointer;
+}
+button:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+.k-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.k-mono {
+	font-family: var(--k-font-mono);
+}
+
+/* Buttons: 44 px tall touch targets; 12 px radius; label 13/600. */
+.k-btn {
+	box-sizing: border-box;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0 16px;
+	border-radius: 12px;
+	border: 1px solid var(--k-border);
+	background: transparent;
+	color: var(--k-text);
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	transition:
+		background-color 150ms ease,
+		border-color 150ms ease;
+}
+.k-btn:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--k-text) 6%, transparent);
+}
+.k-btn-primary {
+	background: var(--k-accent);
+	border-color: var(--k-accent);
+	color: var(--k-on-accent);
+}
+.k-btn-primary:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--k-accent) 88%, var(--k-text));
+}
+.k-btn-danger {
+	border-color: var(--k-danger);
+	color: var(--k-danger);
+}
+.k-btn-danger.k-btn-filled {
+	background: var(--k-danger);
+	color: var(--k-on-accent);
+}
+.k-btn-icon {
+	width: 44px;
+	padding: 0;
+	color: var(--k-text-muted);
+}
+
+/* Inputs */
+.k-input,
+.k-select {
+	box-sizing: border-box;
+	min-height: 44px;
+	width: 100%;
+	padding: 0 12px;
+	border-radius: 10px;
+	border: 1px solid var(--k-border);
+	background: var(--k-bg-alt);
+	color: var(--k-text);
+	font-size: 13px;
+}
+.k-range {
+	width: 100%;
+	height: 28px;
+	accent-color: var(--k-accent);
+}
+.k-check {
+	width: 18px;
+	height: 18px;
+	accent-color: var(--k-accent);
+}
+
+/* Menus and popovers (top layer via the popover attribute). */
+.k-popover {
+	position: fixed;
+	inset: auto;
+	margin: 0;
+	box-sizing: border-box;
+	padding: 8px;
+	border-radius: 14px;
+	border: 1px solid var(--k-border);
+	background: var(--k-bg-alt);
+	color: var(--k-text);
+	box-shadow: 0 16px 40px color-mix(in srgb, var(--k-bg) 60%, transparent);
+}
+.k-menu-item {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	min-height: 44px;
+	padding: 0 12px;
+	border: 0;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--k-text);
+	font-size: 13px;
+	text-align: left;
+}
+.k-menu-item:hover:not(:disabled) {
+	background: var(--k-surface);
+}
+.k-menu-item[data-tone='danger'] {
+	color: var(--k-danger);
+}
+.k-menu-sep {
+	height: 1px;
+	margin: 6px 4px;
+	background: var(--k-border);
+}
+
+/* Modal dialogs and sheets. */
+.k-dialog {
+	box-sizing: border-box;
+	padding: 0;
+	border: 1px solid var(--k-border);
+	border-radius: 16px;
+	background: var(--k-bg-alt);
+	color: var(--k-text);
+	max-width: min(440px, calc(100vw - 32px));
+	width: 100%;
+}
+.k-dialog::backdrop {
+	background: color-mix(in srgb, var(--k-bg) 65%, transparent);
+}
+.k-dialog-body {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 20px;
+}
+.k-dialog-title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 600;
+}
+.k-dialog-text {
+	margin: 0;
+	font-size: 13px;
+	color: var(--k-text-muted);
+}
+.k-dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+}
+.k-label {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--k-text-muted);
+}
+
+/* Edit mode (DESIGN §6). */
+.k-dots {
+	background-image: radial-gradient(circle, var(--k-border) 1.5px, transparent 1.6px);
+	background-size: 24px 24px;
+	background-position: 12px 12px;
+}
+.k-ghost {
+	box-sizing: border-box;
+	border: 2px dashed var(--k-accent);
+	border-radius: var(--k-radius);
+	background: color-mix(in srgb, var(--k-accent) 8%, transparent);
+	pointer-events: none;
+}
+@keyframes k-shake {
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+	16%,
+	50%,
+	83% {
+		transform: translateX(-6px);
+	}
+	33%,
+	66% {
+		transform: translateX(6px);
+	}
+}
+.k-shake {
+	animation: k-shake 300ms ease-in-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	* {
 		transition-duration: 0ms !important;
 		animation-duration: 0ms !important;
+	}
+	/* DESIGN §6: no lift rotation, no shake. */
+	.k-shake {
+		animation: none;
 	}
 }
