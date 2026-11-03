@@ -78,7 +78,7 @@ export interface BurnInSettings {
 }
 
 export const settingsGet = () => invoke<DeckSettings>('settings_get');
-/** Shallow-merges `patch` into the stored settings and returns the result. */
+/** Merges `patch` into the stored settings (nested `appearance`, `burnIn`, `themeAuto` deep-merge; `activeWorkspace` is replaced) and returns the result. */
 export const settingsSet = (patch: Partial<DeckSettings>) => invoke<DeckSettings>('settings_set', { patch });
 /** Shows (creating on first use) the separate 960×680 settings window, label "settings", route `/settings`. */
 export const settingsOpen = () => invoke<void>('settings_open');
@@ -361,6 +361,8 @@ export interface DeckEvents {
 	'theme://user-changed': Record<string, never>;
 	/** Workspace files changed from another window (settings import, rename) → reload. */
 	'workspace://changed': Record<string, never>;
+	/** Tray Quit: windows get ~500 ms to flush pending saves before the process exits. */
+	'deck://quitting': Record<string, never>;
 }
 
 export function on<K extends keyof DeckEvents>(event: K, handler: (payload: DeckEvents[K]) => void): Promise<UnlistenFn> {

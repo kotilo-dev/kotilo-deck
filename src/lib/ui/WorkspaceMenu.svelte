@@ -8,6 +8,7 @@
 	import Icon from './Icon.svelte';
 	import Popover from './Popover.svelte';
 	import { getDeck } from './deck.svelte';
+	import { openTextFile, saveTextFile } from '#lib/settings/files.ts';
 
 	const { store, ui } = getDeck();
 	const ws = $derived(store.active);
@@ -16,7 +17,6 @@
 	let nameDialog = $state<HTMLDialogElement>();
 	let deleteDialog = $state<HTMLDialogElement>();
 	let resetDialog = $state<HTMLDialogElement>();
-	let fileInput = $state<HTMLInputElement>();
 
 	let nameMode = $state<'new' | 'rename'>('new');
 	let nameValue = $state('');
@@ -69,37 +69,28 @@
 		if (ws && !(await store.remove(ws.id))) ui.say(t('shell.workspace.deleteLast'), 'warning');
 	}
 
-	function chooseImport() {
+	async function chooseImport() {
 		close();
-		fileInput?.click();
-	}
-
-	async function onFile(e: Event) {
-		const input = e.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		input.value = '';
-		if (!file) return;
 		try {
-			const imported = store.importJson(await file.text());
+			const text = await openTextFile(['json']);
+			if (text === null) return;
+			const imported = store.importJson(text);
 			ui.say(t('shell.workspace.imported', { name: imported.name }));
 		} catch (err) {
-			ui.say(err instanceof WorkspaceError ? err.message : String(err), 'warning', 7000);
+			ui.say(err instanceof WorkspaceError ? err.message : err instanceof Error ? err.message : String(err), 'warning', 7000);
 		}
 	}
 
-	function exportActive() {
+	/** Native save dialog inside Tauri (`file_save_as`), Blob download in a browser. */
+	async function exportActive() {
 		close();
 		if (!ws) return;
 		const file = `${ws.id}.json`;
-		const url = URL.createObjectURL(new Blob([store.exportJson(ws.id)], { type: 'application/json' }));
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = file;
-		document.body.append(a);
-		a.click();
-		a.remove();
-		setTimeout(() => URL.revokeObjectURL(url), 1000);
-		ui.say(t('shell.workspace.exported', { file }));
+		try {
+			if (await saveTextFile(file, store.exportJson(ws.id))) ui.say(t('shell.workspace.exported', { file }));
+		} catch (err) {
+			ui.say(err instanceof Error ? err.message : String(err), 'warning', 7000);
+		}
 	}
 </script>
 
@@ -145,7 +136,6 @@
 	</div>
 </Popover>
 
-<input bind:this={fileInput} type="file" accept=".json,application/json" class="k-sr-only" tabindex="-1" aria-hidden="true" onchange={onFile} />
 
 <dialog bind:this={nameDialog} class="k-dialog" aria-labelledby="k-ws-name-title">
 	<form class="k-dialog-body" onsubmit={submitName}>

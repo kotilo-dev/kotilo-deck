@@ -3,6 +3,9 @@ import type { Workspace } from '#lib/ipc/index.ts';
 import { layout } from '#lib/grid/index.ts';
 import {
 	BROWSER_MONITOR,
+	DEFAULT_SETTINGS,
+	ECHO_GUARD_MS,
+	normalizeSettings,
 	PRESET_IDS,
 	SAVE_DEBOUNCE_MS,
 	WorkspaceError,
@@ -21,7 +24,10 @@ const SIZES: Record<string, string[]> = {
 	clock: ['2x1', '2x2', '4x2'],
 	date: ['2x1'],
 	weather: ['2x1', '2x2', '4x2'],
-	system: ['2x2', '4x2']
+	system: ['2x2', '4x2'],
+	todo: ['2x2', '4x2', '4x4'],
+	media: ['4x1', '4x2'],
+	volume: ['2x1', '2x2']
 };
 const sizesOf = (id: string) =>
 	SIZES[id]?.map((s) => {
@@ -100,7 +106,7 @@ describe('validation', () => {
 		expect(out.id).toBe('mein-buro');
 		expect(out.extra).toEqual({ keep: true });
 		expect(new Set(out.widgets.map((w) => w.instance)).size).toBe(out.widgets.length);
-		expect(out.widgets).toHaveLength(3);
+		expect(out.widgets).toHaveLength(valid().widgets.length);
 	});
 
 	it('slugifies and de-duplicates ids', () => {
@@ -260,18 +266,18 @@ describe('WorkspaceStore', () => {
 		await store.init();
 		const ws = makePreset('focus');
 		ws.name = 'Imported';
-		ws.widgets.push({ instance: 'todo-1', widget: 'todo', x: 0, y: 2, w: 4, h: 2, settings: { list: 'x' } });
+		ws.widgets.push({ instance: 'pomodoro-1', widget: 'pomodoro', x: 4, y: 2, w: 2, h: 2, settings: { list: 'x' } });
 		store.importJson(JSON.stringify(ws));
-		expect(store.active.widgets.find((w) => w.widget === 'todo')).toMatchObject({ x: 0, y: 2, settings: { list: 'x' } });
+		expect(store.active.widgets.find((w) => w.widget === 'pomodoro')).toMatchObject({ x: 4, y: 2, settings: { list: 'x' } });
 	});
 
 	it('adds widgets in the first free slot and reports a full grid', async () => {
 		const { store } = setup();
 		await store.init();
 		const placed = store.addWidget('clock', { w: 4, h: 2 })!;
-		expect(placed).toMatchObject({ instance: 'clock-2', x: 0, y: 2 });
-		expect(store.addWidget('clock', { w: 4, h: 2 })).toMatchObject({ x: 4, y: 2 });
+		expect(placed).toMatchObject({ instance: 'clock-2', x: 4, y: 2 });
 		expect(store.addWidget('clock', { w: 4, h: 2 })).toBeNull();
+		expect(store.addWidget('date', { w: 2, h: 1 })).toMatchObject({ x: 6, y: 1 });
 	});
 
 	it('density change reflows and lists what does not fit, keeping it', async () => {
@@ -321,6 +327,7 @@ describe('WorkspaceStore', () => {
 		await store.init();
 		store.setTheme('global', 'dracula');
 		expect(store.settings.theme).toBe('dracula');
+		await store.flush();
 		expect(spy.settings).toHaveBeenCalledWith({ theme: 'dracula' });
 		store.setTheme('workspace', 'nord');
 		expect(store.active.theme).toBe('nord');
@@ -336,5 +343,198 @@ describe('WorkspaceStore', () => {
 		expect(store.workspaces.map((w) => w.id)).toEqual(['ops']);
 		expect(spy.del).not.toHaveBeenCalled();
 		expect(JSON.parse(storage.getItem('kotilo-deck:workspaces')!).bad).toEqual({ id: 'bad' });
+	});
+
+	it('serializes saves and deletes per workspace: a slow save never lands after the delete', async () => {
+		const storage = memoryStorage();
+		const backend = storageBackend(storage);
+		const log: string[] = [];
+		let release!: () => void;
+		const gate = new Promise<void>((r) => (release = r));
+		const realSave = backend.saveWorkspace.bind(backend);
+		backend.saveWorkspace = async (ws) => {
+			log.push(`save:${ws.id}:start`);
+			if (ws.id === 'ops') await gate;
+			await realSave(ws);
+			log.push(`save:${ws.id}:end`);
+		};
+		const realDel = backend.deleteWorkspace.bind(backend);
+		backend.deleteWorkspace = async (id) => {
+			log.push(`delete:${id}`);
+			await realDel(id);
+		};
+		const { store } = setup(undefined, backend);
+		await store.init();
+		await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS); // seeding saves start; ops blocks
+		const removed = store.remove('ops');
+		await vi.advanceTimersByTimeAsync(10);
+		expect(log).not.toContain('delete:ops');
+		release();
+		await removed;
+		expect(log.indexOf('save:ops:end')).toBeLessThan(log.indexOf('delete:ops'));
+		expect(Object.keys(JSON.parse(storage.getItem('kotilo-deck:workspaces')!))).not.toContain('ops');
+	});
+
+	it('writes settings in order even when the backend answers at different speeds', async () => {
+		const backend = storageBackend(memoryStorage());
+		const seen: string[] = [];
+		const real = backend.setSettings.bind(backend);
+		let n = 0;
+		backend.setSettings = async (patch) => {
+			const delay = [30, 1, 15][n++ % 3];
+			await new Promise((r) => setTimeout(r, delay));
+			seen.push(patch.activeWorkspace?.[BROWSER_MONITOR] ?? '?');
+			return real(patch);
+		};
+		const { store } = setup(undefined, backend);
+		await store.init();
+		await vi.advanceTimersByTimeAsync(100);
+		await store.flush();
+		seen.length = 0;
+		store.switchTo('ops');
+		store.switchTo('agents');
+		store.switchTo('full');
+		await vi.advanceTimersByTimeAsync(100);
+		await store.flush();
+		expect(seen).toEqual(['ops', 'agents', 'full']);
+		expect(store.activeId).toBe('full');
+		expect((await backend.getSettings()).activeWorkspace[BROWSER_MONITOR]).toBe('full');
+	});
+
+	it('ignores a stale activeWorkspace echo but follows another window afterwards', async () => {
+		const { store } = setup();
+		await store.init();
+		await store.flush();
+		store.switchTo('agents');
+		await store.flush();
+		const echo = { ...store.settings, activeWorkspace: { [BROWSER_MONITOR]: 'ops' } };
+		store.applyRemoteSettings(echo);
+		expect(store.activeId).toBe('agents');
+		await vi.advanceTimersByTimeAsync(ECHO_GUARD_MS + 1);
+		store.applyRemoteSettings({ ...echo, theme: 'nord' });
+		expect(store.activeId).toBe('ops');
+		expect(store.settings.theme).toBe('nord');
+	});
+
+	it('reloads files written by another window, keeping unsaved local edits', async () => {
+		const backend = storageBackend(memoryStorage());
+		const { store } = setup(undefined, backend);
+		await store.init();
+		await store.flush();
+		const other = new WorkspaceStore(backend, { sizesOf, viewport: () => ({ width: 1280, height: 720 }), role: 'settings' });
+		await other.init();
+		other.rename('ops', 'Ops renamed');
+		other.duplicate('full');
+		await other.flush();
+		const focusBefore = store.workspaces.find((w) => w.id === 'focus');
+		store.addWidget('date', { w: 2, h: 1 }); // unsaved edit on the active (focus) workspace
+		await store.reload();
+		expect(store.workspaces.find((w) => w.id === 'ops')!.name).toBe('Ops renamed');
+		expect(store.workspaces).toHaveLength(5);
+		expect(store.workspaces.find((w) => w.id === 'focus')).toBe(focusBefore);
+		expect(store.activeId).toBe('focus');
+	});
+
+	it('reload never resurrects a workspace deleted elsewhere, and the other window wins on a changed file', async () => {
+		const backend = storageBackend(memoryStorage());
+		const { store } = setup(undefined, backend);
+		await store.init();
+		await store.flush();
+		store.switchTo('ops');
+		const other = new WorkspaceStore(backend, { sizesOf, viewport: () => ({ width: 1280, height: 720 }), role: 'settings' });
+		await other.init();
+		await other.remove('agents');
+		other.rename('full', 'Everything');
+		await other.flush();
+		// Unsaved deck edits on both workspaces the settings window touched, plus a brand-new one.
+		store.switchTo('agents');
+		store.addWidget('date', { w: 2, h: 1 });
+		store.switchTo('full');
+		store.setGrid({ cols: 12, rows: 6 });
+		const fresh = store.create('Brand new');
+		await store.reload();
+		await store.flush();
+		const ids = ((await backend.listWorkspaces()) as Workspace[]).map((w) => w.id);
+		expect(ids).not.toContain('agents');
+		expect(store.workspaces.some((w) => w.id === 'agents')).toBe(false);
+		expect(ids).toContain(fresh.id);
+		const full = ((await backend.listWorkspaces()) as Workspace[]).find((w) => w.id === 'full')!;
+		expect(full.name).toBe('Everything');
+		expect(full.grid).toEqual({ cols: 8, rows: 4 });
+	});
+
+	it('settings role: no switching, no tray, no seeding writes, no viewport reflow', async () => {
+		const backend = storageBackend(memoryStorage());
+		const tray = vi.spyOn(backend, 'setTray');
+		const save = vi.spyOn(backend, 'saveWorkspace');
+		const store = new WorkspaceStore(backend, { sizesOf, viewport: () => ({ width: 600, height: 1024 }), role: 'settings' });
+		await store.init();
+		await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+		expect(save).not.toHaveBeenCalled();
+		expect(store.active.grid).toEqual({ cols: 8, rows: 4 });
+		store.duplicate('ops');
+		expect(store.activeId).toBe('focus');
+		store.setDefaultFor('DISPLAY2', 'ops');
+		await store.flush();
+		expect((await backend.getSettings()).activeWorkspace.DISPLAY2).toBe('ops');
+		expect(tray).not.toHaveBeenCalled();
+	});
+
+	it('undo restores a removed widget in place, or in the first free slot', async () => {
+		const { store } = setup();
+		await store.init();
+		const before = JSON.parse(JSON.stringify(store.active.widgets)) as Workspace['widgets'];
+		const removed = store.removeWidget('clock-1')!;
+		expect(removed.widget.instance).toBe('clock-1');
+		expect(store.restoreWidget(removed.workspace, removed.widget)).toBe(true);
+		expect(store.active.widgets.find((w) => w.instance === 'clock-1')).toMatchObject(before.find((w) => w.instance === 'clock-1')!);
+		const again = store.removeWidget('clock-1')!;
+		const added = store.addWidget('clock', { w: 4, h: 2 })!; // takes the old cells and the old id
+		expect([added.instance, added.x, added.y]).toEqual(['clock-1', 0, 0]);
+		expect(store.restoreWidget(again.workspace, again.widget)).toBe(true);
+		const restored = store.active.widgets.at(-1)!;
+		expect(restored.instance).not.toBe('clock-1');
+		expect([restored.x, restored.y]).not.toEqual([0, 0]);
+		expect(layout(store.active.widgets, store.active.grid).unplaced).toEqual([]);
+		expect(store.removeWidget('nope')).toBeNull();
+	});
+
+	it('updateSettings rejects with the backend error and re-syncs', async () => {
+		const backend = storageBackend(memoryStorage());
+		const real = backend.setSettings.bind(backend);
+		backend.setSettings = async (patch) => {
+			if (patch.hotkey === 'Ctrl+Alt+X') throw new Error('hotkey taken');
+			return real(patch);
+		};
+		const { store } = setup(undefined, backend);
+		await store.init();
+		await expect(store.updateSettings({ hotkey: 'Ctrl+Alt+X' })).rejects.toThrow('hotkey taken');
+		expect(store.settings.hotkey).toBe(DEFAULT_SETTINGS.hotkey);
+		await store.updateSettings({ hotkey: 'Ctrl+Alt+J' });
+		expect(store.settings.hotkey).toBe('Ctrl+Alt+J');
+	});
+});
+
+describe('settings normalization and browser backup', () => {
+	it('fills partial Phase 2 groups', () => {
+		const s = normalizeSettings({ theme: 'nord', burnIn: { night: { enabled: true } }, appearance: { blur: 8 } });
+		expect(s.theme).toBe('nord');
+		expect(s.burnIn.night).toEqual({ ...DEFAULT_SETTINGS.burnIn.night, enabled: true });
+		expect(s.burnIn.idle).toEqual(DEFAULT_SETTINGS.burnIn.idle);
+		expect(s.appearance).toEqual({ ...DEFAULT_SETTINGS.appearance, blur: 8 });
+		expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
+	});
+
+	it('exports and imports everything in a browser', async () => {
+		const a = storageBackend(memoryStorage());
+		await a.setSettings({ theme: 'dracula' });
+		await a.saveWorkspace(makePreset('ops'));
+		const json = await a.exportAll();
+		const b = storageBackend(memoryStorage());
+		await b.importAll(json);
+		expect((await b.getSettings()).theme).toBe('dracula');
+		expect(((await b.listWorkspaces()) as Workspace[]).map((w) => w.id)).toEqual(['ops']);
+		await expect(b.importAll('{"kind":"other"}')).rejects.toThrow();
+		await expect(b.importAll('{nope')).rejects.toThrow();
 	});
 });

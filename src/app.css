@@ -10,6 +10,16 @@
 /* Theme values are injected at runtime by src/lib/theme (applyTheme). */
 :root {
 	--k-dim: 1;
+	/* Backdrop blur behind cards (SPEC §5.3); `none` unless a blur > 0 is configured. */
+	--k-backdrop: none;
+	/* What the deck fades toward under night/idle dim (not a theme colour: dim means darker in every theme). */
+	--k-dim-base: #000;
+}
+
+/* Transparent background layer (overlay mode): the desktop shows through. */
+html[data-bg='transparent'],
+html[data-bg='transparent'] body {
+	background: transparent;
 }
 
 html,
@@ -17,7 +27,8 @@ body {
 	margin: 0;
 	height: 100%;
 	overflow: hidden;
-	background: var(--k-bg);
+	/* Fallback = Mocha bg so the transparent deck window never flashes before the theme vars load. */
+	background: var(--k-bg, #1e1e2e);
 	color: var(--k-text);
 	font-family: var(--k-font-ui);
 }
@@ -34,6 +45,9 @@ body {
 	border: 1px solid var(--k-border);
 	border-radius: var(--k-radius);
 	color: var(--k-text);
+	backdrop-filter: var(--k-backdrop);
+	-webkit-backdrop-filter: var(--k-backdrop);
+	/* Opacity / surface changes animate over 200 ms (DESIGN §8). */
 	transition:
 		background-color 200ms ease,
 		border-color 200ms ease;
@@ -273,4 +287,42 @@ button:disabled {
 	.k-shake {
 		animation: none;
 	}
+}
+
+/* Switch (DESIGN §7): 44×26 track, accent + on-accent knob when on; 44 px tall hit area. */
+.k-switch {
+	position: relative;
+	flex: none;
+	box-sizing: border-box;
+	width: 44px;
+	height: 26px;
+	padding: 0;
+	border-radius: 13px;
+	border: 1px solid var(--k-border);
+	background: var(--k-bg-alt);
+	transition: background-color 150ms ease;
+}
+.k-switch::before {
+	content: '';
+	position: absolute;
+	inset: -10px -2px;
+}
+.k-switch::after {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	background: var(--k-text-muted);
+	transition: transform 150ms ease;
+}
+.k-switch[aria-checked='true'] {
+	background: var(--k-accent);
+	border-color: var(--k-accent);
+}
+.k-switch[aria-checked='true']::after {
+	background: var(--k-on-accent);
+	transform: translateX(18px);
 }

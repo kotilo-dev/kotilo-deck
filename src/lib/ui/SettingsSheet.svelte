@@ -7,7 +7,7 @@
 	import type { SettingSchema } from '../../widgets/index';
 	import FallbackCard from './FallbackCard.svelte';
 	import Icon from './Icon.svelte';
-	import { definition, getDeck, mergedSettings, optionLabel, settingLabel, widgetName, surfaceDefault } from './deck.svelte';
+	import { definition, getDeck, mergedSettings, optionLabel, removeWithUndo, settingLabel, widgetName, surfaceDefault } from './deck.svelte';
 
 	const { store, ui } = getDeck();
 	let dialog = $state<HTMLDialogElement>();
@@ -22,8 +22,9 @@
 		)
 	);
 	const appearance = $derived((inst?.settings?.appearance ?? {}) as { opacity?: number; blur?: number });
-	const fallbackOpacity = $derived(surfaceDefault(store));
+	const fallbackOpacity = $derived(surfaceDefault(ui));
 	const opacityPct = $derived(Math.round((appearance.opacity ?? fallbackOpacity) * 100));
+	const blurPx = $derived(Math.round(appearance.blur ?? ui.look.blur));
 
 	$effect(() => {
 		if (!dialog) return;
@@ -36,23 +37,24 @@
 		store.updateWidgetSettings(inst.instance, { ...(inst.settings ?? {}), [key]: value });
 	}
 
-	function setOpacity(pct: number | null) {
+	function setAppearance(key: 'opacity' | 'blur', value: number | null) {
 		if (!inst) return;
 		const next = { ...appearance };
-		if (pct === null) delete next.opacity;
-		else next.opacity = Math.min(1, Math.max(0, pct / 100));
+		if (value === null) delete next[key];
+		else next[key] = value;
 		const settings = { ...(inst.settings ?? {}) };
 		if (Object.keys(next).length) settings.appearance = next;
 		else delete settings.appearance;
 		store.updateWidgetSettings(inst.instance, settings);
 	}
 
+	const setOpacity = (pct: number | null) => setAppearance('opacity', pct === null ? null : Math.min(1, Math.max(0, pct / 100)));
+
 	function remove() {
 		if (!inst) return;
-		const name = widgetName(inst.widget);
-		store.removeWidget(inst.instance);
-		ui.settingsFor = null;
-		ui.say(t('shell.edit.removed', { name }));
+		const id = inst.instance;
+		dialog?.close();
+		removeWithUndo({ store, ui }, id);
 	}
 </script>
 
@@ -160,6 +162,19 @@
 						<span class="muted small">{appearance.opacity === undefined ? t('shell.sheet.opacityDefault') : ''}</span>
 						{#if appearance.opacity !== undefined}
 							<button type="button" class="k-btn" onclick={() => setOpacity(null)}>{t('shell.sheet.reset')}</button>
+						{/if}
+					</div>
+					<label class="row">
+						<span class="split">
+							{t('shell.sheet.blur')}
+							<span class="k-mono val">{blurPx > 0 ? `${blurPx} px` : t('settings.common.off')}</span>
+						</span>
+						<input type="range" class="k-range" min="0" max="40" step="1" value={blurPx} oninput={(e) => setAppearance('blur', Number(e.currentTarget.value))} />
+					</label>
+					<div class="split">
+						<span class="muted small">{appearance.blur === undefined ? t('shell.sheet.opacityDefault') : t('shell.sheet.blurHint')}</span>
+						{#if appearance.blur !== undefined}
+							<button type="button" class="k-btn" onclick={() => setAppearance('blur', null)}>{t('shell.sheet.reset')}</button>
 						{/if}
 					</div>
 				</section>

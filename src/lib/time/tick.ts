@@ -3,9 +3,10 @@
  *
  * A single `setTimeout` chain is aligned to the next second boundary while any subscriber
  * wants seconds, otherwise to the next minute boundary, so an always-on deck idles at one
- * wake-up per minute. The chain is paused while `document.hidden` and fires immediately
- * when the page becomes visible again.
+ * wake-up per minute. The chain is paused while the deck is hidden (`deck://visibility`,
+ * with `document.hidden` as a secondary signal) and fires immediately when it is shown again.
  */
+import { isDeckVisible, onDeckVisibility } from './visibility';
 
 export type TickHandler = (now: Date) => void;
 
@@ -19,9 +20,9 @@ const SLACK_MS = 5;
 
 const subs = new Set<Subscriber>();
 let timer: ReturnType<typeof setTimeout> | null = null;
-let listening = false;
+let stopVisibility: (() => void) | null = null;
 
-const hidden = (): boolean => typeof document !== 'undefined' && document.hidden;
+const hidden = (): boolean => !isDeckVisible();
 
 function wantsSeconds(): boolean {
 	for (const s of subs) if (s.seconds) return true;
@@ -57,16 +58,18 @@ function fire(): void {
 	schedule();
 }
 
-function onVisibility(): void {
-	if (hidden()) clear();
-	else fire();
+function onVisibility(visible: boolean): void {
+	if (visible) fire();
+	else clear();
 }
 
 function setListening(on: boolean): void {
-	if (typeof document === 'undefined' || on === listening) return;
-	listening = on;
-	if (on) document.addEventListener('visibilitychange', onVisibility);
-	else document.removeEventListener('visibilitychange', onVisibility);
+	if (on === (stopVisibility !== null)) return;
+	if (on) stopVisibility = onDeckVisibility(onVisibility);
+	else {
+		stopVisibility?.();
+		stopVisibility = null;
+	}
 }
 
 /**

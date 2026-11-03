@@ -5,15 +5,29 @@ import { t } from '#lib/i18n/index.ts';
 import { parseSize, widgets, type WidgetDefinition } from '../../widgets/index';
 import type { Size } from '#lib/grid/index.ts';
 import type { WorkspaceStore } from '#lib/workspace/index.ts';
-import { effectiveThemeId, getTheme } from '#lib/theme/index.ts';
+
+export interface NoticeAction {
+	label: string;
+	run: () => void;
+}
+
+export interface Notice {
+	id: number;
+	text: string;
+	tone: 'info' | 'warning';
+	action?: NoticeAction;
+}
 
 export class DeckUi {
 	editing = $state(false);
 	drawerOpen = $state(false);
 	/** Instance whose settings sheet is open. */
 	settingsFor = $state<string | null>(null);
-	notice = $state<{ id: number; text: string; tone: 'info' | 'warning' } | null>(null);
-	capabilities = $state<ReadonlySet<Capability>>(new Set());
+	notice = $state<Notice | null>(null);
+	/** null until the backend answered, so widgets don't flash "Not available" at boot. */
+	capabilities = $state<ReadonlySet<Capability> | null>(null);
+	/** Resolved appearance for cards without their own override (written by the deck page). */
+	look = $state({ surfaceOpacity: 0.85, blur: 0 });
 	/** Instance to flash after placing it from the drawer. */
 	highlight = $state<string | null>(null);
 	reducedMotion = $state(false);
@@ -21,10 +35,27 @@ export class DeckUi {
 	#noticeTimer: ReturnType<typeof setTimeout> | null = null;
 	#highlightTimer: ReturnType<typeof setTimeout> | null = null;
 
-	say(text: string, tone: 'info' | 'warning' = 'info', ms = 4000) {
+	say(text: string, tone: 'info' | 'warning' = 'info', ms = 4000, action?: NoticeAction) {
 		if (this.#noticeTimer) clearTimeout(this.#noticeTimer);
-		this.notice = { id: Date.now(), text, tone };
-		this.#noticeTimer = setTimeout(() => (this.notice = null), ms);
+		const notice: Notice = { id: Date.now(), text, tone, action };
+		this.notice = notice;
+		this.#noticeTimer = setTimeout(() => {
+			if (this.notice === notice) this.notice = null;
+		}, ms);
+	}
+
+	dismiss() {
+		if (this.#noticeTimer) clearTimeout(this.#noticeTimer);
+		this.notice = null;
+	}
+
+	/** Runs the visible toast's action (Undo); also bound to Ctrl+Z while the toast shows. */
+	runAction(): boolean {
+		const action = this.notice?.action;
+		if (!action) return false;
+		this.dismiss();
+		action.run();
+		return true;
 	}
 
 	flash(instance: string) {
@@ -43,8 +74,18 @@ export class DeckUi {
 		this.settingsFor = null;
 	}
 
+	/** "unknown" while capabilities are still loading and the widget needs some. */
+	availability(def: WidgetDefinition | undefined): 'yes' | 'no' | 'unknown' {
+		if (!def) return 'no';
+		const needs = def.manifest.capabilities;
+		if (needs.length === 0) return 'yes';
+		const caps = this.capabilities;
+		if (caps === null) return 'unknown';
+		return needs.every((c) => caps.has(c)) ? 'yes' : 'no';
+	}
+
 	available(def: WidgetDefinition | undefined): boolean {
-		return !!def && def.manifest.capabilities.every((c) => this.capabilities.has(c));
+		return this.availability(def) === 'yes';
 	}
 }
 
@@ -56,6 +97,28 @@ export interface DeckContext {
 const KEY = Symbol('kotilo-deck');
 export const setDeck = (ctx: DeckContext) => setContext(KEY, ctx);
 export const getDeck = () => getContext<DeckContext>(KEY);
+
+/** Toast duration for removals with Undo. */
+export const UNDO_MS = 5000;
+
+/** Removes a widget instance and offers Undo for 5 s (edit-mode Delete, trash zone, sheet button). */
+export function removeWithUndo({ store, ui }: DeckContext, instance: string): void {
+	const removed = store.removeWidget(instance);
+	if (!removed) return;
+	const name = widgetName(removed.widget.widget);
+	if (ui.settingsFor === instance) ui.settingsFor = null;
+	ui.say(t('shell.edit.removed', { name }), 'info', UNDO_MS, {
+		label: t('shell.edit.undo'),
+		run: () => {
+			if (store.restoreWidget(removed.workspace, removed.widget)) {
+				const back = store.active?.widgets.at(-1)?.instance;
+				if (back) ui.flash(back);
+			} else {
+				ui.say(t('shell.edit.undoNoRoom', { name }), 'warning', 6000);
+			}
+		}
+	});
+}
 
 // ── registry helpers ────────────────────────────────────────────────────────
 
@@ -91,12 +154,8 @@ export const mergedSettings = (inst: WidgetInstance): Record<string, unknown> =>
 export const allDefinitions = (): WidgetDefinition[] =>
 	[...widgets.values()].sort((a, b) => widgetName(a.manifest.id).localeCompare(widgetName(b.manifest.id)));
 
-/** Surface opacity a widget gets without its own override: workspace appearance, else the theme default. */
-export function surfaceDefault(store: WorkspaceStore): number {
-	const ws = store.active;
-	const o = ws?.appearance?.opacity;
-	return typeof o === 'number' ? o : getTheme(effectiveThemeId(ws?.theme, store.settings.theme)).opacity.surface;
-}
+/** Surface opacity a widget gets without its own override (workspace > global setting > theme). */
+export const surfaceDefault = (ui: DeckUi): number => ui.look.surfaceOpacity;
 
 /** "2 widgets don't fit this grid: Clock, Weather" (singular/plural). */
 export const unplacedText = (names: string[]): string =>

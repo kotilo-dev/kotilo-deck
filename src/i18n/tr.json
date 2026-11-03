@@ -14,7 +14,9 @@
 			"scopeWorkspace": "Yalnızca {name}",
 			"useGlobal": "Genel temayı kullan",
 			"dark": "koyu",
-			"light": "açık"
+			"light": "açık",
+			"user": "kullanıcı",
+			"userSkipped": "{count} geçersiz kullanıcı teması atlandı: {names}"
 		},
 		"grid": {
 			"label": "Bileşen ızgarası, {name}",
@@ -37,7 +39,9 @@
 			"removed": "{name} kaldırıldı",
 			"unplaced": "{count} bileşen bu ızgaraya sığmıyor: {names}",
 			"widgetLabel": "{name} bileşeni, {size}",
-			"unplacedOne": "1 bileşen bu ızgaraya sığmıyor: {names}"
+			"unplacedOne": "1 bileşen bu ızgaraya sığmıyor: {names}",
+			"undo": "Geri al",
+			"undoNoRoom": "{name} geri koymak için yer yok"
 		},
 		"drawer": {
 			"title": "Bileşen ekle",
@@ -56,7 +60,9 @@
 			"reset": "Varsayılanı kullan",
 			"remove": "Bileşeni kaldır",
 			"close": "Kapat",
-			"noSettings": "Bu bileşenin ayarı yok."
+			"noSettings": "Bu bileşenin ayarı yok.",
+			"blur": "Arka plan bulanıklığı",
+			"blurHint": "Sürekli açık ekranda GPU kullanır"
 		},
 		"workspace": {
 			"menu": "Çalışma alanı işlemleri",
@@ -85,7 +91,9 @@
 			"unknown": "Bilinmeyen bileşen",
 			"unknownBody": "“{id}” yüklü değil. Ayarları korunuyor.",
 			"error": "Bu bileşen çalışmayı durdurdu",
-			"retry": "Yeniden dene"
+			"retry": "Yeniden dene",
+			"notAvailable": "Bu işletim sisteminde kullanılamıyor",
+			"browserPreview": "Kotilo Deck masaüstü uygulaması gerekir"
 		},
 		"presets": {
 			"focus": "Odak",
@@ -105,6 +113,9 @@
 			"json": "Dosya geçerli bir JSON değil.",
 			"notFound": "Çalışma alanı bulunamadı.",
 			"storage": "Kaydedilemedi: {message}"
+		},
+		"screensaver": {
+			"wake": "Ekranı uyandır"
 		}
 	},
 	"widgets": {
@@ -134,11 +145,27 @@
 				"search": "Saat dilimi ara",
 				"noResults": "Eşleşen saat dilimi yok",
 				"change": "Değiştir",
-				"cancel": "Vazgeç"
+				"cancel": "Vazgeç",
+				"hour12": "12 saatlik gösterim",
+				"seconds": "Saniyeleri göster",
+				"face": "Kadran (2×2)",
+				"city": "Şehir etiketi",
+				"zones": "Ek saat dilimleri"
+			},
+			"name": "Saat",
+			"options": {
+				"face": {
+					"analog": "Analog",
+					"digital": "Dijital"
+				}
 			}
 		},
 		"date": {
-			"title": "Tarih"
+			"title": "Tarih",
+			"name": "Tarih",
+			"settings": {
+				"dayOfYear": "Yılın gününü göster"
+			}
 		},
 		"weather": {
 			"title": "Hava durumu",
@@ -184,7 +211,15 @@
 				"name": "Görünen ad",
 				"useCoords": "Koordinatları kullan",
 				"invalidCoords": "Enlem −90…90, boylam −180…180",
-				"clear": "Konumu temizle"
+				"clear": "Konumu temizle",
+				"unit": "Birim"
+			},
+			"name": "Hava durumu",
+			"options": {
+				"unit": {
+					"c": "Santigrat (°C)",
+					"f": "Fahrenhayt (°F)"
+				}
 			}
 		},
 		"system": {
@@ -206,11 +241,302 @@
 			"procCpu": "CPU",
 			"procMem": "RAM",
 			"noProcesses": "İşlem verisi yok",
-			"processesFailed": "İşlemler okunamadı"
+			"processesFailed": "İşlemler okunamadı",
+			"name": "Sistem",
+			"settings": {
+				"threshold": "Uyarı eşiği (%)"
+			}
 		},
-		"volume": {},
-		"media": {},
-		"todo": {}
+		"volume": {
+			"title": "Ses",
+			"volume": "Ses düzeyi",
+			"percent": "%{n}",
+			"muted": "Sessiz",
+			"mute": "Sesi kapat",
+			"unmute": "Sesi aç",
+			"outputDevice": "Çıkış aygıtı",
+			"outputDevices": "Çıkış aygıtları",
+			"noDevice": "Çıkış aygıtı yok",
+			"moreDevices": "Diğer aygıtlar…",
+			"mixer": "Karıştırıcı",
+			"mixerTitle": "Uygulama sesleri",
+			"noSessions": "Ses çalan uygulama yok",
+			"sessionsFailed": "Uygulama sesleri okunamadı",
+			"appVolume": "{name} ses düzeyi",
+			"muteApp": "{name} sesini kapat",
+			"unmuteApp": "{name} sesini aç",
+			"error": "Ses bilgisi okunamadı",
+			"name": "Ses",
+			"settings": {
+				"devicePicker": "Çıkış aygıtı seçiciyi göster",
+				"mixer": "Uygulama karıştırıcı düğmesini göster"
+			}
+		},
+		"media": {
+			"title": "Şimdi çalıyor",
+			"nothingPlaying": "Çalan bir şey yok",
+			"play": "Oynat",
+			"pause": "Duraklat",
+			"prev": "Önceki",
+			"next": "Sonraki",
+			"shuffle": "Karıştır",
+			"repeatOff": "Tekrar: kapalı",
+			"repeatList": "Tekrar: tümü",
+			"repeatTrack": "Tekrar: bu parça",
+			"seek": "Konum",
+			"position": "{pos} / {dur}",
+			"byline": "{artist} · {source}",
+			"error": "Medya bilgisi okunamadı",
+			"name": "Medya",
+			"settings": {
+				"showAlbum": "Albümü göster (4×2)"
+			}
+		},
+		"todo": {
+			"title": "Bugün",
+			"left": "{n} kaldı",
+			"more": "+{n} daha",
+			"placeholder": "Ekle… “yarın 9'da deploy”",
+			"addLabel": "Hızlı görev ekle",
+			"dueChip": "Bitiş: {when}",
+			"today": "Bugün",
+			"tomorrow": "Yarın",
+			"yesterday": "Dün",
+			"empty": "Yapılacak bir şey yok",
+			"emptyHint": "Görev eklemek için aşağıya yazın",
+			"delete": "Sil",
+			"deleteItem": "“{text}” görevini sil",
+			"snooze": "10 dk ertele",
+			"dismiss": "Kapat",
+			"reminder": "Hatırlatma",
+			"reorder": "“{text}” görevini sürükleyerek taşı",
+			"keysHint": "Alt+Yukarı veya Alt+Aşağı görevi taşır, Delete silme düğmesini gösterir",
+			"list": "Görevler",
+			"moved": "{n}. sıraya taşındı",
+			"error": "Görevler yüklenemedi",
+			"saveFailed": "Kaydedilemedi",
+			"group": {
+				"overdue": "Gecikmiş",
+				"today": "Bugün",
+				"tomorrow": "Yarın",
+				"later": "Daha sonra",
+				"none": "Tarihsiz",
+				"done": "Tamamlanan"
+			},
+			"name": "Yapılacaklar",
+			"settings": {
+				"remind": "Bitiş saatinde hatırlat",
+				"showCompleted": "Tamamlanan görevleri göster"
+			}
+		}
 	},
-	"settings": {}
+	"settings": {
+		"window": {
+			"title": "Kotilo Deck — Ayarlar",
+			"minimize": "Simge durumuna küçült",
+			"close": "Kapat"
+		},
+		"nav": {
+			"label": "Ayar bölümleri",
+			"general": "Genel",
+			"display": "Ekran ve monitör",
+			"appearance": "Görünüm",
+			"themes": "Temalar",
+			"workspaces": "Çalışma alanları",
+			"weather": "Hava durumu ve takvim",
+			"companion": "Eşlikçi",
+			"burnin": "Ekran yanması ve gece",
+			"about": "Hakkında · MIT"
+		},
+		"common": {
+			"off": "Kapalı",
+			"save": "Kaydet",
+			"saveFailed": "Kaydedilemedi: {message}",
+			"desktopOnly": "Kotilo Deck masaüstü uygulamasında kullanılabilir.",
+			"later": "Sonraki bir sürümde gelecek."
+		},
+		"general": {
+			"title": "Genel",
+			"text": "Başlangıç, göster/gizle kısayolu, birimler ve bildirimler.",
+			"startup": "Başlangıç ve pencere",
+			"autostart": "İşletim sistemiyle başlat",
+			"autostartHelp": "Oturum açtığınızda deck açılır",
+			"alwaysOnTop": "Her zaman üstte",
+			"alwaysOnTopHelp": "Deck diğer pencerelerin üstünde kalır",
+			"hotkeyGroup": "Kısayol",
+			"hotkey": "Deck’i göster / gizle",
+			"hotkeyHelp": "Bir tuş kombinasyonuna basın, örn. Ctrl+Alt+K",
+			"hotkeySaved": "Kısayol {hotkey} olarak ayarlandı",
+			"hotkeyErrors": {
+				"empty": "Bir tuş kombinasyonu girin.",
+				"modifier": "Ctrl, Alt, Shift veya Super ekleyin.",
+				"key": "Değiştirici tuşların yanında tam olarak bir tuş kullanın.",
+				"backend": "Kaydedilmedi: {message}"
+			},
+			"units": "Birimler ve bildirimler",
+			"unit": "Sıcaklık birimi",
+			"unitHelp": "Hava durumu bileşenleri için varsayılan; her bileşen değiştirebilir",
+			"sound": "Bildirim sesi",
+			"soundHelp": "Hatırlatıcı ve pomodoro bildirimleriyle çalar"
+		},
+		"backup": {
+			"title": "Yedekleme",
+			"label": "Tüm ayarlar ve çalışma alanları",
+			"help": "Tek bir JSON dosyası. İçe aktarma her şeyi değiştirir; mevcut dosyalar önce yedeklenir.",
+			"import": "İçe aktar…",
+			"export": "Dışa aktar…",
+			"exported": "Ayarlar dışa aktarıldı",
+			"imported": "İçe aktarıldı. Önceki dosyalar {path} klasörüne yedeklendi",
+			"failed": "Yedekleme başarısız: {message}",
+			"invalid": "Bu dosya bir Kotilo Deck dışa aktarımı değil.",
+			"importedBrowser": "Ayarlar ve çalışma alanları içe aktarıldı",
+			"confirmTitle": "Tüm ayarlar ve çalışma alanları değiştirilsin mi?",
+			"confirmBody": "Her şey seçtiğiniz dosyayla değiştirilir. Mevcut dosyalar önce {path} klasörüne kopyalanır.",
+			"confirmBodyBrowser": "Bu tarayıcıdaki her şey seçtiğiniz dosyayla değiştirilir.",
+			"confirm": "Hepsini değiştir"
+		},
+		"display": {
+			"title": "Ekran ve monitör",
+			"text": "Deck’in hangi ekranda olduğu ve ekranı nasıl kapladığı.",
+			"monitor": "Monitör",
+			"refresh": "Yenile",
+			"none": "Hiç monitör bildirilmedi.",
+			"primary": "birincil",
+			"pinned": "deck burada",
+			"auto": "deck burada · otomatik",
+			"rule": "Seçim yapılmazsa deck ilk ikincil monitörü kullanır ve monitör yeniden bağlanınca oraya döner.",
+			"moved": "Deck {name} ekranına taşındı",
+			"mode": "Pencere",
+			"modeLabel": "Görüntüleme modu",
+			"fullscreen": "Tam ekran",
+			"overlay": "Katman",
+			"fullscreenHelp": "Seçilen monitörü kaplar",
+			"overlayHelp": "Normal boyutlu, her zaman üstte pencere; üst çubuktan sürükleyin"
+		},
+		"appearance": {
+			"title": "Görünüm",
+			"text": "Arka plan, yüzey opaklığı ve bulanıklık. Çalışma alanları ve tek tek bileşenler bunları değiştirebilir.",
+			"background": "Arka plan katmanı",
+			"solid": "Düz",
+			"solidMeta": "tema arka planı",
+			"wallpaper": "Duvar kâğıdı",
+			"noWallpaper": "yok",
+			"transparent": "Saydam",
+			"transparentMeta": "katman",
+			"transparentUnavailable": "Bu işletim sisteminde kullanılamıyor",
+			"transparentHint": "Saydamlık en iyi katman modunda çalışır (Ekran ve monitör).",
+			"wallpapers": "Duvar kâğıtları",
+			"noWallpapers": "Henüz duvar kâğıdı yok. Birini içe aktarın ya da görselleri/videoları {path} klasörüne bırakın.",
+			"import": "İçe aktar…",
+			"importFailed": "İçe aktarılamadı: {message}",
+			"surfaces": "Bileşen yüzeyleri",
+			"opacity": "Yüzey opaklığı",
+			"opacityHelp": "Tema varsayılanı %{pct}",
+			"blur": "Arka plan bulanıklığı",
+			"blurHelp": "Sürekli açık ekranda GPU kullanır",
+			"windowOpacity": "Pencere opaklığı",
+			"windowOpacityHelp": "Yalnızca katman modunda — tam ekranda devre dışı",
+			"windowOpacityOverlay": "Tüm pencere, katman modu",
+			"dim": "Karartma",
+			"nightSummary": "{from} → {to} · %{pct} seviyesine karart",
+			"idleSummary": "{min} dk sonra",
+			"idleSummaryClock": "{min} dk sonra · saat ekranını göster",
+			"unsaved": "Kaydedilmemiş değişiklikler",
+			"reset": "Temaya sıfırla",
+			"apply": "Uygula",
+			"applied": "Görünüm uygulandı"
+		},
+		"themes": {
+			"title": "Temalar",
+			"text": "Genel tema. Bir çalışma alanı bunu deck’teki tema çipinden değiştirebilir.",
+			"auto": "Açık / koyu",
+			"autoLabel": "Otomatik değiştir",
+			"autoHelp": "Temanın açık veya koyu eşini kullanır",
+			"noPair": "{name} temasının açık/koyu eşi yok, olduğu gibi kalır.",
+			"os": "Sistemi izle",
+			"schedule": "Zamanlama",
+			"lightFrom": "Açık başlangıcı",
+			"darkFrom": "Koyu başlangıcı",
+			"global": "Tüm temalar · {count}",
+			"scopeNote": "Çalışma alanı seçimleri bu seçimin önüne geçer.",
+			"pairLabel": "Eşini göster: {name}",
+			"noPairShort": "eşi yok",
+			"user": "Kullanıcı temaları",
+			"userHelp": "Tema JSON dosyalarını bu klasöre bırakın; anında yüklenir. Paketteki bir temayla aynı kimliğe sahip dosya o temanın yerini alır:",
+			"skipped": "Atlanan dosyalar"
+		},
+		"workspaces": {
+			"title": "Çalışma alanları",
+			"text": "Kayıtlı panolar. Değişiklikler deck’te hemen görünür.",
+			"list": "Çalışma alanları · {count}",
+			"widgets": "{count} bileşen",
+			"hidden": "{count} gizli",
+			"density": "{name} ızgara yoğunluğu",
+			"renameOne": "{name} adını değiştir",
+			"duplicateOne": "{name} kopyasını oluştur",
+			"resetOne": "{name} alanını hazır düzene sıfırla",
+			"exportOne": "{name} alanını dışa aktar",
+			"deleteOne": "{name} alanını sil",
+			"created": "{name} oluşturuldu",
+			"perMonitor": "Monitör başına varsayılan",
+			"perMonitorHelp": "Deck bu monitördeyken gösterilir",
+			"browserMonitor": "Bu tarayıcı",
+			"appearance": "Görünüm geçersiz kılma",
+			"appearanceOf": "{name} görünümü",
+			"inherit": "Geneli kullan",
+			"inheritHelp": "Bu çalışma alanı için genel Görünüm ayarının yerine geçer",
+			"own": "Kendi değeri",
+			"ownValue": "Bu çalışma alanı için kendi {what} değeri"
+		},
+		"weather": {
+			"title": "Hava durumu ve takvim",
+			"text": "Hava durumu ve takvim bileşenleri için varsayılanlar.",
+			"weather": "Hava durumu",
+			"location": "Her hava durumu bileşeni konumunu düzenleme modunda dişli simgesinden seçer.",
+			"calendar": "Takvim",
+			"feeds": "Takvim beslemeleri (ICS)"
+		},
+		"companion": {
+			"title": "Eşlikçi",
+			"text": "Kotilo masaüstü uygulamasıyla bağlantı (ajan durumu, pomodoro eşitleme).",
+			"status": "Kotilo masaüstü",
+			"statusOff": "Bağlı değil"
+		},
+		"burnin": {
+			"title": "Ekran yanması ve gece",
+			"text": "Sürekli açık ekranları korur: küçük piksel kaydırmaları, gece ve boştayken karartma.",
+			"pending": "Görünüm sayfasında uygulanmamış karartma ayarları var.",
+			"shift": "Piksel kaydırma",
+			"shiftLabel": "Deck’i kaydır",
+			"shiftHelp": "Her şeyi en fazla 4 px kaydırır",
+			"every": "Her {min} dk",
+			"night": "Gece zamanlaması",
+			"nightLabel": "Gece karart",
+			"nightHelp": "Ekranın değil, deck içeriğinin parlaklığını düşürür",
+			"from": "Başlangıç",
+			"to": "Bitiş",
+			"dimTo": "Karartma seviyesi",
+			"idle": "Boştayken karartma",
+			"idleLabel": "Boştayken karart",
+			"idleHelp": "Dokunma, fare veya klavye girdisi olmadığında",
+			"after": "Süre",
+			"minutes": "{min} dk",
+			"clockFace": "Saat ekranını göster",
+			"clockFaceHelp": "Yavaşça kayan büyük bir saat; uyandırmak için dokunun"
+		},
+		"about": {
+			"title": "Hakkında",
+			"text": "Sürüm, lisans ve verilerinizin bulunduğu yer.",
+			"tagline": "Geliştiriciler için ikinci ekran paneli",
+			"license": "Lisans",
+			"licenseText": "MIT lisansıyla açık kaynak",
+			"files": "Dosyalar",
+			"settings": "Ayarlar",
+			"workspaces": "Çalışma alanları",
+			"wallpapers": "Duvar kâğıtları",
+			"themes": "Kullanıcı temaları",
+			"logs": "Günlükler",
+			"privacy": "Hesap yok, bulut yok, telemetri yok. Her şey bu bilgisayarda kalır."
+		}
+	}
 }

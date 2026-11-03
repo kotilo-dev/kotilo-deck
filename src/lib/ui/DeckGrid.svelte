@@ -19,15 +19,18 @@
 	} from '#lib/grid/index.ts';
 	import Icon from './Icon.svelte';
 	import WidgetFrame from './WidgetFrame.svelte';
-	import { fmtSize, getDeck, sizesOf, widgetName } from './deck.svelte';
+	import { fmtSize, getDeck, removeWithUndo, sizesOf, widgetName } from './deck.svelte';
 
 	const LONG_PRESS_MS = 500;
 	const SWIPE_PX = 64;
 	const DRAG_START_PX = 6;
 	/** Pointer this close to the grid's bottom edge = over the trash zone. */
 	const TRASH_BAND_PX = 44;
+	/** Gesture opt-out: widgets can mark any subtree with `data-no-gesture`. */
+	const NO_GESTURE = '[data-no-gesture], input[type="range"], dialog, [popover]';
 
-	const { store, ui } = getDeck();
+	const deck = getDeck();
+	const { store, ui } = deck;
 	const ws = $derived(store.active);
 
 	type MoveDrag = {
@@ -125,6 +128,8 @@
 	function onpointerdown(e: PointerEvent) {
 		if (e.pointerType === 'mouse' && e.button !== 0) return;
 		const target = e.target as Element;
+		// Sliders, sheets and menus inside widgets never start a long-press or a swipe.
+		if (target.closest(NO_GESTURE)) return;
 		const frame = target.closest<HTMLElement>('[data-instance]');
 		if (!ui.editing) {
 			clearPress();
@@ -216,9 +221,7 @@
 
 		if (!d.started) return;
 		if (d.overTrash) {
-			const name = widgetName(original(d.id).widget);
-			store.removeWidget(d.id);
-			ui.say(t('shell.edit.removed', { name }));
+			removeWithUndo(deck, d.id);
 			return;
 		}
 		if (d.preview) store.setWidgets(d.preview);
@@ -271,8 +274,9 @@
 			cycleSize(inst);
 		} else if (e.key === 'Delete' || e.key === 'Backspace') {
 			e.preventDefault();
-			store.removeWidget(inst.instance);
-			ui.say(t('shell.edit.removed', { name: widgetName(inst.widget) }));
+			// Undo toast (5 s, also Ctrl+Z) instead of instant loss; focus moves to the grid so keys keep working.
+			removeWithUndo(deck, inst.instance);
+			gridEl?.focus();
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
 			ui.settingsFor = inst.instance;
@@ -286,6 +290,7 @@
 	class:k-dots={ui.editing}
 	class:editing={ui.editing}
 	class:dragging={drag !== null}
+	tabindex="-1"
 	style:grid-template-columns="repeat({ws.grid.cols}, minmax(0, 1fr))"
 	style:grid-template-rows="repeat({ws.grid.rows}, minmax(0, 1fr))"
 	aria-label={t('shell.grid.label', { name: ws.name })}

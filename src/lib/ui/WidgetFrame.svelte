@@ -3,7 +3,8 @@
 	 * One widget instance on the grid: explicit placement, merged settings, capability check,
 	 * per-instance surface opacity, error boundary, and the edit-mode affordances (DESIGN §4.3, §6).
 	 */
-	import type { WidgetInstance } from '#lib/ipc/index.ts';
+	import { isTauri, type Appearance, type WidgetInstance } from '#lib/ipc/index.ts';
+	import { backdropValue, clamp } from '#lib/settings/look.ts';
 	import type { Rect } from '#lib/grid/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import FallbackCard from './FallbackCard.svelte';
@@ -34,10 +35,11 @@
 		ongear: () => void;
 	} = $props();
 
-	const { store, ui } = getDeck();
+	const { ui } = getDeck();
 	const def = $derived(definition(inst.widget));
 	const settings = $derived(mergedSettings(inst));
-	const available = $derived(ui.available(def));
+	/** Central capability gate: a widget is only mounted once its capabilities are known to exist. */
+	const availability = $derived(ui.availability(def));
 	const size = $derived(`${rect.w}x${rect.h}` as const);
 	const name = $derived(widgetName(inst.widget));
 	const compact = $derived(rect.h === 1);
@@ -46,15 +48,18 @@
 	 * Per-instance appearance.opacity (0–1). Edit mode forces 100 % via the grid, except for the instance
 	 * whose settings sheet is open, so the opacity slider previews live.
 	 */
+	const own = $derived((inst.settings?.appearance ?? undefined) as Appearance | undefined);
 	const opacity = $derived.by(() => {
-		const o = (inst.settings?.appearance as { opacity?: unknown } | undefined)?.opacity;
+		const o = own?.opacity;
 		return typeof o === 'number' && o >= 0 && o <= 1 ? o : null;
 	});
 	const previewing = $derived(ui.settingsFor === inst.instance);
 	const surfaceA = $derived.by(() => {
-		const o = previewing ? (opacity ?? surfaceDefault(store)) : ui.editing ? null : opacity;
+		const o = previewing ? (opacity ?? surfaceDefault(ui)) : ui.editing ? null : opacity;
 		return o === null ? undefined : `color-mix(in srgb, var(--k-surface) ${Math.round(o * 100)}%, transparent)`;
 	});
+	/** Instance blur override only; the workspace/global value is inherited from :root. */
+	const backdrop = $derived(typeof own?.blur === 'number' ? backdropValue(clamp(Math.round(own.blur), 0, 40)) : undefined);
 
 	const transform = $derived(
 		lifted
@@ -73,12 +78,23 @@
 	style:grid-row="{rect.y + 1} / span {rect.h}"
 	style:transform
 	style:--k-surface-a={surfaceA}
+	style:--k-backdrop={backdrop}
 >
 	<div class="content" inert={ui.editing}>
-		{#if def}
+		{#if def && availability === 'unknown'}
+			<div class="k-card" aria-busy="true" aria-label={name}></div>
+		{:else if def && availability === 'no'}
+			<FallbackCard
+				{compact}
+				title={name}
+				meta={fmtSize(size)}
+				icon={def.manifest.icon}
+				body={isTauri() ? t('shell.widget.notAvailable') : t('shell.widget.browserPreview')}
+			/>
+		{:else if def}
 			{@const Widget = def.component}
 			<svelte:boundary onerror={(e) => console.error(`kotilo-deck: widget ${inst.instance} failed`, e)}>
-				<Widget {size} {settings} instance={inst.instance} editing={ui.editing} {available} />
+				<Widget {size} {settings} instance={inst.instance} editing={ui.editing} available={true} />
 				{#snippet failed(_error, reset)}
 					<FallbackCard {compact} icon="alert" title={name} meta={fmtSize(size)} body={t('shell.widget.error')} onretry={reset} />
 				{/snippet}

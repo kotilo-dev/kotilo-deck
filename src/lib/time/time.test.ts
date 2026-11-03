@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const ipcHandlers: Record<string, (payload: { visible: boolean }) => void> = {};
+vi.mock('#lib/ipc/index.ts', () => ({
+	on: (event: string, handler: (payload: { visible: boolean }) => void) => {
+		ipcHandlers[event] = handler;
+		return Promise.resolve(() => delete ipcHandlers[event]);
+	}
+}));
+
 import {
+	createVisibility,
 	cityFromZone,
 	dayOfYear,
 	delayToBoundary,
@@ -133,5 +143,81 @@ describe('subscribeTick', () => {
 		offMinute();
 		expect(tickInterval()).toBeNull();
 		expect(vi.getTimerCount()).toBe(0);
+	});
+});
+
+describe('createVisibility', () => {
+	class FakeDoc extends EventTarget {
+		hidden = false;
+		set(hidden: boolean) {
+			this.hidden = hidden;
+			this.dispatchEvent(new Event('visibilitychange'));
+		}
+	}
+	const setup = () => {
+		const doc = new FakeDoc();
+		let deckCb: ((v: boolean) => void) | null = null;
+		const unlisten = vi.fn();
+		const listenDeck = vi.fn((cb: (v: boolean) => void) => {
+			deckCb = cb;
+			return Promise.resolve(unlisten);
+		});
+		const vis = createVisibility({ doc, listenDeck });
+		return { doc, vis, listenDeck, unlisten, deck: (v: boolean) => deckCb?.(v) };
+	};
+
+	it('combines deck://visibility and document.hidden, reporting only changes', () => {
+		const { doc, vis, deck } = setup();
+		const seen: boolean[] = [];
+		const off = vis.subscribe((v) => seen.push(v));
+		expect(vis.isVisible()).toBe(true);
+		deck(false);
+		deck(false);
+		doc.set(true);
+		deck(true); // still hidden by the document
+		doc.set(false);
+		expect(seen).toEqual([false, true]);
+		off();
+	});
+
+	it('listens only while subscribed and drops a late unlisten', async () => {
+		const { vis, listenDeck, unlisten } = setup();
+		const off = vis.subscribe(() => {});
+		expect(listenDeck).toHaveBeenCalledTimes(1);
+		off(); // before the listen promise resolved
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(unlisten).toHaveBeenCalledTimes(1);
+	});
+
+	it('assumes shown again after a subscriber gap (missed events never pause forever)', () => {
+		const { vis, deck } = setup();
+		const off = vis.subscribe(() => {});
+		deck(false);
+		expect(vis.isVisible()).toBe(false);
+		off();
+		expect(vis.isVisible()).toBe(true);
+	});
+});
+
+describe('subscribeTick and deck visibility', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date(Date.UTC(2026, 10, 3, 6, 37, 14, 250)));
+	});
+	afterEach(() => vi.useRealTimers());
+
+	it('pauses while the deck is hidden and fires immediately on show', () => {
+		const cb = vi.fn();
+		const off = subscribeTick(cb, { seconds: true });
+		expect(tickInterval()).toBe(1000);
+		ipcHandlers['deck://visibility']?.({ visible: false });
+		expect(tickInterval()).toBeNull();
+		vi.advanceTimersByTime(5_000);
+		expect(cb).not.toHaveBeenCalled();
+		ipcHandlers['deck://visibility']?.({ visible: true });
+		expect(cb).toHaveBeenCalledTimes(1);
+		expect(tickInterval()).toBe(1000);
+		off();
 	});
 });

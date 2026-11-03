@@ -2,9 +2,11 @@ import type { Workspace, WidgetInstance } from '#lib/ipc/index.ts';
 import { t } from '#lib/i18n/index.ts';
 
 /**
- * Bundled presets (SPEC §4.1), laid out on the 8×4 default. Phase 1 only ships clock, date, weather and
- * system, so each preset uses those; pomodoro / todo / media / calendar / agent status join in later
- * phases. Full places clock and weather twice at different sizes (Phase 1 acceptance).
+ * Bundled presets (SPEC §4.1), laid out on the 8×4 default. SPEC: Focus = clock + pomodoro + todo,
+ * Ops = system + media + calendar, Agents = agent status + pomodoro + todo, Full = everything.
+ * Pomodoro, calendar and agent status arrive in Phase 3; until then each preset uses what exists.
+ * Full places clock twice at different sizes (Phase 1 acceptance). Only new seeds and
+ * "Reset to preset" use these; existing workspace files are never rewritten.
  */
 export const PRESET_IDS = ['focus', 'ops', 'agents', 'full'] as const;
 export type PresetId = (typeof PRESET_IDS)[number];
@@ -12,33 +14,39 @@ export type PresetId = (typeof PRESET_IDS)[number];
 type Slot = [widget: string, x: number, y: number, w: number, h: number];
 
 const LAYOUTS: Record<PresetId, Slot[]> = {
-	// Calm: one big clock, weather and date beside it, bottom half free for focus widgets.
+	// Calm: one big clock, weather and date beside it, today's todos below.
 	focus: [
 		['clock', 0, 0, 4, 2],
 		['weather', 4, 0, 2, 2],
-		['date', 6, 0, 2, 1]
+		['date', 6, 0, 2, 1],
+		['todo', 0, 2, 4, 2]
 	],
-	// Machine first: wide system tile, compact clock/date/weather column.
+	// Machine first: wide system tile, compact clock/date/weather column, media below.
 	ops: [
 		['system', 0, 0, 4, 2],
 		['weather', 4, 0, 2, 2],
 		['clock', 6, 0, 2, 1],
-		['date', 6, 1, 2, 1]
+		['date', 6, 1, 2, 1],
+		['media', 0, 2, 4, 2]
 	],
-	// Glanceable status strip while agents run.
+	// Glanceable status strip while agents run, todos below.
 	agents: [
 		['clock', 0, 0, 2, 1],
 		['date', 0, 1, 2, 1],
 		['system', 2, 0, 2, 2],
-		['weather', 4, 0, 2, 1]
+		['weather', 4, 0, 2, 1],
+		['todo', 0, 2, 4, 2]
 	],
+	// Every Phase 2 widget, filling the 8×4 grid.
 	full: [
 		['clock', 0, 0, 4, 2],
-		['weather', 4, 0, 4, 2],
-		['system', 0, 2, 4, 2],
-		['clock', 4, 2, 2, 2],
-		['date', 6, 2, 2, 1],
-		['weather', 6, 3, 2, 1]
+		['weather', 4, 0, 2, 2],
+		['system', 6, 0, 2, 2],
+		['media', 0, 2, 4, 1],
+		['volume', 0, 3, 2, 1],
+		['date', 2, 3, 2, 1],
+		['todo', 4, 2, 2, 2],
+		['clock', 6, 2, 2, 2]
 	]
 };
 

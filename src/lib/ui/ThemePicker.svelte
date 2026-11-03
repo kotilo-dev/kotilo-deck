@@ -1,7 +1,7 @@
 <script lang="ts">
 	/** Theme chip (DESIGN §4.2) + popover. Scope: global setting or the active workspace's override. */
 	import { t } from '#lib/i18n/index.ts';
-	import { effectiveThemeId, getTheme, themeLabel, themes } from '#lib/theme/index.ts';
+	import { effectiveThemeId, getTheme, isUserTheme, themeLabel, themes } from '#lib/theme/index.ts';
 	import Icon from './Icon.svelte';
 	import Popover from './Popover.svelte';
 	import { getDeck } from './deck.svelte';
@@ -73,7 +73,7 @@
 							<span style:background={theme.colors.accent}></span>
 							<span style:background={theme.colors['accent-2']}></span>
 						</span>
-						<span class="name">{theme.name}</span>
+						<span class="name">{theme.name}{#if isUserTheme(theme.id)}<span class="user"> · {t('shell.theme.user')}</span>{/if}</span>
 						<span class="variant">{t(`shell.theme.${theme.variant}`)}</span>
 					</button>
 				</li>
@@ -126,7 +126,7 @@
 		border: 1px solid var(--k-border);
 	}
 	.seg button {
-		min-height: 36px;
+		min-height: 44px;
 		padding: 0 8px;
 		border: 0;
 		border-radius: 9px;
@@ -169,7 +169,8 @@
 	.name {
 		flex: 1;
 	}
-	.variant {
+	.variant,
+	.user {
 		font-size: 11px;
 		color: var(--k-text-muted);
 	}

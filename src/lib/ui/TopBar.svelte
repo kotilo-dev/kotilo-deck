@@ -15,6 +15,8 @@
 	const companionConnected = false;
 
 	const unplaced = $derived(ws ? layout(ws.widgets, ws.grid).unplaced : []);
+	/** Overlay mode is a borderless normal window: the empty parts of the top bar move it. */
+	const drag = $derived(store.settings.displayMode === 'overlay' ? true : undefined);
 
 	function cycleDensity() {
 		if (!ws) return;
@@ -27,15 +29,15 @@
 </script>
 
 {#if !ui.editing}
-	<header class="bar">
-		<div class="side start">
+	<header class="bar" data-tauri-drag-region={drag}>
+		<div class="side start" data-tauri-drag-region={drag}>
 			<Mark />
-			<span class="brand">{t('shell.appName')}</span>
+			<span class="brand" data-tauri-drag-region={drag}>{t('shell.appName')}</span>
 		</div>
-		<div class="center">
+		<div class="center" data-tauri-drag-region={drag}>
 			<WorkspaceSwitcher />
 		</div>
-		<div class="side end">
+		<div class="side end" data-tauri-drag-region={drag}>
 			<span class="companion">
 				<span class="dot" class:on={companionConnected} aria-hidden="true"></span>
 				<span class="companion-label">

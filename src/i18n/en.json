@@ -14,7 +14,9 @@
 			"scopeWorkspace": "Only {name}",
 			"useGlobal": "Use the global theme",
 			"dark": "dark",
-			"light": "light"
+			"light": "light",
+			"user": "user",
+			"userSkipped": "Skipped {count} invalid user theme(s): {names}"
 		},
 		"grid": {
 			"label": "Widget grid, {name}",
@@ -37,7 +39,9 @@
 			"removed": "{name} removed",
 			"unplaced": "{count} widgets don't fit this grid: {names}",
 			"widgetLabel": "{name} widget, {size}",
-			"unplacedOne": "1 widget doesn't fit this grid: {names}"
+			"unplacedOne": "1 widget doesn't fit this grid: {names}",
+			"undo": "Undo",
+			"undoNoRoom": "No room to put {name} back"
 		},
 		"drawer": {
 			"title": "Add widget",
@@ -56,7 +60,9 @@
 			"reset": "Use default",
 			"remove": "Remove widget",
 			"close": "Close",
-			"noSettings": "This widget has no settings."
+			"noSettings": "This widget has no settings.",
+			"blur": "Backdrop blur",
+			"blurHint": "Uses GPU on an always-on screen"
 		},
 		"workspace": {
 			"menu": "Workspace actions",
@@ -85,7 +91,9 @@
 			"unknown": "Unknown widget",
 			"unknownBody": "“{id}” isn't installed. Its settings are kept.",
 			"error": "This widget stopped working",
-			"retry": "Retry"
+			"retry": "Retry",
+			"notAvailable": "Not available on this OS",
+			"browserPreview": "Needs the Kotilo Deck desktop app"
 		},
 		"presets": {
 			"focus": "Focus",
@@ -105,6 +113,9 @@
 			"json": "The file isn't valid JSON.",
 			"notFound": "Workspace not found.",
 			"storage": "Couldn't save: {message}"
+		},
+		"screensaver": {
+			"wake": "Wake the deck"
 		}
 	},
 	"widgets": {
@@ -134,11 +145,27 @@
 				"search": "Search time zones",
 				"noResults": "No matching time zones",
 				"change": "Change",
-				"cancel": "Cancel"
+				"cancel": "Cancel",
+				"hour12": "12-hour clock",
+				"seconds": "Show seconds",
+				"face": "Face (2×2)",
+				"city": "City label",
+				"zones": "Extra time zones"
+			},
+			"name": "Clock",
+			"options": {
+				"face": {
+					"analog": "Analog",
+					"digital": "Digital"
+				}
 			}
 		},
 		"date": {
-			"title": "Date"
+			"title": "Date",
+			"name": "Date",
+			"settings": {
+				"dayOfYear": "Show day of the year"
+			}
 		},
 		"weather": {
 			"title": "Weather",
@@ -184,7 +211,15 @@
 				"name": "Display name",
 				"useCoords": "Use coordinates",
 				"invalidCoords": "Latitude −90…90, longitude −180…180",
-				"clear": "Clear location"
+				"clear": "Clear location",
+				"unit": "Unit"
+			},
+			"name": "Weather",
+			"options": {
+				"unit": {
+					"c": "Celsius (°C)",
+					"f": "Fahrenheit (°F)"
+				}
 			}
 		},
 		"system": {
@@ -206,11 +241,302 @@
 			"procCpu": "CPU",
 			"procMem": "RAM",
 			"noProcesses": "No process data",
-			"processesFailed": "Couldn't read processes"
+			"processesFailed": "Couldn't read processes",
+			"name": "System",
+			"settings": {
+				"threshold": "Warning threshold (%)"
+			}
 		},
-		"volume": {},
-		"media": {},
-		"todo": {}
+		"volume": {
+			"title": "Volume",
+			"volume": "Volume",
+			"percent": "{n}%",
+			"muted": "Muted",
+			"mute": "Mute",
+			"unmute": "Unmute",
+			"outputDevice": "Output device",
+			"outputDevices": "Output devices",
+			"noDevice": "No output device",
+			"moreDevices": "More devices…",
+			"mixer": "Mixer",
+			"mixerTitle": "App volume",
+			"noSessions": "No apps are playing audio",
+			"sessionsFailed": "Couldn't read app volumes",
+			"appVolume": "{name} volume",
+			"muteApp": "Mute {name}",
+			"unmuteApp": "Unmute {name}",
+			"error": "Couldn't read audio",
+			"name": "Volume",
+			"settings": {
+				"devicePicker": "Show output device picker",
+				"mixer": "Show app mixer button"
+			}
+		},
+		"media": {
+			"title": "Now playing",
+			"nothingPlaying": "Nothing playing",
+			"play": "Play",
+			"pause": "Pause",
+			"prev": "Previous",
+			"next": "Next",
+			"shuffle": "Shuffle",
+			"repeatOff": "Repeat: off",
+			"repeatList": "Repeat: all",
+			"repeatTrack": "Repeat: one",
+			"seek": "Position",
+			"position": "{pos} of {dur}",
+			"byline": "{artist} · {source}",
+			"error": "Couldn't read media",
+			"name": "Media",
+			"settings": {
+				"showAlbum": "Show album (4×2)"
+			}
+		},
+		"todo": {
+			"title": "Today",
+			"left": "{n} left",
+			"more": "+{n} more",
+			"placeholder": "Add… “deploy tomorrow 9am”",
+			"addLabel": "Quick add task",
+			"dueChip": "Due {when}",
+			"today": "Today",
+			"tomorrow": "Tomorrow",
+			"yesterday": "Yesterday",
+			"empty": "Nothing to do",
+			"emptyHint": "Type below to add a task",
+			"delete": "Delete",
+			"deleteItem": "Delete “{text}”",
+			"snooze": "Snooze 10 min",
+			"dismiss": "Dismiss",
+			"reminder": "Reminder",
+			"reorder": "Drag to reorder “{text}”",
+			"keysHint": "Alt+Up or Alt+Down moves a task, Delete shows its delete button",
+			"list": "Tasks",
+			"moved": "Moved to position {n}",
+			"error": "Couldn't load tasks",
+			"saveFailed": "Couldn't save",
+			"group": {
+				"overdue": "Overdue",
+				"today": "Today",
+				"tomorrow": "Tomorrow",
+				"later": "Later",
+				"none": "No date",
+				"done": "Completed"
+			},
+			"name": "Todo",
+			"settings": {
+				"remind": "Remind at the due time",
+				"showCompleted": "Show completed tasks"
+			}
+		}
 	},
-	"settings": {}
+	"settings": {
+		"window": {
+			"title": "Kotilo Deck — Settings",
+			"minimize": "Minimize",
+			"close": "Close"
+		},
+		"nav": {
+			"label": "Settings sections",
+			"general": "General",
+			"display": "Display & monitor",
+			"appearance": "Appearance",
+			"themes": "Themes",
+			"workspaces": "Workspaces",
+			"weather": "Weather & calendar",
+			"companion": "Companion",
+			"burnin": "Burn-in & night",
+			"about": "About · MIT"
+		},
+		"common": {
+			"off": "Off",
+			"save": "Save",
+			"saveFailed": "Couldn't save: {message}",
+			"desktopOnly": "Available in the Kotilo Deck desktop app.",
+			"later": "Coming in a later version."
+		},
+		"general": {
+			"title": "General",
+			"text": "Startup, the show/hide hotkey, units and notifications.",
+			"startup": "Startup & window",
+			"autostart": "Start with the OS",
+			"autostartHelp": "Opens the deck when you sign in",
+			"alwaysOnTop": "Always on top",
+			"alwaysOnTopHelp": "Keeps the deck above other windows",
+			"hotkeyGroup": "Hotkey",
+			"hotkey": "Show / hide deck",
+			"hotkeyHelp": "Press a key combination, e.g. Ctrl+Alt+K",
+			"hotkeySaved": "Hotkey set to {hotkey}",
+			"hotkeyErrors": {
+				"empty": "Enter a key combination.",
+				"modifier": "Add Ctrl, Alt, Shift or Super.",
+				"key": "Use exactly one key besides the modifiers.",
+				"backend": "Not saved: {message}"
+			},
+			"units": "Units & notifications",
+			"unit": "Temperature unit",
+			"unitHelp": "Default for weather widgets; each widget can override it",
+			"sound": "Notification sound",
+			"soundHelp": "Plays with reminders and pomodoro notifications"
+		},
+		"backup": {
+			"title": "Backup",
+			"label": "All settings and workspaces",
+			"help": "One JSON file. Importing replaces everything; current files are backed up first.",
+			"import": "Import…",
+			"export": "Export…",
+			"exported": "Settings exported",
+			"imported": "Imported. The previous files were backed up to {path}",
+			"failed": "Backup failed: {message}",
+			"invalid": "This file isn't a Kotilo Deck export.",
+			"importedBrowser": "Settings and workspaces imported",
+			"confirmTitle": "Replace all settings and workspaces?",
+			"confirmBody": "Everything is replaced by the file you picked. The current files are first copied to {path}.",
+			"confirmBodyBrowser": "Everything in this browser is replaced by the file you picked.",
+			"confirm": "Replace everything"
+		},
+		"display": {
+			"title": "Display & monitor",
+			"text": "Where the deck lives and how it covers the screen.",
+			"monitor": "Monitor",
+			"refresh": "Refresh",
+			"none": "No monitors reported.",
+			"primary": "primary",
+			"pinned": "deck here",
+			"auto": "deck here · auto",
+			"rule": "Without a choice the deck uses the first secondary monitor and moves back when it reconnects.",
+			"moved": "Deck moved to {name}",
+			"mode": "Window",
+			"modeLabel": "Display mode",
+			"fullscreen": "Fullscreen",
+			"overlay": "Overlay",
+			"fullscreenHelp": "Covers the chosen monitor",
+			"overlayHelp": "Normal-sized window, always on top; drag it by the top bar"
+		},
+		"appearance": {
+			"title": "Appearance",
+			"text": "Background, surface opacity and blur. Workspaces and single widgets can override these.",
+			"background": "Background layer",
+			"solid": "Solid",
+			"solidMeta": "theme bg",
+			"wallpaper": "Wallpaper",
+			"noWallpaper": "none",
+			"transparent": "Transparent",
+			"transparentMeta": "overlay",
+			"transparentUnavailable": "Not available on this OS",
+			"transparentHint": "Transparent works best in overlay mode (Display & monitor).",
+			"wallpapers": "Wallpapers",
+			"noWallpapers": "No wallpapers yet. Import one or drop images/videos into {path}.",
+			"import": "Import…",
+			"importFailed": "Couldn't import: {message}",
+			"surfaces": "Widget surfaces",
+			"opacity": "Surface opacity",
+			"opacityHelp": "Theme default {pct}%",
+			"blur": "Backdrop blur",
+			"blurHelp": "Uses GPU on an always-on screen",
+			"windowOpacity": "Window opacity",
+			"windowOpacityHelp": "Overlay mode only — disabled in fullscreen",
+			"windowOpacityOverlay": "Whole window, overlay mode",
+			"dim": "Dim",
+			"nightSummary": "{from} → {to} · dim to {pct}%",
+			"idleSummary": "After {min} min",
+			"idleSummaryClock": "After {min} min · show clock face",
+			"unsaved": "Unsaved changes",
+			"reset": "Reset to theme",
+			"apply": "Apply",
+			"applied": "Appearance applied"
+		},
+		"themes": {
+			"title": "Themes",
+			"text": "The global theme. A workspace can override it from the theme chip on the deck.",
+			"auto": "Light / dark",
+			"autoLabel": "Switch automatically",
+			"autoHelp": "Uses the theme’s light or dark pair",
+			"noPair": "{name} has no light/dark pair, so it stays as it is.",
+			"os": "Follow OS",
+			"schedule": "Schedule",
+			"lightFrom": "Light from",
+			"darkFrom": "Dark from",
+			"global": "All themes · {count}",
+			"scopeNote": "Workspace overrides still win over this choice.",
+			"pairLabel": "Show its pair, {name}",
+			"noPairShort": "no pair",
+			"user": "User themes",
+			"userHelp": "Drop theme JSON files into this folder; they load instantly. A file with a bundled id replaces that theme:",
+			"skipped": "Skipped files"
+		},
+		"workspaces": {
+			"title": "Workspaces",
+			"text": "Saved dashboards. Changes show on the deck right away.",
+			"list": "Workspaces · {count}",
+			"widgets": "{count} widgets",
+			"hidden": "{count} hidden",
+			"density": "Grid density of {name}",
+			"renameOne": "Rename {name}",
+			"duplicateOne": "Duplicate {name}",
+			"resetOne": "Reset {name} to a preset",
+			"exportOne": "Export {name}",
+			"deleteOne": "Delete {name}",
+			"created": "Created {name}",
+			"perMonitor": "Default per monitor",
+			"perMonitorHelp": "Shown when the deck is on this monitor",
+			"browserMonitor": "This browser",
+			"appearance": "Appearance override",
+			"appearanceOf": "Appearance of {name}",
+			"inherit": "Inherit global",
+			"inheritHelp": "Overrides the global Appearance setting for this workspace",
+			"own": "Own value",
+			"ownValue": "Own {what} for this workspace"
+		},
+		"weather": {
+			"title": "Weather & calendar",
+			"text": "Defaults for weather and calendar widgets.",
+			"weather": "Weather",
+			"location": "Each weather widget picks its own location from its gear in edit mode.",
+			"calendar": "Calendar",
+			"feeds": "Calendar feeds (ICS)"
+		},
+		"companion": {
+			"title": "Companion",
+			"text": "Connection to the Kotilo desktop app (agent status, pomodoro sync).",
+			"status": "Kotilo desktop",
+			"statusOff": "Not connected"
+		},
+		"burnin": {
+			"title": "Burn-in & night",
+			"text": "Protects always-on screens: tiny pixel shifts, dimming at night and when idle.",
+			"pending": "The Appearance page has unapplied dim toggles.",
+			"shift": "Pixel shift",
+			"shiftLabel": "Shift the deck",
+			"shiftHelp": "Moves everything by up to 4 px",
+			"every": "Every {min} min",
+			"night": "Night schedule",
+			"nightLabel": "Dim at night",
+			"nightHelp": "Lowers brightness of the deck content, not the display",
+			"from": "From",
+			"to": "To",
+			"dimTo": "Dim to",
+			"idle": "Idle dim",
+			"idleLabel": "Dim when idle",
+			"idleHelp": "After no touch, mouse or key input",
+			"after": "After",
+			"minutes": "{min} min",
+			"clockFace": "Show clock face",
+			"clockFaceHelp": "A large, slowly drifting clock; tap to wake"
+		},
+		"about": {
+			"title": "About",
+			"text": "Version, license and where your data lives.",
+			"tagline": "A second-screen deck for developers",
+			"license": "License",
+			"licenseText": "Open source under the MIT license",
+			"files": "Files",
+			"settings": "Settings",
+			"workspaces": "Workspaces",
+			"wallpapers": "Wallpapers",
+			"themes": "User themes",
+			"logs": "Logs",
+			"privacy": "No account, no cloud, no telemetry. Everything stays on this computer."
+		}
+	}
 }
