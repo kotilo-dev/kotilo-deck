@@ -1,0 +1,23 @@
+{
+  "id": "rose-pine",
+  "name": "Rosé Pine",
+  "variant": "dark",
+  "pair": "rose-pine-dawn",
+  "colors": {
+    "bg": "#191724",
+    "bg-alt": "#1f1d2e",
+    "surface": "#26233a",
+    "text": "#e0def4",
+    "text-muted": "#908caa",
+    "border": "#403d52",
+    "accent": "#9ccfd8",
+    "accent-2": "#c4a7e7",
+    "success": "#31748f",
+    "warning": "#f6c177",
+    "danger": "#eb6f92",
+    "info": "#ebbcba"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "ayu-dark",
+  "name": "Ayu Dark",
+  "variant": "dark",
+  "pair": "ayu-light",
+  "colors": {
+    "bg": "#0d1017",
+    "bg-alt": "#0b0e14",
+    "surface": "#131721",
+    "text": "#bfbdb6",
+    "text-muted": "#7a808f",
+    "border": "#1b1f29",
+    "accent": "#59c2ff",
+    "accent-2": "#d2a6ff",
+    "success": "#aad94c",
+    "warning": "#ffb454",
+    "danger": "#d95757",
+    "info": "#95e6cb"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

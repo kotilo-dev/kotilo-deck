@@ -1,0 +1,22 @@
+{
+  "id": "material-palenight",
+  "name": "Material Palenight",
+  "variant": "dark",
+  "colors": {
+    "bg": "#292d3e",
+    "bg-alt": "#202331",
+    "surface": "#34324a",
+    "text": "#a6accd",
+    "text-muted": "#979cb7",
+    "border": "#444267",
+    "accent": "#82aaff",
+    "accent-2": "#c792ea",
+    "success": "#c3e88d",
+    "warning": "#ffcb6b",
+    "danger": "#f07178",
+    "info": "#89ddff"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

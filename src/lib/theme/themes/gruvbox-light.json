@@ -1,0 +1,23 @@
+{
+  "id": "gruvbox-light",
+  "name": "Gruvbox Light",
+  "variant": "light",
+  "pair": "gruvbox-dark",
+  "colors": {
+    "bg": "#fbf1c7",
+    "bg-alt": "#ebdbb2",
+    "surface": "#f9f5d7",
+    "text": "#3c3836",
+    "text-muted": "#665c54",
+    "border": "#d5c4a1",
+    "accent": "#076678",
+    "accent-2": "#8f3f71",
+    "success": "#79740e",
+    "warning": "#b57614",
+    "danger": "#9d0006",
+    "info": "#427b58"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

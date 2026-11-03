@@ -1,0 +1,23 @@
+{
+  "id": "everforest-light",
+  "name": "Everforest Light",
+  "variant": "light",
+  "pair": "everforest-dark",
+  "colors": {
+    "bg": "#f4f0d9",
+    "bg-alt": "#efebd4",
+    "surface": "#fdf6e3",
+    "text": "#5c6a72",
+    "text-muted": "#626f61",
+    "border": "#e6e2cc",
+    "accent": "#317ca5",
+    "accent-2": "#df69ba",
+    "success": "#8da101",
+    "warning": "#dfa000",
+    "danger": "#f85552",
+    "info": "#35a77c"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

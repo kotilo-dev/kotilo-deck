@@ -1,0 +1,23 @@
+{
+  "id": "solarized-dark",
+  "name": "Solarized Dark",
+  "variant": "dark",
+  "pair": "solarized-light",
+  "colors": {
+    "bg": "#002b36",
+    "bg-alt": "#002b36",
+    "surface": "#073642",
+    "text": "#93a1a1",
+    "text-muted": "#8b9b9d",
+    "border": "#586e75",
+    "accent": "#3295da",
+    "accent-2": "#6c71c4",
+    "success": "#859900",
+    "warning": "#b58900",
+    "danger": "#dc322f",
+    "info": "#2aa198"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

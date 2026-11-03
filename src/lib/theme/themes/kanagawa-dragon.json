@@ -1,0 +1,22 @@
+{
+  "id": "kanagawa-dragon",
+  "name": "Kanagawa Dragon",
+  "variant": "dark",
+  "colors": {
+    "bg": "#181616",
+    "bg-alt": "#0d0c0c",
+    "surface": "#282727",
+    "text": "#c5c9c5",
+    "text-muted": "#a6a69c",
+    "border": "#625e5a",
+    "accent": "#8ba4b0",
+    "accent-2": "#8992a7",
+    "success": "#8a9a7b",
+    "warning": "#c4b28a",
+    "danger": "#c4746e",
+    "info": "#8ea4a2"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

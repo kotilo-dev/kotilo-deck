@@ -1,0 +1,23 @@
+{
+  "id": "everforest-dark",
+  "name": "Everforest Dark",
+  "variant": "dark",
+  "pair": "everforest-light",
+  "colors": {
+    "bg": "#2d353b",
+    "bg-alt": "#232a2e",
+    "surface": "#343f44",
+    "text": "#d3c6aa",
+    "text-muted": "#a0aba3",
+    "border": "#475258",
+    "accent": "#7fbbb3",
+    "accent-2": "#d699b6",
+    "success": "#a7c080",
+    "warning": "#dbbc7f",
+    "danger": "#e67e80",
+    "info": "#83c092"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

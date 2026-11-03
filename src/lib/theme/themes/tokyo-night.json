@@ -2,6 +2,7 @@
   "id": "tokyo-night",
   "name": "Tokyo Night",
   "variant": "dark",
+  "pair": "tokyo-night-day",
   "colors": {
     "bg": "#1a1b26",
     "bg-alt": "#16161e",

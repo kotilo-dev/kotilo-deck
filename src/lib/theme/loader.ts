@@ -36,6 +36,7 @@ export function parseTheme(input: unknown): Theme {
 		name: t.name,
 		variant: t.variant,
 		pair: typeof t.pair === 'string' ? t.pair : undefined,
+		short: typeof t.short === 'string' && t.short.trim() ? t.short.trim() : undefined,
 		colors: Object.fromEntries(COLOR_TOKENS.map((k) => [k, t.colors[k]])) as Theme['colors'],
 		radius: typeof t.radius === 'string' ? t.radius : '16px',
 		opacity: { surface, bg },

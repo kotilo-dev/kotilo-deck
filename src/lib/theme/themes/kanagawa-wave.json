@@ -1,0 +1,22 @@
+{
+  "id": "kanagawa-wave",
+  "name": "Kanagawa Wave",
+  "variant": "dark",
+  "colors": {
+    "bg": "#1f1f28",
+    "bg-alt": "#16161d",
+    "surface": "#2a2a37",
+    "text": "#dcd7ba",
+    "text-muted": "#c8c093",
+    "border": "#54546d",
+    "accent": "#7e9cd8",
+    "accent-2": "#957fb8",
+    "success": "#98bb6c",
+    "warning": "#e6c384",
+    "danger": "#e46876",
+    "info": "#7aa89f"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

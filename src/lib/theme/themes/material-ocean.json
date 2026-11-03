@@ -1,0 +1,22 @@
+{
+  "id": "material-ocean",
+  "name": "Material Ocean",
+  "variant": "dark",
+  "colors": {
+    "bg": "#0f111a",
+    "bg-alt": "#090b10",
+    "surface": "#1a1c25",
+    "text": "#8f93a2",
+    "text-muted": "#7a83a4",
+    "border": "#3b3f51",
+    "accent": "#82aaff",
+    "accent-2": "#c792ea",
+    "success": "#c3e88d",
+    "warning": "#ffcb6b",
+    "danger": "#f07178",
+    "info": "#89ddff"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

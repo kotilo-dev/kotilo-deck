@@ -1,0 +1,22 @@
+{
+  "id": "one-dark",
+  "name": "One Dark",
+  "variant": "dark",
+  "colors": {
+    "bg": "#282c34",
+    "bg-alt": "#21252b",
+    "surface": "#2c313a",
+    "text": "#abb2bf",
+    "text-muted": "#9399a5",
+    "border": "#3e4451",
+    "accent": "#61afef",
+    "accent-2": "#c678dd",
+    "success": "#98c379",
+    "warning": "#e5c07b",
+    "danger": "#e06c75",
+    "info": "#56b6c2"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "oxocarbon",
+  "name": "Oxocarbon",
+  "variant": "dark",
+  "colors": {
+    "bg": "#161616",
+    "bg-alt": "#161616",
+    "surface": "#262626",
+    "text": "#f2f4f8",
+    "text-muted": "#dde1e6",
+    "border": "#393939",
+    "accent": "#78a9ff",
+    "accent-2": "#be95ff",
+    "success": "#42be65",
+    "warning": "#ff7eb6",
+    "danger": "#ee5396",
+    "info": "#3ddbd9"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

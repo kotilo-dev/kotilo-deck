@@ -1,0 +1,22 @@
+{
+  "id": "nightfox",
+  "name": "Nightfox",
+  "variant": "dark",
+  "colors": {
+    "bg": "#192330",
+    "bg-alt": "#131a24",
+    "surface": "#212e3f",
+    "text": "#cdcecf",
+    "text-muted": "#aeafb0",
+    "border": "#29394f",
+    "accent": "#719cd6",
+    "accent-2": "#9d79d6",
+    "success": "#81b29a",
+    "warning": "#dbc074",
+    "danger": "#c94f6d",
+    "info": "#63cdcf"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

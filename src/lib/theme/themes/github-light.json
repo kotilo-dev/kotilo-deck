@@ -1,0 +1,23 @@
+{
+  "id": "github-light",
+  "name": "GitHub Light",
+  "variant": "light",
+  "pair": "github-dark",
+  "colors": {
+    "bg": "#f6f8fa",
+    "bg-alt": "#eaeef2",
+    "surface": "#ffffff",
+    "text": "#1f2328",
+    "text-muted": "#656d76",
+    "border": "#d0d7de",
+    "accent": "#0969da",
+    "accent-2": "#8250df",
+    "success": "#1a7f37",
+    "warning": "#9a6700",
+    "danger": "#d1242f",
+    "info": "#1b7c83"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

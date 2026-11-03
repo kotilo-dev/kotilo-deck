@@ -1,0 +1,22 @@
+{
+  "id": "ayu-mirage",
+  "name": "Ayu Mirage",
+  "variant": "dark",
+  "colors": {
+    "bg": "#242936",
+    "bg-alt": "#1f2430",
+    "surface": "#282e3b",
+    "text": "#cccac2",
+    "text-muted": "#8f97a5",
+    "border": "#171b24",
+    "accent": "#73d0ff",
+    "accent-2": "#dfbfff",
+    "success": "#d5ff80",
+    "warning": "#ffd173",
+    "danger": "#ff6666",
+    "info": "#95e6cb"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "tokyo-night-day",
+  "name": "Tokyo Night Day",
+  "variant": "light",
+  "pair": "tokyo-night",
+  "colors": {
+    "bg": "#e1e2e7",
+    "bg-alt": "#d0d5e3",
+    "surface": "#e9e9ed",
+    "text": "#3760bf",
+    "text-muted": "#4f609e",
+    "border": "#a8aecb",
+    "accent": "#1c72e7",
+    "accent-2": "#9854f1",
+    "success": "#587539",
+    "warning": "#8c6c3e",
+    "danger": "#f52a65",
+    "info": "#007197"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

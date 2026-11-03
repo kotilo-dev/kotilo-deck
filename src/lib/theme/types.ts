@@ -21,6 +21,8 @@ export interface Theme {
 	name: string;
 	variant: 'dark' | 'light';
 	pair?: string;
+	/** Optional top-bar chip label (e.g. "tokyo day"); otherwise derived by `themeLabel`. */
+	short?: string;
 	colors: Record<ColorToken, string>;
 	radius: string;
 	opacity: { surface: number; bg: number };

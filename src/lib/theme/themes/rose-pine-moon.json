@@ -1,0 +1,22 @@
+{
+  "id": "rose-pine-moon",
+  "name": "Rosé Pine Moon",
+  "variant": "dark",
+  "colors": {
+    "bg": "#232136",
+    "bg-alt": "#2a273f",
+    "surface": "#393552",
+    "text": "#e0def4",
+    "text-muted": "#a4a1b9",
+    "border": "#44415a",
+    "accent": "#9ccfd8",
+    "accent-2": "#c4a7e7",
+    "success": "#3e8fb0",
+    "warning": "#f6c177",
+    "danger": "#eb6f92",
+    "info": "#ea9a97"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

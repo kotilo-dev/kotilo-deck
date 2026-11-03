@@ -1,0 +1,22 @@
+{
+  "id": "monokai-pro",
+  "name": "Monokai Pro",
+  "variant": "dark",
+  "colors": {
+    "bg": "#2d2a2e",
+    "bg-alt": "#221f22",
+    "surface": "#403e41",
+    "text": "#fcfcfa",
+    "text-muted": "#c1c0c0",
+    "border": "#5b595c",
+    "accent": "#78dce8",
+    "accent-2": "#ab9df2",
+    "success": "#a9dc76",
+    "warning": "#ffd866",
+    "danger": "#ff6188",
+    "info": "#78dce8"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}
