@@ -1,0 +1,15 @@
+{
+	"id": "media",
+	"name": "Media",
+	"icon": "music",
+	"sizes": ["4x1", "4x2"],
+	"defaultSize": "4x1",
+	"capabilities": ["media"],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"showAlbum": { "type": "boolean", "title": "Show album (4×2)", "default": true }
+		}
+	}
+}
