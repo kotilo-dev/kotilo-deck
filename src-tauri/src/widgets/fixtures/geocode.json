@@ -1,0 +1,27 @@
+{
+ "results": [
+  {
+   "id": 745044,
+   "name": "Istanbul",
+   "latitude": 41.01384,
+   "longitude": 28.94966,
+   "elevation": 39.0,
+   "feature_code": "PPLA",
+   "country_code": "TR",
+   "timezone": "Europe/Istanbul",
+   "population": 14804116,
+   "country_id": 298795,
+   "country": "Türkiye",
+   "admin1_id": 745042,
+   "admin1": "Istanbul"
+  },
+  {
+   "id": 1,
+   "name": "Nowhere",
+   "latitude": 0.5,
+   "longitude": -0.5,
+   "timezone": "GMT"
+  }
+ ],
+ "generationtime_ms": 0.7
+}

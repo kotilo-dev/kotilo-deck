@@ -35,7 +35,9 @@ pub enum PlatformError {
 
 pub type Result<T> = std::result::Result<T, PlatformError>;
 
-#[derive(Debug, Clone, Serialize)]
+/// Sizes are physical pixels; divide by `scale_factor` for CSS pixels.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MonitorInfo {
     /// Stable name used to re-attach when the monitor reconnects.
     pub name: String,
@@ -46,6 +48,7 @@ pub struct MonitorInfo {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AudioDevice {
     pub id: String,
     pub name: String,
@@ -76,7 +79,12 @@ pub trait Platform: Send + Sync {
     }
 
     // Phase 1: System widget GPU tile (CPU/RAM come from `sysinfo`, which is portable).
+    /// Busiest GPU engine utilisation, 0–100 (Task Manager's "GPU" figure).
     fn gpu_usage(&self) -> Result<f32> {
+        Err(PlatformError::Unsupported(Capability::Gpu))
+    }
+    /// Name of the primary hardware GPU adapter.
+    fn gpu_name(&self) -> Result<String> {
         Err(PlatformError::Unsupported(Capability::Gpu))
     }
 
@@ -122,6 +130,31 @@ mod tests {
             p.volume(),
             Err(PlatformError::Unsupported(Capability::Audio))
         ));
+    }
+
+    #[test]
+    fn gpu_defaults_to_unsupported() {
+        assert!(matches!(
+            Bare.gpu_usage(),
+            Err(PlatformError::Unsupported(Capability::Gpu))
+        ));
+        assert!(matches!(
+            Bare.gpu_name(),
+            Err(PlatformError::Unsupported(Capability::Gpu))
+        ));
+    }
+
+    #[test]
+    fn monitor_info_is_camel_case() {
+        let m = MonitorInfo {
+            name: "D".into(),
+            width: 1,
+            height: 1,
+            scale_factor: 1.5,
+            primary: true,
+        };
+        let v = serde_json::to_value(m).unwrap();
+        assert_eq!(v["scaleFactor"], 1.5);
     }
 
     #[test]
