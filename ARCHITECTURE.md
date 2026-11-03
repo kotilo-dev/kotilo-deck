@@ -33,17 +33,24 @@ kotilo-deck/
 
 ```rust
 pub trait Platform: Send + Sync {
-    fn capabilities(&self) -> Vec<Capability>;           // required
-    fn has(&self, c: Capability) -> bool;                // derived
-    fn audio_devices(&self) -> Result<Vec<AudioDevice>>; // default: Unsupported
-    fn volume(&self) -> Result<f32>;
-    fn set_volume(&self, level: f32) -> Result<()>;
-    fn set_muted(&self, muted: bool) -> Result<()>;
-    fn gpu_usage(&self) -> Result<f32>;
-    fn set_window_transparent(&self, on: bool) -> Result<()>;
+    fn capabilities(&self) -> Vec<Capability>;                         // required
+    fn has(&self, c: Capability) -> bool;                              // derived
+    // every method below defaults to Err(Unsupported(cap))
+    fn audio_state(&self) -> Result<AudioState>;                       // + volume/mute/devices
+    fn set_default_audio_device(&self, id: &str) -> Result<()>;
+    fn audio_sessions(&self) -> Result<Vec<AudioSession>>;             // + per-session volume/mute
+    fn watch_audio(&self, on_change: ChangeFn) -> Result<Watch>;       // drop = unregister
+    fn media_state(&self) -> Result<MediaState>;
+    fn media_control(&self, a: MediaAction) -> Result<()>;
+    fn media_seek(&self, seconds: f64) -> Result<()>;
+    fn watch_media(&self, on_change: ChangeFn) -> Result<Watch>;
+    fn gpu_usage(&self) -> Result<f32>;  fn gpu_name(&self) -> Result<String>;  fn gpu_release(&self);
+    fn set_window_opacity(&self, w: NativeWindow, opacity: f64) -> Result<()>;
 }
-pub fn current() -> &'static dyn Platform;              // cfg-selected impl
+pub fn current() -> &'static dyn Platform;                            // cfg-selected impl
 ```
+
+Windows: COM/WinRT calls run on dedicated MTA worker threads (`platform/windows/com.rs`); watchers own their own thread and only signal a debounced "changed" — callers re-read state.
 
 `Capability` = `monitors | system-info | gpu | audio | media | notifications | transparency | companion` (kebab-case on the wire, same strings as widget manifests' `capabilities`). Methods grow per phase; each new one gets an `Unsupported` default so unimplemented OSes keep compiling.
 
