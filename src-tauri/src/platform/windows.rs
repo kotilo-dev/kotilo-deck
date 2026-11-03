@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use windows::core::{w, PCWSTR};
+use windows::Win32::Foundation::{COLORREF, HWND};
 use windows::Win32::Graphics::Dxgi::{
     CreateDXGIFactory1, IDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE,
 };
@@ -10,8 +11,12 @@ use windows::Win32::System::Performance::{
     PdhOpenQueryW, PDH_CSTATUS_NEW_DATA, PDH_CSTATUS_VALID_DATA, PDH_FMT_COUNTERVALUE_ITEM_W,
     PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PDH_MORE_DATA,
 };
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetWindowLongW, IsWindow, SetLayeredWindowAttributes, SetWindowLongW, GWL_EXSTYLE, LWA_ALPHA,
+    WS_EX_LAYERED,
+};
 
-use super::{Capability, Platform, PlatformError, Result};
+use super::{Capability, NativeWindow, Platform, PlatformError, Result};
 
 /// Windows implementation (windows-rs). Capabilities are added as each phase lands.
 pub struct WindowsPlatform;
@@ -22,7 +27,34 @@ impl Platform for WindowsPlatform {
             Capability::Monitors,
             Capability::SystemInfo,
             Capability::Gpu,
+            Capability::Transparency,
         ]
+    }
+
+    fn set_window_opacity(&self, window: NativeWindow, opacity: f64) -> Result<()> {
+        let hwnd = HWND(window.0 as *mut core::ffi::c_void);
+        let layered = WS_EX_LAYERED.0 as i32;
+        // SAFETY: the handle is validated with IsWindow; style reads/writes and
+        // SetLayeredWindowAttributes have no memory-safety preconditions beyond a valid HWND.
+        unsafe {
+            if !IsWindow(Some(hwnd)).as_bool() {
+                return Err(PlatformError::Os("not a window".into()));
+            }
+            let ex = GetWindowLongW(hwnd, GWL_EXSTYLE);
+            if opacity >= 1.0 || !opacity.is_finite() {
+                if ex & layered != 0 {
+                    SetWindowLongW(hwnd, GWL_EXSTYLE, ex & !layered);
+                }
+                return Ok(());
+            }
+            if ex & layered == 0 {
+                SetWindowLongW(hwnd, GWL_EXSTYLE, ex | layered);
+                if GetWindowLongW(hwnd, GWL_EXSTYLE) & layered == 0 {
+                    return Err(PlatformError::Os("cannot make the window layered".into()));
+                }
+            }
+            SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha(opacity), LWA_ALPHA).map_err(os)
+        }
     }
 
     fn gpu_usage(&self) -> Result<f32> {
@@ -66,6 +98,11 @@ impl Platform for WindowsPlatform {
         }
         Err(PlatformError::Os("no hardware GPU adapter".into()))
     }
+}
+
+/// 0–1 → 0–255 alpha.
+fn alpha(opacity: f64) -> u8 {
+    (opacity.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
 fn os(e: windows::core::Error) -> PlatformError {
@@ -188,6 +225,21 @@ fn busiest(per_engine: &HashMap<String, f64>) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opacity_to_alpha() {
+        assert_eq!(alpha(0.2), 51);
+        assert_eq!(alpha(1.0), 255);
+        assert_eq!(alpha(-1.0), 0);
+    }
+
+    #[test]
+    fn opacity_on_invalid_window_is_an_error() {
+        assert!(matches!(
+            WindowsPlatform.set_window_opacity(NativeWindow(0), 0.5),
+            Err(PlatformError::Os(_))
+        ));
+    }
 
     #[test]
     fn engine_key_strips_pid() {

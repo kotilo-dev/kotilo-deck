@@ -55,6 +55,11 @@ pub struct AudioDevice {
     pub is_default: bool,
 }
 
+/// Opaque native top-level window handle (`HWND` on Windows). Obtained from Tauri in
+/// `window.rs`; only the platform modules interpret it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeWindow(pub isize);
+
 /// OS integration surface. Methods default to `Unsupported` so a new platform
 /// compiles as soon as it implements `capabilities()`; fill in per phase.
 pub trait Platform: Send + Sync {
@@ -88,8 +93,12 @@ pub trait Platform: Send + Sync {
         Err(PlatformError::Unsupported(Capability::Gpu))
     }
 
-    // Phase 2: overlay mode.
-    fn set_window_transparent(&self, _transparent: bool) -> Result<()> {
+    // Phase 2: overlay mode. (A transparent *background* needs no OS call: the deck window
+    // is created with Tauri `transparent: true` and the page paints its own background.)
+    /// Whole-window opacity, 0–1 (1 removes the layered style again so fullscreen pays
+    /// nothing). Must be re-applied after the window toolkit rewrites the window styles
+    /// (fullscreen / always-on-top changes).
+    fn set_window_opacity(&self, _window: NativeWindow, _opacity: f64) -> Result<()> {
         Err(PlatformError::Unsupported(Capability::Transparency))
     }
 }
@@ -141,6 +150,14 @@ mod tests {
         assert!(matches!(
             Bare.gpu_name(),
             Err(PlatformError::Unsupported(Capability::Gpu))
+        ));
+    }
+
+    #[test]
+    fn window_opacity_defaults_to_unsupported() {
+        assert!(matches!(
+            Bare.set_window_opacity(NativeWindow(0), 0.5),
+            Err(PlatformError::Unsupported(Capability::Transparency))
         ));
     }
 

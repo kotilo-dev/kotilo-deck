@@ -1,4 +1,4 @@
-//! Tray icon: Show / Hide, Workspaces ▸, Monitor ▸, Settings… (Phase 2), Quit.
+//! Tray icon: Show / Hide, Workspaces ▸, Monitor ▸, Settings…, Quit.
 //! Left-click toggles the deck. The menu is rebuilt whenever workspaces or monitors change.
 
 use std::sync::Mutex;
@@ -83,7 +83,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &ws_menu,
             &mon_menu,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, ID_SETTINGS, "Settings…", false, None::<&str>)?,
+            &MenuItem::with_id(app, ID_SETTINGS, "Settings…", true, None::<&str>)?,
             &MenuItem::with_id(app, ID_QUIT, "Quit", true, None::<&str>)?,
         ],
     )
@@ -93,7 +93,10 @@ fn on_menu(app: &AppHandle, event: MenuEvent) {
     let id = event.id.as_ref();
     match id {
         ID_SHOW_HIDE => window::toggle(app),
-        ID_QUIT => app.exit(0),
+        ID_SETTINGS => {
+            let _ = crate::settings_window::open(app);
+        }
+        ID_QUIT => crate::startup::quit(app),
         _ => {
             if let Some(ws) = id.strip_prefix(WS_PREFIX) {
                 let _ = app.emit(EVENT_WORKSPACE_SWITCH, json!({ "id": ws }));

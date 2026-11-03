@@ -1,8 +1,17 @@
-//! App setup: managed state, tray, hotkeys, initial placement and background watchers.
+//! App setup: managed state, tray, hotkeys, initial placement and background tasks; and
+//! the orderly quit path.
 
-use tauri::{App, WindowEvent};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
-use crate::{hotkeys, paths, settings, tray, widgets, window, workspace};
+use serde_json::json;
+use tauri::{App, AppHandle, Emitter, Manager};
+
+use crate::{files, hotkeys, paths, settings, tray, widgets, window, workspace};
+
+pub const EVENT_QUITTING: &str = "deck://quitting";
+/// Time the webviews get after `deck://quitting` to flush pending saves.
+const QUIT_GRACE: Duration = Duration::from_millis(500);
 
 /// Registers managed state. Called on the builder before `setup`.
 pub fn manage(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
@@ -10,9 +19,12 @@ pub fn manage(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry>
         .manage(settings::SettingsLock::default())
         .manage(workspace::WorkspaceStore::new(paths::workspaces_dir()))
         .manage(window::Placement::default())
+        .manage(window::DisplayState::new(paths::window_state_file()))
         .manage(tray::TrayState::default())
         .manage(widgets::system::Sampler::default())
         .manage(widgets::weather::Weather::new(paths::weather_cache_dir()))
+        .manage(widgets::todo::Todos::open(&paths::database_file()))
+        .manage(files::ThemeWatcher::default())
 }
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
@@ -22,21 +34,50 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     if let Err(e) = tray::setup(&handle) {
         tracing::warn!("tray icon unavailable: {e}");
     }
-    window::apply_always_on_top(&handle, s.always_on_top);
-    window::attach(&handle);
+    if !window::attach(&handle) {
+        window::apply_window_flags(&handle, &s);
+    }
     window::show(&handle);
     hotkeys::setup(&handle, &s.hotkey);
     window::spawn_watcher(handle.clone());
+    settings::sync_autostart(&handle, &s);
+    widgets::todo::spawn_scheduler(handle.clone());
+    files::watch_user_themes(&handle);
 
-    // Closing the deck hides it to the tray; "Quit" lives in the tray menu.
+    // Closing the deck hides it to the tray ("Quit" lives in the tray menu); overlay
+    // geometry is remembered.
     if let Some(win) = window::deck(&handle) {
-        let w = win.clone();
-        win.on_window_event(move |event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = w.hide();
-            }
-        });
+        let app = handle.clone();
+        win.on_window_event(move |event| window::on_deck_event(&app, event));
     }
     Ok(())
+}
+
+static QUITTING: AtomicBool = AtomicBool::new(false);
+
+/// Tray "Quit": hides the windows at once, tells the webviews (`deck://quitting`) so they
+/// can flush debounced saves, and exits after [`QUIT_GRACE`].
+pub fn quit(app: &AppHandle) {
+    if QUITTING.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    tracing::info!("quit requested");
+    let _ = app.emit(EVENT_QUITTING, json!({}));
+    window::hide(app);
+    if let Some(w) = app.get_webview_window(crate::settings_window::SETTINGS_LABEL) {
+        let _ = w.hide();
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(QUIT_GRACE).await;
+        app.exit(0);
+    });
+}
+
+/// `RunEvent::Exit`: persist window state and flush the log writer (the process ends
+/// without running destructors).
+pub fn on_exit(app: &AppHandle) {
+    app.state::<window::DisplayState>().flush();
+    tracing::info!("Kotilo Deck exiting");
+    crate::logging::flush();
 }

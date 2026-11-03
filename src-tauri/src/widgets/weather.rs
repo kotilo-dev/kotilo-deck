@@ -212,6 +212,16 @@ fn is_fresh(report: &WeatherReport, now: i64) -> bool {
 
 // ── State + commands ────────────────────────────────────────────────────────
 
+const CACHE_VERSION: u32 = 1;
+
+/// On-disk cache entry (`cache/weather/<key>.json`).
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CacheFile {
+    schema_version: u32,
+    report: WeatherReport,
+}
+
 pub struct Weather {
     client: Result<Client, String>,
     cache_dir: PathBuf,
@@ -259,11 +269,13 @@ impl Weather {
             return Some(r.clone());
         }
         let path = self.cache_dir.join(format!("{key}.json"));
-        let report: WeatherReport = fs::read(&path)
+        // Files without the current schemaVersion (Phase 1 wrote bare reports) are a miss.
+        let file: CacheFile = fs::read(&path)
             .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())?;
-        mem.insert(key.to_string(), report.clone());
-        Some(report)
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .filter(|f: &CacheFile| f.schema_version == CACHE_VERSION)?;
+        mem.insert(key.to_string(), file.report.clone());
+        Some(file.report)
     }
 
     fn store(&self, key: &str, report: &WeatherReport) {
@@ -274,7 +286,11 @@ impl Weather {
         let write = || -> std::io::Result<()> {
             fs::create_dir_all(&self.cache_dir)?;
             let path = self.cache_dir.join(format!("{key}.json"));
-            crate::workspace::write_atomic(&path, &serde_json::to_vec(report).unwrap_or_default())
+            let file = CacheFile {
+                schema_version: CACHE_VERSION,
+                report: report.clone(),
+            };
+            crate::workspace::write_atomic(&path, &serde_json::to_vec(&file).unwrap_or_default())
         };
         if let Err(e) = write() {
             tracing::warn!("cannot write weather cache: {e}");
@@ -469,6 +485,25 @@ mod tests {
         assert!(r.stale);
         assert_eq!(r.fetched_at, 5);
         assert!(w2.get(3.0, 4.0, Unit::C).await.is_err());
+    }
+
+    #[test]
+    fn unversioned_cache_file_is_a_miss() {
+        let dir = tempfile::tempdir().unwrap();
+        let report = parse_forecast(FORECAST, Unit::C, 5).unwrap();
+        let key = cache_key(1.0, 2.0, Unit::C);
+        fs::write(
+            dir.path().join(format!("{key}.json")),
+            serde_json::to_vec(&report).unwrap(),
+        )
+        .unwrap();
+        assert!(Weather::new(dir.path().to_path_buf())
+            .cached(&key)
+            .is_none());
+        let w = Weather::new(dir.path().to_path_buf());
+        w.store(&key, &report);
+        let fresh = Weather::new(dir.path().to_path_buf());
+        assert_eq!(fresh.cached(&key).unwrap().fetched_at, 5);
     }
 
     #[test]

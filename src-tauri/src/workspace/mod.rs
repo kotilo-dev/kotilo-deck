@@ -107,7 +107,8 @@ impl WorkspaceStore {
         Ok(out)
     }
 
-    pub fn save(&self, ws: &Workspace) -> Result<(), String> {
+    /// The checks `save` applies before writing.
+    pub fn check(ws: &Workspace) -> Result<(), String> {
         if !valid_id(&ws.id) {
             return Err("invalid workspace id (expected [a-z0-9-]+)".into());
         }
@@ -120,6 +121,11 @@ impl WorkspaceStore {
         if let Some(i) = ws.widgets.iter().position(|w| !valid_widget(w)) {
             return Err(format!("widget #{i} is malformed"));
         }
+        Ok(())
+    }
+
+    pub fn save(&self, ws: &Workspace) -> Result<(), String> {
+        Self::check(ws)?;
         let path = self.path_for(&ws.id);
         self.refuse_if_future(&path)?;
         backup_if_lossy(&path)?;

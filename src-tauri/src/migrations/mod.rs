@@ -3,11 +3,56 @@
 //! Each schema has a `CURRENT` version and an ordered list of steps; step `i` upgrades
 //! version `i` to `i + 1`. A document without `schemaVersion` is v0. Documents from a
 //! future version are rejected (callers skip them and leave the file untouched).
+//!
+//! The SQLite database (`deck.db`, todos) uses the same idea with `PRAGMA user_version`
+//! as its schemaVersion and [`DB_STEPS`] as the ordered list of SQL migrations.
 
 use serde_json::{Map, Value};
 
 pub const WORKSPACE_VERSION: u64 = 1;
 pub const SETTINGS_VERSION: u32 = 1;
+
+/// SQL migrations for `deck.db`; step `i` upgrades `user_version` `i` to `i + 1`.
+/// Append only — never edit a released step.
+pub const DB_STEPS: &[&str] = &[
+    // v1: todos (Phase 2).
+    "CREATE TABLE todos (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        text         TEXT    NOT NULL,
+        done         INTEGER NOT NULL DEFAULT 0,
+        due          INTEGER,
+        remind_at    INTEGER,
+        position     INTEGER NOT NULL,
+        created_at   INTEGER NOT NULL,
+        completed_at INTEGER
+    );
+    CREATE INDEX todos_remind_at ON todos (remind_at) WHERE remind_at IS NOT NULL AND done = 0;",
+];
+
+pub const DB_VERSION: i64 = DB_STEPS.len() as i64;
+
+/// Brings `conn` to [`DB_VERSION`], one transaction per step. A database written by a
+/// newer build is refused (and left untouched). Returns the version it started from.
+pub fn migrate_db(conn: &mut rusqlite::Connection) -> Result<i64, String> {
+    let from: i64 = conn
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .map_err(|e| format!("cannot read database version: {e}"))?;
+    if from > DB_VERSION {
+        return Err(format!(
+            "database schemaVersion {from} is newer than this build supports"
+        ));
+    }
+    for v in from.max(0)..DB_VERSION {
+        let mut step = || -> rusqlite::Result<()> {
+            let tx = conn.transaction()?;
+            tx.execute_batch(DB_STEPS[v as usize])?;
+            tx.pragma_update(None, "user_version", v + 1)?;
+            tx.commit()
+        };
+        step().map_err(|e| format!("database migration from v{v} failed: {e}"))?;
+    }
+    Ok(from)
+}
 
 type Step = fn(Map<String, Value>) -> Result<Map<String, Value>, String>;
 
@@ -115,6 +160,20 @@ mod tests {
             migrate_workspace(json!({"schemaVersion": "1"})),
             Err(MigrationError::BadVersion)
         );
+    }
+
+    #[test]
+    fn db_migrates_once_and_refuses_future() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        assert_eq!(migrate_db(&mut conn).unwrap(), 0);
+        assert_eq!(migrate_db(&mut conn).unwrap(), DB_VERSION);
+        let v: i64 = conn
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, DB_VERSION);
+        conn.pragma_update(None, "user_version", DB_VERSION + 1)
+            .unwrap();
+        assert!(migrate_db(&mut conn).is_err());
     }
 
     #[test]

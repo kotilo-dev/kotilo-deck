@@ -1,11 +1,14 @@
 pub mod platform;
 
+mod files;
 mod hotkeys;
 mod logging;
 mod migrations;
 mod paths;
 mod settings;
+mod settings_window;
 mod startup;
+mod transfer;
 mod tray;
 mod widgets;
 mod window;
@@ -13,7 +16,7 @@ mod workspace;
 
 use platform::Capability;
 use tauri::webview::PageLoadEvent;
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 use tauri_plugin_autostart::MacosLauncher;
 
 /// Capabilities the current OS provides; widgets needing a missing one render "Not available on this OS".
@@ -31,15 +34,18 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        // Registered only; the toggle UI is Phase 2.
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             None,
-        ));
-    let result = startup::manage(builder)
+        ))
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init());
+    let app = startup::manage(builder)
         .setup(startup::setup)
         .on_page_load(|webview, payload| {
-            if payload.event() == PageLoadEvent::Started {
+            // Ref-counted subscriptions belong to the deck page; the settings window
+            // loading must not reset them.
+            if payload.event() == PageLoadEvent::Started && webview.label() == window::DECK_LABEL {
                 webview.state::<widgets::system::Sampler>().reset();
             }
         })
@@ -59,10 +65,33 @@ pub fn run() {
             widgets::system::system_top_processes,
             widgets::weather::weather_geocode,
             widgets::weather::weather_get,
+            // Phase 2 core
+            settings_window::settings_open,
+            transfer::settings_export_all,
+            transfer::settings_import_all,
+            files::wallpaper_list,
+            files::wallpaper_import,
+            files::theme_user_list,
+            files::file_save_as,
+            files::file_open_text,
+            widgets::todo::todo_list,
+            widgets::todo::todo_add,
+            widgets::todo::todo_update,
+            widgets::todo::todo_delete,
+            widgets::todo::todo_reorder,
+            widgets::todo::todo_snooze,
         ])
-        .run(tauri::generate_context!());
-    if let Err(e) = result {
-        tracing::error!("Kotilo Deck exited with an error: {e}");
-        std::process::exit(1);
+        .build(tauri::generate_context!());
+    match app {
+        Ok(app) => app.run(|handle, event| {
+            if let RunEvent::Exit = event {
+                startup::on_exit(handle);
+            }
+        }),
+        Err(e) => {
+            tracing::error!("Kotilo Deck failed to start: {e}");
+            logging::flush();
+            std::process::exit(1);
+        }
     }
 }
