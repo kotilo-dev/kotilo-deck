@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kotilo Deck — Settings, Appearance</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#11111b;display:flex;justify-content:center;padding:24px}
+:root{--k-bg:#1e1e2e;--k-bg-alt:#181825;--k-surface:#313244;--k-text:#cdd6f4;--k-text-muted:#a6adc8;--k-border:#45475a;--k-accent:#89b4fa;--k-accent-2:#cba6f7;--k-success:#a6e3a1;--k-warning:#f9e2af;--k-danger:#f38ba8;--k-info:#94e2d5;--k-font:Inter,system-ui,sans-serif;--k-mono:"JetBrains Mono",ui-monospace,monospace}
+a{color:#89b4fa}a:hover{color:#b4d0ff}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit}
+</style>
+<div style="width: 960px; height: 680px; box-sizing: border-box; background: var(--k-bg); color: var(--k-text); font-family: var(--k-font); display: flex; flex-direction: column; overflow: hidden; border-radius: 12px; border: 1px solid var(--k-border)">
+
+  <!-- Window title bar -->
+  <div style="height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--k-border); background: var(--k-bg-alt)">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 22 12 12 22 2 12Z" stroke="#89b4fa" stroke-width="2" stroke-linejoin="round"/></svg>
+      <span style="font-size: 13px; font-weight: 600">Kotilo Deck — Settings</span>
+      <span style="font-family: var(--k-mono); font-size: 11px; color: var(--k-text-muted)">v0.1.0</span>
+    </div>
+    <div style="display: flex; gap: 6px">
+      <button aria-label="Minimize" style="width: 36px; height: 32px; border-radius: 8px; border: 0; background: transparent; color: var(--k-text-muted)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+      <button aria-label="Close" style="width: 36px; height: 32px; border-radius: 8px; border: 0; background: transparent; color: var(--k-text-muted)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+  </div>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <!-- Sidebar -->
+    <nav aria-label="Settings sections" style="width: 220px; box-sizing: border-box; padding: 14px 10px; border-right: 1px solid var(--k-border); display: flex; flex-direction: column; gap: 2px; background: var(--k-bg-alt)">
+      <a href="#general" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; color: var(--k-text-muted); text-decoration: none">General</a>
+      <a href="#display" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; color: var(--k-text-muted); text-decoration: none">Display &amp; monitor</a>
+      <a href="#appearance" aria-current="page" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--k-text); background: var(--k-surface); text-decoration: none">Appearance</a>
+      <a href="#themes" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; color: var(--k-text-muted); text-decoration: none">Themes</a>
+      <a href="#workspaces" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; color: var(--k-text-muted); text-decoration: none">Workspaces</a>
+      <a href="#widgets" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; color: var(--k-text-muted); text-decoration: none">Weather &amp; calendar</a>
+      <a href="#companion" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 500; color: var(--k-text-muted); text-decoration: none">Companion <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--k-success)"></span></a>
+      <a href="#burnin" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; color: var(--k-text-muted); text-decoration: none">Burn-in &amp; night</a>
+      <a href="#about" style="height: 40px; padding: 0 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; color: var(--k-text-muted); text-decoration: none; margin-top: auto">About · MIT</a>
+    </nav>
+
+    <!-- Content -->
+    <div style="flex: 1; box-sizing: border-box; padding: 24px 28px; display: flex; flex-direction: column; gap: 18px; overflow: hidden">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 20px; font-weight: 600">Appearance</h1>
+        <span style="font-size: 13px; color: var(--k-text-muted)">Background, surface opacity and blur. Workspaces and single widgets can override these.</span>
+      </div>
+
+      <!-- Background mode -->
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--k-text-muted)">Background layer</span>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+          <button style="height: 96px; box-sizing: border-box; padding: 12px; border-radius: 12px; border: 1px solid var(--k-border); background: var(--k-surface); color: var(--k-text); display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; text-align: left">
+            <div style="width: 100%; height: 36px; border-radius: 6px; background: var(--k-bg)"></div>
+            <span style="font-size: 13px; font-weight: 500">Solid <span style="color: var(--k-text-muted); font-weight: 400">· theme bg</span></span>
+          </button>
+          <button style="height: 96px; box-sizing: border-box; padding: 12px; border-radius: 12px; border: 2px solid var(--k-accent); background: var(--k-surface); color: var(--k-text); display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; text-align: left">
+            <div style="width: 100%; height: 36px; border-radius: 6px; background: #585b70; display: flex; align-items: center; justify-content: center; color: var(--k-text)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 17 5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/></svg></div>
+            <span style="font-size: 13px; font-weight: 500">Wallpaper <span style="color: var(--k-text-muted); font-weight: 400">· mountains.jpg</span></span>
+          </button>
+          <button style="height: 96px; box-sizing: border-box; padding: 12px; border-radius: 12px; border: 1px solid var(--k-border); background: var(--k-surface); color: var(--k-text); display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; text-align: left">
+            <div style="width: 100%; height: 36px; border-radius: 6px; border: 1px dashed var(--k-border); background-image: repeating-linear-gradient(45deg, #45475a 0 6px, transparent 6px 12px)"></div>
+            <span style="font-size: 13px; font-weight: 500">Transparent <span style="color: var(--k-text-muted); font-weight: 400">· overlay</span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sliders -->
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--k-text-muted)">Widget surfaces</span>
+
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+          <label for="opacity" style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 500">Surface opacity</span><span style="font-size: 11px; color: var(--k-text-muted)">Theme default 85%</span></label>
+          <input id="opacity" type="range" min="0" max="100" value="85" style="width: 100%; margin: 0; accent-color: #89b4fa; height: 28px">
+          <span style="font-family: var(--k-mono); font-size: 13px; text-align: right">85%</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+          <label for="blur" style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 500">Backdrop blur</span><span style="font-size: 11px; color: var(--k-warning)">Uses GPU on an always-on screen</span></label>
+          <input id="blur" type="range" min="0" max="40" value="0" style="width: 100%; margin: 0; accent-color: #89b4fa; height: 28px">
+          <span style="font-family: var(--k-mono); font-size: 13px; text-align: right">Off</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 64px; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border); opacity: 0.55">
+          <label for="winop" style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 500">Window opacity</span><span style="font-size: 11px; color: var(--k-text-muted)">Overlay mode only — disabled in fullscreen</span></label>
+          <input id="winop" type="range" min="20" max="100" value="100" disabled style="width: 100%; margin: 0; accent-color: #89b4fa; height: 28px">
+          <span style="font-family: var(--k-mono); font-size: 13px; text-align: right">100%</span>
+        </div>
+      </div>
+
+      <!-- Dim schedule -->
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--k-text-muted)">Dim</span>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 500">Night schedule</span><span style="font-size: 11px; color: var(--k-text-muted)">22:00 → 07:00 · dim to 40%</span></div>
+            <button role="switch" aria-checked="true" aria-label="Night schedule" style="width: 44px; height: 26px; border-radius: 13px; border: 0; background: var(--k-accent); position: relative; padding: 0"><span style="position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; background: #11111b"></span></button>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; font-weight: 500">Idle dim</span><span style="font-size: 11px; color: var(--k-text-muted)">After 10 min · show clock face</span></div>
+            <button role="switch" aria-checked="false" aria-label="Idle dim" style="width: 44px; height: 26px; border-radius: 13px; border: 1px solid var(--k-border); background: var(--k-bg-alt); position: relative; padding: 0"><span style="position: absolute; top: 2px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--k-text-muted)"></span></button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center">
+        <span style="font-size: 11px; color: var(--k-text-muted); font-family: var(--k-mono)">~/.kotilo/deck/settings.json</span>
+        <div style="display: flex; gap: 8px">
+          <button style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-size: 13px; font-weight: 500">Reset to theme</button>
+          <button style="height: 40px; padding: 0 16px; border-radius: 10px; border: 0; background: var(--k-accent); color: #11111b; font-size: 13px; font-weight: 600">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

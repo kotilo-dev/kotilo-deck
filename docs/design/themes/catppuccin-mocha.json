@@ -1,0 +1,23 @@
+{
+  "id": "catppuccin-mocha",
+  "name": "Catppuccin Mocha",
+  "variant": "dark",
+  "pair": "catppuccin-latte",
+  "colors": {
+    "bg": "#1e1e2e",
+    "bg-alt": "#181825",
+    "surface": "#313244",
+    "text": "#cdd6f4",
+    "text-muted": "#a6adc8",
+    "border": "#45475a",
+    "accent": "#89b4fa",
+    "accent-2": "#cba6f7",
+    "success": "#a6e3a1",
+    "warning": "#f9e2af",
+    "danger": "#f38ba8",
+    "info": "#94e2d5"
+  },
+  "radius": "16px",
+  "opacity": { "surface": 0.85, "bg": 1.0 },
+  "font": { "ui": "Inter, system-ui, sans-serif", "mono": "JetBrains Mono, ui-monospace, monospace" }
+}

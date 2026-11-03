@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kotilo Deck — Edit mode</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#11111b;display:flex;justify-content:center;padding:24px}
+:root{--k-bg:#1e1e2e;--k-bg-alt:#181825;--k-surface:#313244;--k-text:#cdd6f4;--k-text-muted:#a6adc8;--k-border:#45475a;--k-accent:#89b4fa;--k-accent-2:#cba6f7;--k-success:#a6e3a1;--k-warning:#f9e2af;--k-danger:#f38ba8;--k-info:#94e2d5;--k-radius:16px;--k-font:Inter,system-ui,sans-serif;--k-mono:"JetBrains Mono",ui-monospace,monospace}
+a{color:#89b4fa}a:hover{color:#b4d0ff}
+button{font-family:inherit;cursor:pointer}
+.k-dots{background-image:radial-gradient(circle, #585b70 1.5px, transparent 1.6px);background-size:24px 24px;background-position:12px 12px}
+</style>
+<div style="width: 1280px; height: 720px; box-sizing: border-box; background: var(--k-bg); color: var(--k-text); font-family: var(--k-font); display: flex; flex-direction: column; overflow: hidden; position: relative">
+
+  <!-- Edit top bar -->
+  <div style="height: 56px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--k-border)">
+    <div style="display: flex; align-items: center; gap: 12px; min-width: 260px">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--k-accent)"></span>
+      <span style="font-size: 14px; font-weight: 600">Editing <span style="color: var(--k-accent)">Focus</span></span>
+      <span style="font-size: 12px; color: var(--k-text-muted); font-family: var(--k-mono)">8 × 4</span>
+    </div>
+    <span style="font-size: 12px; color: var(--k-text-muted)">Long-press to move · drag the corner to cycle sizes · drop on the bottom edge to remove</span>
+    <div style="display: flex; align-items: center; gap: 10px; min-width: 260px; justify-content: flex-end">
+      <button style="height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add widget
+      </button>
+      <button style="height: 40px; padding: 0 18px; border-radius: 12px; border: 0; background: var(--k-accent); color: #11111b; font-size: 13px; font-weight: 600">Done</button>
+    </div>
+  </div>
+
+  <!-- Grid with dot pattern -->
+  <div class="k-dots" style="flex: 1; box-sizing: border-box; padding: 8px 24px 24px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 16px; position: relative">
+
+    <!-- Clock 4x2 (surface at 100% in edit mode) -->
+    <section aria-label="Clock" style="grid-column: 1 / span 4; grid-row: 1 / span 2; box-sizing: border-box; background: var(--k-surface); border: 1px solid var(--k-border); border-radius: var(--k-radius); padding: 22px 28px; display: flex; flex-direction: column; justify-content: space-between; min-height: 0; position: relative">
+      <button aria-label="Clock settings" style="position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--k-border); background: var(--k-bg-alt); color: var(--k-text-muted); display: flex; align-items: center; justify-content: center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+      </button>
+      <span style="font-family: var(--k-mono); font-size: 128px; font-weight: 500; line-height: 1; letter-spacing: -0.04em">09:37</span>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 18px; font-weight: 600">Tuesday, 3 November</span>
+        <span style="font-size: 13px; color: var(--k-text-muted)">Week 45 · Day 307</span>
+      </div>
+    </section>
+
+    <!-- Pomodoro 2x2 — lifted / being dragged -->
+    <section aria-label="Pomodoro (dragging)" style="grid-column: 5 / span 2; grid-row: 1 / span 2; box-sizing: border-box; background: var(--k-surface); border: 2px solid var(--k-accent); border-radius: var(--k-radius); padding: 18px 20px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 0; position: relative; transform: translate(14px, 10px) scale(1.04) rotate(-1deg); box-shadow: 0 24px 48px rgba(17, 17, 27, 0.6); z-index: 2">
+      <div style="width: 100%; display: flex; justify-content: space-between; align-items: center">
+        <span style="font-size: 13px; font-weight: 600">Focus</span>
+        <span style="font-size: 12px; color: var(--k-text-muted); font-family: var(--k-mono)">2 / 4</span>
+      </div>
+      <div style="position: relative; width: 136px; height: 136px">
+        <svg width="136" height="136" viewBox="0 0 136 136" aria-hidden="true" style="position: absolute; inset: 0; transform: rotate(-90deg)">
+          <circle cx="68" cy="68" r="60" fill="none" stroke="#45475a" stroke-width="10"/>
+          <circle cx="68" cy="68" r="60" fill="none" stroke="#89b4fa" stroke-width="10" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="99"/>
+        </svg>
+        <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center">
+          <span style="font-family: var(--k-mono); font-size: 30px; font-weight: 600">18:24</span>
+        </div>
+      </div>
+      <span style="font-size: 11px; color: var(--k-text-muted)">Pomodoro</span>
+      <!-- corner size handle -->
+      <div aria-hidden="true" style="position: absolute; right: -14px; bottom: -14px; width: 28px; height: 28px; border-radius: 50%; background: var(--k-accent); border: 3px solid var(--k-bg); display: flex; align-items: center; justify-content: center">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#11111b" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M20 4 4 20M20 12l-8 8M20 20h0"/></svg>
+      </div>
+      <div style="position: absolute; left: 50%; top: -16px; transform: translateX(-50%); padding: 4px 10px; border-radius: 999px; background: var(--k-accent); color: #11111b; font-family: var(--k-mono); font-size: 11px; font-weight: 600; white-space: nowrap">2×2 → 2×1 · 4×2</div>
+    </section>
+
+    <!-- Drop target ghost where Pomodoro will land -->
+    <div aria-hidden="true" style="grid-column: 7 / span 2; grid-row: 1 / span 2; box-sizing: border-box; border: 2px dashed var(--k-accent); border-radius: var(--k-radius); background: rgba(137, 180, 250, 0.08)"></div>
+
+    <!-- Todo 2x2 -->
+    <section aria-label="Todo" style="grid-column: 1 / span 2; grid-row: 3 / span 2; box-sizing: border-box; background: var(--k-surface); border: 1px solid var(--k-border); border-radius: var(--k-radius); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; min-height: 0; position: relative">
+      <button aria-label="Todo settings" style="position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--k-border); background: var(--k-bg-alt); color: var(--k-text-muted); display: flex; align-items: center; justify-content: center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
+      </button>
+      <span style="font-size: 13px; font-weight: 600">Today</span>
+      <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px">
+        <span>☐ Ship Deck phase 1 build</span>
+        <span>☐ Write CHANGELOG for 0.1.0</span>
+        <span style="color: var(--k-text-muted); text-decoration: line-through">☑ Reply about ICS feeds</span>
+      </div>
+    </section>
+
+    <!-- System 2x2 -->
+    <section aria-label="System" style="grid-column: 3 / span 2; grid-row: 3 / span 2; box-sizing: border-box; background: var(--k-surface); border: 1px solid var(--k-border); border-radius: var(--k-radius); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; min-height: 0">
+      <span style="font-size: 13px; font-weight: 600">System</span>
+      <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-size: 12px; color: var(--k-text-muted)">CPU</span><span style="font-family: var(--k-mono); font-size: 20px; font-weight: 500">23%</span></div>
+      <svg width="100%" height="36" viewBox="0 0 240 36" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,30 20,26 40,28 60,22 80,24 100,18 120,20 140,12 160,16 180,22 200,20 220,24 240,22" fill="none" stroke="#89b4fa" stroke-width="2"/></svg>
+      <div style="display: flex; justify-content: space-between"><span style="font-size: 12px; color: var(--k-text-muted)">Memory</span><span style="font-family: var(--k-mono); font-size: 13px">11.2 / 32 GB</span></div>
+      <div style="height: 6px; border-radius: 3px; background: var(--k-bg-alt); overflow: hidden"><div style="width: 35%; height: 100%; background: var(--k-info)"></div></div>
+    </section>
+
+    <!-- Media 4x1 -->
+    <section aria-label="Now playing" style="grid-column: 5 / span 4; grid-row: 3 / span 1; box-sizing: border-box; background: var(--k-surface); border: 1px solid var(--k-border); border-radius: var(--k-radius); padding: 14px 18px; display: flex; align-items: center; gap: 16px; min-height: 0">
+      <div style="width: 84px; height: 84px; flex-shrink: 0; border-radius: 12px; background: #cba6f7"></div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 15px; font-weight: 600">Weightless</span>
+        <span style="font-size: 12px; color: var(--k-text-muted)">Marconi Union · Spotify</span>
+      </div>
+      <span style="font-family: var(--k-mono); font-size: 11px; color: var(--k-text-muted); padding: 4px 8px; border: 1px solid var(--k-border); border-radius: 8px">4×1</span>
+    </section>
+
+    <!-- Row 4, cols 5-8 are empty: dot grid shows through -->
+
+    <!-- Trash zone -->
+    <div style="position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); height: 44px; padding: 0 22px; border-radius: 14px 14px 0 0; background: rgba(243, 139, 168, 0.16); border: 1px solid var(--k-danger); border-bottom: 0; color: var(--k-danger); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>Drop here to remove
+    </div>
+  </div>
+
+  <!-- Widget drawer (open) -->
+  <aside aria-label="Widget drawer" style="position: absolute; top: 56px; right: 0; bottom: 0; width: 340px; box-sizing: border-box; background: var(--k-bg-alt); border-left: 1px solid var(--k-border); padding: 20px; display: flex; flex-direction: column; gap: 14px; box-shadow: -16px 0 40px rgba(17, 17, 27, 0.5)">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <span style="font-size: 15px; font-weight: 600">Add widget</span>
+      <button aria-label="Close drawer" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text-muted); display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <span style="font-size: 12px; color: var(--k-text-muted)">Tap a size to place. The same widget can be placed more than once.</span>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--k-bg); display: flex; align-items: center; justify-content: center; color: var(--k-accent)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 600">Clock</span>
+          <div style="display: flex; gap: 6px"><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">2×1</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">2×2</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-accent); background: rgba(137, 180, 250, 0.16); color: var(--k-text); font-family: var(--k-mono); font-size: 11px">4×2</button></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--k-bg); display: flex; align-items: center; justify-content: center; color: var(--k-warning)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 600">Weather</span>
+          <div style="display: flex; gap: 6px"><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">2×1</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">2×2</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">4×2</button></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--k-bg); display: flex; align-items: center; justify-content: center; color: var(--k-info)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l5-6 4 3 5-8 4 5"/></svg></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 600">System</span>
+          <div style="display: flex; gap: 6px"><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">2×2</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">4×2</button></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--k-bg); display: flex; align-items: center; justify-content: center; color: var(--k-success)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 600">Todo</span>
+          <div style="display: flex; gap: 6px"><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">2×2</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">4×2</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">4×4</button></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--k-surface); border: 1px solid var(--k-border)">
+        <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--k-bg); display: flex; align-items: center; justify-content: center; color: var(--k-accent-2)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><circle cx="12" cy="10" r="2"/></svg></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; font-weight: 600">Agent Status <span style="font-size: 10px; color: var(--k-text-muted); font-weight: 500">· companion</span></span>
+          <div style="display: flex; gap: 6px"><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">2×1</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">2×2</button><button style="height: 28px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--k-border); background: transparent; color: var(--k-text); font-family: var(--k-mono); font-size: 11px">4×2</button></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+</body>
+</html>
