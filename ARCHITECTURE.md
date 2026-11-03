@@ -65,11 +65,12 @@ Windows: COM/WinRT calls run on dedicated MTA worker threads (`platform/windows/
   - `system_info() / system_subscribe() / system_unsubscribe() / system_top_processes()` — sampler runs only while subscribed
   - `weather_geocode(query) / weather_get(latitude, longitude, unit)` — Open-Meteo, 15 min cache, stale fallback
   - Phase 2: `settings_open / settings_export_all / settings_import_all`, `wallpaper_list / wallpaper_import`, `theme_user_list`, `file_save_as / file_open_text`, `audio_*`, `media_*`, `todo_*` (todos live in a backend-owned SQLite so reminders fire while the UI is hidden)
+  - Phase 3: `pomodoro_*` (backend-owned timer + SQLite history), `companion_status / companion_snapshot / companion_respond / companion_open_desktop`, `calendar_upcoming / calendar_refresh`
 - Backend → frontend: Tauri events named `<area>://<event>` for pushed data, so the UI never polls:
-  `system://sample`, `workspace://cycle`, `workspace://switch`, `monitor://changed`; Phase 2: `settings://changed`, `deck://visibility`, `audio://state`, `media://state`, `todo://changed`, `todo://reminder`, `theme://user-changed`, `workspace://changed`.
+  `system://sample`, `workspace://cycle`, `workspace://switch`, `monitor://changed`; Phase 2: `settings://changed`, `deck://visibility`, `audio://state`, `media://state`, `todo://changed`, `todo://reminder`, `theme://user-changed`, `workspace://changed`, `deck://quitting`; Phase 3: `pomodoro://state`, `pomodoro://phase-end`, `companion://status`, `companion://snapshot`, `companion://suggest`, `calendar://changed`.
 - Windows: `deck` (fullscreen/overlay) and `settings` (960×680 normal window, route `/settings`), same SPA.
 - Widgets: `src/widgets/index.ts` globs every `<id>/manifest.json` + `Widget.svelte` (+ optional `settings.ts`, `Settings.svelte`); contract types in `src/widgets/types.ts`.
-- Companion (Phase 3): `protocol.md`.
+- Companion (Phase 3): `protocol.md` (repo root) is the single source of truth; server in `src-tauri/src/companion/`, reference client `scripts/mock-desktop.mjs`.
 
 ## Data
 

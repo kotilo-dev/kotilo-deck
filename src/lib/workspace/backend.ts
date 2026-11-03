@@ -40,7 +40,11 @@ export const DEFAULT_SETTINGS: DeckSettings = {
 	},
 	themeAuto: { mode: 'off', lightFrom: '07:00', darkFrom: '19:00' },
 	temperatureUnit: 'c',
-	notificationSound: true
+	notificationSound: true,
+	companion: { enabled: true, allowWorkspaceSwitch: false, notifyApprovals: true },
+	pomodoro: { focus: 25, shortBreak: 5, longBreak: 15, sessionsPerCycle: 4, autoStartNext: false, dailyGoal: 8 },
+	calendarFeeds: [],
+	autoSwitch: []
 };
 
 const obj = (v: unknown): Record<string, unknown> =>
@@ -65,7 +69,11 @@ export function normalizeSettings(input: unknown): DeckSettings {
 			night: { ...d.burnIn.night, ...obj(burnIn.night) },
 			idle: { ...d.burnIn.idle, ...obj(burnIn.idle) }
 		},
-		themeAuto: { ...d.themeAuto, ...obj(s.themeAuto) }
+		themeAuto: { ...d.themeAuto, ...obj(s.themeAuto) },
+		companion: { ...d.companion, ...obj(s.companion) },
+		pomodoro: { ...d.pomodoro, ...obj(s.pomodoro) },
+		calendarFeeds: Array.isArray(s.calendarFeeds) ? s.calendarFeeds : [],
+		autoSwitch: Array.isArray(s.autoSwitch) ? s.autoSwitch : []
 	} as DeckSettings;
 }
 

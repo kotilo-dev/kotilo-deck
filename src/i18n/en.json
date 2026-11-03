@@ -328,7 +328,10 @@
 				"remind": "Remind at the due time",
 				"showCompleted": "Show completed tasks"
 			}
-		}
+		},
+		"pomodoro": {},
+		"agents": {},
+		"calendar": {}
 	},
 	"settings": {
 		"window": {

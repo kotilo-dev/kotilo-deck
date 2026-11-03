@@ -53,6 +53,57 @@ export interface DeckSettings {
 	temperatureUnit: 'c' | 'f';
 	/** Sound with reminder/pomodoro notifications. Default true. */
 	notificationSound: boolean;
+
+	// ── Phase 3 (additive; defaults in doc comments) ──
+	/** Companion server (protocol.md). Default enabled true, allowWorkspaceSwitch false, notifyApprovals true. */
+	companion: { enabled: boolean; allowWorkspaceSwitch: boolean; notifyApprovals: boolean };
+	/** One shared timer for all pomodoro widgets. Defaults 25 / 5 / 15 min, 4 per cycle, autoStartNext false, dailyGoal 8. */
+	pomodoro: PomodoroSettings;
+	/** ICS feeds (SPEC §4.4 Calendar). Default []. */
+	calendarFeeds: CalendarFeed[];
+	/** Workspace auto-switch rules (SPEC §4.1), evaluated by the deck UI. Default []. */
+	autoSwitch: AutoSwitchRule[];
+}
+
+export interface PomodoroSettings {
+	/** Minutes, 1–180. */
+	focus: number;
+	/** Minutes, 1–60. */
+	shortBreak: number;
+	/** Minutes, 1–120. */
+	longBreak: number;
+	/** 1–12. */
+	sessionsPerCycle: number;
+	autoStartNext: boolean;
+	/** Focus sessions per day, 1–24 (daily stat ring). */
+	dailyGoal: number;
+}
+
+/** Token colour name, never a hex (theme-driven per-feed colour). */
+export type FeedColor = 'accent' | 'accent-2' | 'success' | 'warning' | 'danger' | 'info';
+
+export interface CalendarFeed {
+	/** Slug `[a-z0-9-]+`, stable. */
+	id: string;
+	name: string;
+	/** https:// or webcal:// (treated as https). Never logged (may carry a secret). */
+	url: string;
+	color: FeedColor;
+	enabled: boolean;
+}
+
+export type AutoSwitchTrigger =
+	| { type: 'time'; at: string; /** 0=Sun … 6=Sat; empty = every day. */ days: number[] }
+	| { type: 'pomodoro-start' }
+	| { type: 'pomodoro-end' }
+	| { type: 'calendar-start'; /** null = any feed. */ feedId: string | null };
+
+export interface AutoSwitchRule {
+	id: string;
+	enabled: boolean;
+	trigger: AutoSwitchTrigger;
+	/** Target workspace id. */
+	workspace: string;
 }
 
 export interface DeckAppearance {
@@ -337,6 +388,130 @@ export const todoReorder = (ids: number[]) => invoke<void>('todo_reorder', { ids
 /** Sets remindAt to now + minutes. */
 export const todoSnooze = (id: number, minutes: number) => invoke<Todo>('todo_snooze', { id, minutes });
 
+// ── Pomodoro (backend-owned timer so it keeps running and notifies with the UI hidden) ──
+
+export type PomodoroPhase = 'idle' | 'focus' | 'short-break' | 'long-break';
+
+/** Same shape as protocol.md `pomodoro.state`. */
+export interface PomodoroState {
+	phase: PomodoroPhase;
+	running: boolean;
+	/** Unix ms while running, else null. UI derives the countdown from this (no per-second events). */
+	endsAt: number | null;
+	/** Seconds left; authoritative while paused. */
+	remaining: number;
+	/** Full length of the phase in seconds. */
+	duration: number;
+	/** 1-based focus session index in the cycle. */
+	session: number;
+	sessionsPerCycle: number;
+}
+
+export interface PomodoroToday {
+	/** Completed focus sessions today (local day). */
+	sessions: number;
+	focusMinutes: number;
+	goal: number;
+}
+
+export const pomodoroState = () => invoke<PomodoroState>('pomodoro_state');
+/** Starts `phase` (default: focus when idle, else the current phase) from its full length. */
+export const pomodoroStart = (phase?: Exclude<PomodoroPhase, 'idle'>, minutes?: number) =>
+	invoke<PomodoroState>('pomodoro_start', { phase: phase ?? null, minutes: minutes ?? null });
+export const pomodoroPause = () => invoke<PomodoroState>('pomodoro_pause');
+export const pomodoroResume = () => invoke<PomodoroState>('pomodoro_resume');
+/** Ends the current phase now and moves to the next (a skipped focus is not counted). */
+export const pomodoroSkip = () => invoke<PomodoroState>('pomodoro_skip');
+/** Back to idle, session 1. */
+export const pomodoroReset = () => invoke<PomodoroState>('pomodoro_reset');
+export const pomodoroToday = () => invoke<PomodoroToday>('pomodoro_today');
+
+// ── Companion (protocol.md; Deck is the server) ─────────────────────────────
+
+export interface CompanionStatus {
+	enabled: boolean;
+	/** Server bound to 127.0.0.1:port. false when disabled or the port is taken (`error` says why). */
+	listening: boolean;
+	connected: boolean;
+	/** `clientVersion` from the desktop's hello. */
+	client: string | null;
+	port: number;
+	error: string | null;
+}
+
+export type AgentStatus = 'idle' | 'working' | 'waiting';
+
+export interface Agent {
+	id: string;
+	repo: string;
+	name: string;
+	status: AgentStatus;
+	task: string | null;
+	since: number | null;
+}
+
+export interface Approval {
+	id: string;
+	agentId: string;
+	summary: string;
+	detail: string | null;
+	requestedAt: number;
+}
+
+export interface Usage {
+	tokens: number;
+	costUsd: number;
+	budgetUsd: number | null;
+}
+
+/** Last snapshot from the desktop; cleared (agents [], approvals [], usage null) when it disconnects. */
+export interface CompanionSnapshot {
+	agents: Agent[];
+	approvals: Approval[];
+	usage: Usage | null;
+	/** Unix ms of the last desktop message, null if none since connect. */
+	updatedAt: number | null;
+}
+
+export const companionStatus = () => invoke<CompanionStatus>('companion_status');
+export const companionSnapshot = () => invoke<CompanionSnapshot>('companion_snapshot');
+/** Sends `approval.respond`; rejects if not connected. Optimistically removes the approval locally. */
+export const companionRespond = (id: string, decision: 'approve' | 'deny') =>
+	invoke<void>('companion_respond', { id, decision });
+/** Tries to launch the Kotilo desktop app (`kotilo://` URL scheme). Rejects if nothing handles it. */
+export const companionOpenDesktop = () => invoke<void>('companion_open_desktop');
+
+// ── Calendar widget (ICS feeds fetched by the backend) ──────────────────────
+
+export interface CalendarEvent {
+	/** Stable per occurrence: `<feedId>:<uid>:<start>`. */
+	id: string;
+	feedId: string;
+	title: string;
+	/** Unix ms. All-day events start at local midnight. */
+	start: number;
+	end: number;
+	allDay: boolean;
+	location: string | null;
+}
+
+export interface CalendarUpcoming {
+	/** Sorted by start; events already ended are excluded; recurring events expanded. */
+	events: CalendarEvent[];
+	/** Unix ms of the oldest successful feed fetch in this result, null if none. */
+	fetchedAt: number | null;
+	/** True when at least one feed is served from cache after a failed refresh. */
+	stale: boolean;
+	/** Per-feed errors (message is user-safe: no URL). */
+	errors: { feedId: string; message: string }[];
+}
+
+/** Next events within `days` (default 7) across enabled feeds, at most `limit` (default 20). Cached 15 min. */
+export const calendarUpcoming = (limit?: number, days?: number) =>
+	invoke<CalendarUpcoming>('calendar_upcoming', { limit: limit ?? null, days: days ?? null });
+/** Forces a refetch of all enabled feeds (Retry button / feed list changed). */
+export const calendarRefresh = () => invoke<void>('calendar_refresh');
+
 // ── Events (backend → UI) ───────────────────────────────────────────────────
 
 export interface DeckEvents {
@@ -363,6 +538,16 @@ export interface DeckEvents {
 	'workspace://changed': Record<string, never>;
 	/** Tray Quit: windows get ~500 ms to flush pending saves before the process exits. */
 	'deck://quitting': Record<string, never>;
+	/** Every pomodoro change (not per tick). */
+	'pomodoro://state': PomodoroState;
+	/** A phase finished (OS notification already shown); UI may play a cue / trigger auto-switch rules. */
+	'pomodoro://phase-end': { phase: Exclude<PomodoroPhase, 'idle'>; next: PomodoroPhase };
+	'companion://status': CompanionStatus;
+	'companion://snapshot': CompanionSnapshot;
+	/** protocol.md `pomodoro.suggest`; UI shows the 60 s banner. */
+	'companion://suggest': { reason: string; minutes: number | null };
+	/** Calendar cache refreshed (any feed). */
+	'calendar://changed': Record<string, never>;
 }
 
 export function on<K extends keyof DeckEvents>(event: K, handler: (payload: DeckEvents[K]) => void): Promise<UnlistenFn> {

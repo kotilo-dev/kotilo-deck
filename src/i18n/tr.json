@@ -328,7 +328,10 @@
 				"remind": "Bitiş saatinde hatırlat",
 				"showCompleted": "Tamamlanan görevleri göster"
 			}
-		}
+		},
+		"pomodoro": {},
+		"agents": {},
+		"calendar": {}
 	},
 	"settings": {
 		"window": {
