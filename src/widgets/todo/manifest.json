@@ -1,0 +1,16 @@
+{
+	"id": "todo",
+	"name": "Todo",
+	"icon": "todo",
+	"sizes": ["2x2", "4x2", "4x4"],
+	"defaultSize": "2x2",
+	"capabilities": [],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"remind": { "type": "boolean", "title": "Remind at the due time", "default": true },
+			"showCompleted": { "type": "boolean", "title": "Show completed tasks", "default": true }
+		}
+	}
+}
