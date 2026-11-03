@@ -96,6 +96,9 @@ pub fn run() {
             widgets::media::media_seek,
             widgets::media::media_subscribe,
             widgets::media::media_unsubscribe,
+            // Phase 3 calendar
+            widgets::calendar::calendar_upcoming,
+            widgets::calendar::calendar_refresh,
         ])
         .build(tauri::generate_context!());
     match app {

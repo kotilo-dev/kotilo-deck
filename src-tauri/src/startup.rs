@@ -27,6 +27,9 @@ pub fn manage(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry>
         .manage(widgets::weather::Weather::new(paths::weather_cache_dir()))
         .manage(widgets::todo::Todos::open(&paths::database_file()))
         .manage(files::ThemeWatcher::default())
+        .manage(widgets::calendar::Calendar::new(
+            widgets::calendar::cache_dir(),
+        ))
 }
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
@@ -45,6 +48,7 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     settings::sync_autostart(&handle, &s);
     widgets::todo::spawn_scheduler(handle.clone());
     files::watch_user_themes(&handle);
+    widgets::calendar::start(&handle);
 
     // Closing the deck hides it to the tray ("Quit" lives in the tray menu); overlay
     // geometry is remembered.
