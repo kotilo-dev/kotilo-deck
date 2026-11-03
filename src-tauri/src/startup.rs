@@ -22,6 +22,8 @@ pub fn manage(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry>
         .manage(window::DisplayState::new(paths::window_state_file()))
         .manage(tray::TrayState::default())
         .manage(widgets::system::Sampler::default())
+        .manage(widgets::audio::AudioHub::default())
+        .manage(widgets::media::MediaHub::default())
         .manage(widgets::weather::Weather::new(paths::weather_cache_dir()))
         .manage(widgets::todo::Todos::open(&paths::database_file()))
         .manage(files::ThemeWatcher::default())

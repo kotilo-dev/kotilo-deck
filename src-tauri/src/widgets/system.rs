@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::{Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use sysinfo::{
@@ -53,7 +53,31 @@ pub struct ProcessInfo {
 #[derive(Default)]
 pub struct Sampler(Mutex<(u32, Option<Sender<()>>)>);
 
-fn sample(sys: &mut System) -> SystemSample {
+/// The PDH `\GPU Engine(*)` wildcard query is the costliest part of a sample, so the GPU
+/// value is refreshed at most every [`GPU_INTERVAL`] and reused in between.
+const GPU_INTERVAL: Duration = Duration::from_secs(3);
+
+#[derive(Default)]
+struct GpuThrottle {
+    last: Option<f32>,
+    at: Option<Instant>,
+}
+
+impl GpuThrottle {
+    fn get(&mut self, now: Instant, read: impl FnOnce() -> Option<f32>) -> Option<f32> {
+        let due = match self.at {
+            Some(at) => now.saturating_duration_since(at) >= GPU_INTERVAL,
+            None => true,
+        };
+        if due {
+            self.last = read();
+            self.at = Some(now);
+        }
+        self.last
+    }
+}
+
+fn sample(sys: &mut System, gpu: Option<f32>) -> SystemSample {
     sys.refresh_cpu_usage();
     sys.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
     SystemSample {
@@ -66,7 +90,7 @@ fn sample(sys: &mut System) -> SystemSample {
             .collect(),
         mem_used: sys.used_memory(),
         mem_total: sys.total_memory(),
-        gpu: platform::current().gpu_usage().ok(),
+        gpu,
     }
 }
 
@@ -79,10 +103,14 @@ fn spawn_sampler(app: AppHandle) -> Option<Sender<()>> {
             let mut sys = System::new();
             sys.refresh_cpu_usage(); // baseline for the first delta
             let _ = platform::current().gpu_usage(); // prime the GPU rate counter
-                                                     // Wakes every second; a disconnect (sender dropped) ends the loop at once.
+            let mut gpu = GpuThrottle::default();
+            // Wakes every second; a disconnect (sender dropped) ends the loop at once.
             while let Err(RecvTimeoutError::Timeout) = rx.recv_timeout(SAMPLE_INTERVAL) {
-                let _ = app.emit(EVENT_SAMPLE, sample(&mut sys));
+                let g = gpu.get(Instant::now(), || platform::current().gpu_usage().ok());
+                let _ = app.emit(EVENT_SAMPLE, sample(&mut sys, g));
             }
+            // Close the PDH query so a later restart doesn't average over the idle gap.
+            platform::current().gpu_release();
             tracing::debug!("system sampler stopped");
         });
     match res {
@@ -235,9 +263,28 @@ mod tests {
     }
 
     #[test]
+    fn gpu_is_read_at_most_every_interval() {
+        let mut t = GpuThrottle::default();
+        let start = Instant::now();
+        let mut reads = 0;
+        let mut at = |secs: u64, v: f32, t: &mut GpuThrottle| {
+            t.get(start + Duration::from_secs(secs), || {
+                reads += 1;
+                Some(v)
+            })
+        };
+        assert_eq!(at(0, 10.0, &mut t), Some(10.0));
+        assert_eq!(at(1, 20.0, &mut t), Some(10.0), "reused");
+        assert_eq!(at(2, 30.0, &mut t), Some(10.0), "reused");
+        assert_eq!(at(3, 40.0, &mut t), Some(40.0), "refreshed after 3 s");
+        assert_eq!(at(4, 50.0, &mut t), Some(40.0));
+        assert_eq!(reads, 2);
+    }
+
+    #[test]
     fn sample_is_camel_case() {
         let mut sys = System::new();
-        let v = serde_json::to_value(sample(&mut sys)).unwrap();
+        let v = serde_json::to_value(sample(&mut sys, Some(1.0))).unwrap();
         for k in ["t", "cpu", "perCore", "memUsed", "memTotal", "gpu"] {
             assert!(v.get(k).is_some(), "{k}");
         }

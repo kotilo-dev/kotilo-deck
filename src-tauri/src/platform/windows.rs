@@ -16,7 +16,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_EX_LAYERED,
 };
 
-use super::{Capability, NativeWindow, Platform, PlatformError, Result};
+use super::{
+    AudioDevice, AudioSession, AudioState, Capability, ChangeFn, MediaAction, MediaState,
+    NativeWindow, Platform, PlatformError, Result, Watch,
+};
+
+mod audio;
+mod com;
+mod media;
 
 /// Windows implementation (windows-rs). Capabilities are added as each phase lands.
 pub struct WindowsPlatform;
@@ -28,6 +35,8 @@ impl Platform for WindowsPlatform {
             Capability::SystemInfo,
             Capability::Gpu,
             Capability::Transparency,
+            Capability::Audio,
+            Capability::Media,
         ]
     }
 
@@ -55,6 +64,58 @@ impl Platform for WindowsPlatform {
             }
             SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha(opacity), LWA_ALPHA).map_err(os)
         }
+    }
+
+    fn audio_devices(&self) -> Result<Vec<AudioDevice>> {
+        audio::run(audio::devices)
+    }
+    fn volume(&self) -> Result<f32> {
+        audio::run(audio::volume)
+    }
+    fn set_volume(&self, level: f32) -> Result<()> {
+        audio::run(move || audio::set_volume(level))
+    }
+    fn set_muted(&self, muted: bool) -> Result<()> {
+        audio::run(move || audio::set_muted(muted))
+    }
+    fn audio_state(&self) -> Result<AudioState> {
+        audio::run(audio::state)
+    }
+    fn set_default_audio_device(&self, id: &str) -> Result<()> {
+        let id = id.to_string();
+        audio::run(move || audio::set_default_device(&id))
+    }
+    fn audio_sessions(&self) -> Result<Vec<AudioSession>> {
+        audio::run(audio::sessions)
+    }
+    fn set_session_volume(&self, id: &str, level: f32) -> Result<()> {
+        let id = id.to_string();
+        audio::run(move || audio::set_session_volume(&id, level))
+    }
+    fn set_session_muted(&self, id: &str, muted: bool) -> Result<()> {
+        let id = id.to_string();
+        audio::run(move || audio::set_session_muted(&id, muted))
+    }
+    fn watch_audio(&self, on_change: ChangeFn) -> Result<Watch> {
+        audio::watch(on_change)
+    }
+
+    fn media_state(&self) -> Result<MediaState> {
+        media::run(media::state)
+    }
+    fn media_control(&self, action: MediaAction) -> Result<()> {
+        media::run(move || media::control(action))
+    }
+    fn media_seek(&self, seconds: f64) -> Result<()> {
+        media::run(move || media::seek(seconds))
+    }
+    fn watch_media(&self, on_change: ChangeFn) -> Result<Watch> {
+        media::watch(on_change)
+    }
+
+    fn gpu_release(&self) {
+        // Closes the PDH query (Drop); the next gpu_usage() re-primes from scratch.
+        *GPU_QUERY.lock().unwrap_or_else(|p| p.into_inner()) = None;
     }
 
     fn gpu_usage(&self) -> Result<f32> {
@@ -268,5 +329,34 @@ mod tests {
         let v = p.gpu_usage().expect("gpu usage");
         assert!((0.0..=100.0).contains(&v));
         assert!(!p.gpu_name().expect("gpu name").is_empty());
+        p.gpu_release();
+        assert!(
+            GPU_QUERY.lock().unwrap().is_none(),
+            "query closed on release"
+        );
+    }
+
+    /// Rough cost of one `\GPU Engine(*)` collection (wall time ≈ CPU time; it's CPU-bound).
+    #[test]
+    #[ignore = "measures real PDH GPU query cost"]
+    fn real_gpu_query_cost() {
+        let p = WindowsPlatform;
+        let t = std::time::Instant::now();
+        let _ = p.gpu_usage(); // open + prime
+        let open = t.elapsed();
+        let n = 10;
+        let mut total = std::time::Duration::ZERO;
+        for _ in 0..n {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            let t = std::time::Instant::now();
+            let _ = p.gpu_usage();
+            total += t.elapsed();
+        }
+        p.gpu_release();
+        println!(
+            "PDH GPU query: open+prime {:?}, sample avg {:?} over {n}",
+            open,
+            total / n
+        );
     }
 }
