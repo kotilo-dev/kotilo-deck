@@ -1,0 +1,15 @@
+{
+	"id": "system",
+	"name": "System",
+	"icon": "cpu",
+	"sizes": ["2x2", "4x2"],
+	"defaultSize": "2x2",
+	"capabilities": ["system-info"],
+	"multiInstance": true,
+	"settings": {
+		"type": "object",
+		"properties": {
+			"threshold": { "type": "number", "title": "Warning threshold (%)", "minimum": 50, "maximum": 99, "step": 1, "default": 85 }
+		}
+	}
+}
