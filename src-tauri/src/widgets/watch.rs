@@ -13,31 +13,73 @@ pub const DEBOUNCE: Duration = Duration::from_millis(75);
 /// A continuous stream of signals still emits at least this often.
 pub const DEBOUNCE_MAX: Duration = Duration::from_millis(300);
 
-/// Subscriber count + the running handle (dropping the handle stops the work).
-pub struct Subscription<H>(Mutex<(u32, Option<H>)>);
+/// Who holds a subscription. The deck webview's count is dropped on every page load (a
+/// reload never runs widget cleanup); LAN browsers (`crate::lan`) are tracked per client
+/// there and released when their events socket goes away, so a deck reload never touches
+/// them (and a browser closing never touches the deck's).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Owner {
+    Deck,
+    Remote,
+}
+
+#[derive(Default)]
+struct Counts {
+    deck: u32,
+    remote: u32,
+}
+
+impl Counts {
+    fn get(&mut self, owner: Owner) -> &mut u32 {
+        match owner {
+            Owner::Deck => &mut self.deck,
+            Owner::Remote => &mut self.remote,
+        }
+    }
+
+    fn total(&self) -> u32 {
+        self.deck.saturating_add(self.remote)
+    }
+}
+
+/// Subscriber counts + the running handle (dropping the handle stops the work). The work
+/// runs while the deck and remote counts together are above zero.
+pub struct Subscription<H>(Mutex<(Counts, Option<H>)>);
 
 impl<H> Default for Subscription<H> {
     fn default() -> Self {
-        Self(Mutex::new((0, None)))
+        Self(Mutex::new((Counts::default(), None)))
     }
 }
 
 impl<H> Subscription<H> {
-    /// Adds a subscriber; starts the work on 0 → 1 (or if a previous start failed).
+    #[cfg(test)]
     pub fn subscribe(&self, start: impl FnOnce() -> Option<H>) {
+        self.subscribe_as(Owner::Deck, start);
+    }
+
+    #[cfg(test)]
+    pub fn unsubscribe(&self) {
+        self.unsubscribe_as(Owner::Deck);
+    }
+
+    /// Adds a subscriber; starts the work on 0 → 1 (or if a previous start failed).
+    pub fn subscribe_as(&self, owner: Owner, start: impl FnOnce() -> Option<H>) {
         let mut s = self.0.lock().unwrap_or_else(|p| p.into_inner());
-        s.0 += 1;
+        let n = s.0.get(owner);
+        *n = n.saturating_add(1);
         if s.1.is_none() {
             s.1 = start();
         }
     }
 
-    /// Removes a subscriber; stops the work on 1 → 0.
-    pub fn unsubscribe(&self) {
+    /// Removes a subscriber; stops the work when no subscriber of either owner is left.
+    pub fn unsubscribe_as(&self, owner: Owner) {
         let handle = {
             let mut s = self.0.lock().unwrap_or_else(|p| p.into_inner());
-            s.0 = s.0.saturating_sub(1);
-            if s.0 == 0 {
+            let n = s.0.get(owner);
+            *n = n.saturating_sub(1);
+            if s.0.total() == 0 {
                 s.1.take()
             } else {
                 None
@@ -46,13 +88,15 @@ impl<H> Subscription<H> {
         drop(handle); // outside the lock: stopping a watcher may block briefly
     }
 
-    /// Drops every subscription (webview reload never runs widget cleanup).
+    /// Drops every deck subscription (webview reload never runs widget cleanup); the work
+    /// keeps running for remote subscribers. Returns the deck count that was dropped.
     pub fn reset(&self) -> u32 {
         let (count, handle) = {
             let mut s = self.0.lock().unwrap_or_else(|p| p.into_inner());
-            let count = s.0;
-            s.0 = 0;
-            (count, s.1.take())
+            let count = s.0.deck;
+            s.0.deck = 0;
+            let handle = if s.0.remote == 0 { s.1.take() } else { None };
+            (count, handle)
         };
         drop(handle);
         count
@@ -60,7 +104,7 @@ impl<H> Subscription<H> {
 
     #[cfg(test)]
     pub fn count(&self) -> u32 {
-        self.0.lock().unwrap_or_else(|p| p.into_inner()).0
+        self.0.lock().unwrap_or_else(|p| p.into_inner()).0.total()
     }
 
     #[cfg(test)]
@@ -196,6 +240,29 @@ mod tests {
         // A fresh subscribe after reset starts again.
         sub.subscribe(|| Some(Flag(dropped.clone())));
         assert!(sub.is_running());
+    }
+
+    #[test]
+    fn reset_keeps_remote_subscribers() {
+        let dropped = Arc::new(AtomicUsize::new(0));
+        let sub = Subscription::<Flag>::default();
+        sub.subscribe(|| Some(Flag(dropped.clone())));
+        sub.subscribe_as(Owner::Remote, || Some(Flag(dropped.clone())));
+        assert_eq!(sub.reset(), 1);
+        assert!(sub.is_running(), "a remote subscriber keeps the work alive");
+        assert_eq!(sub.count(), 1);
+        // A deck unsubscribe after the reset never eats the remote count.
+        sub.unsubscribe();
+        assert!(sub.is_running());
+        sub.unsubscribe_as(Owner::Remote);
+        assert!(!sub.is_running());
+        assert_eq!(dropped.load(Ordering::SeqCst), 1);
+        // Deck subscribers survive the last remote one leaving.
+        sub.subscribe(|| Some(Flag(dropped.clone())));
+        sub.subscribe_as(Owner::Remote, || Some(Flag(dropped.clone())));
+        sub.unsubscribe_as(Owner::Remote);
+        assert!(sub.is_running());
+        assert_eq!(dropped.load(Ordering::SeqCst), 1);
     }
 
     #[test]

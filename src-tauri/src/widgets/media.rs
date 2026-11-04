@@ -5,7 +5,7 @@
 
 use tauri::{AppHandle, Emitter, Manager};
 
-use super::watch::{self, blocking, Live, Subscription};
+use super::watch::{self, blocking, Live, Owner, Subscription};
 use crate::platform::{self, MediaAction, MediaState, PlatformError};
 
 pub const EVENT_STATE: &str = "media://state";
@@ -61,21 +61,29 @@ fn start(app: AppHandle) -> Option<Live> {
 
 /// Starting/stopping the watcher registers/unregisters WinRT handlers, so it runs on the
 /// blocking pool rather than an async worker.
-#[tauri::command]
-pub async fn media_subscribe(app: AppHandle) -> Result<(), String> {
+pub async fn subscribe_as(app: AppHandle, owner: Owner) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let hub = app.state::<MediaHub>();
-        hub.0.subscribe(|| start(app.clone()));
+        hub.0.subscribe_as(owner, || start(app.clone()));
     })
     .await
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub async fn media_unsubscribe(app: AppHandle) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || app.state::<MediaHub>().0.unsubscribe())
+pub async fn unsubscribe_as(app: AppHandle, owner: Owner) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || app.state::<MediaHub>().0.unsubscribe_as(owner))
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn media_subscribe(app: AppHandle) -> Result<(), String> {
+    subscribe_as(app, Owner::Deck).await
+}
+
+#[tauri::command]
+pub async fn media_unsubscribe(app: AppHandle) -> Result<(), String> {
+    unsubscribe_as(app, Owner::Deck).await
 }
 
 #[cfg(test)]
