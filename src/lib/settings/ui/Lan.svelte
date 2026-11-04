@@ -4,7 +4,7 @@
 	 * the deck's addresses (token masked until "Show") and a QR code for the first one. Off by default.
 	 */
 	import { onMount, untrack } from 'svelte';
-	import { t } from '#lib/i18n/index.ts';
+	import { t, tCode } from '#lib/i18n/index.ts';
 	import { lanStatus, on, type LanStatus } from '#lib/ipc/index.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { getSettingsContext } from './context.svelte';
@@ -61,7 +61,7 @@
 	const detail = $derived.by(() => {
 		if (!env.tauri) return t('settings.common.desktopOnly');
 		if (view === 'off') return t('lan.offHelp');
-		if (view === 'error') return t('lan.errorHelp', { message: status?.error ?? '' });
+		if (view === 'error') return t('lan.errorHelp', { message: tCode('lan.errors', status?.errorCode, status?.error ?? '') });
 		if (view === 'starting') return t('lan.startingHelp');
 		return t('lan.listeningHelp');
 	});

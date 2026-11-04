@@ -4,7 +4,7 @@
 	 * files live (no telemetry, SPEC §1).
 	 */
 	import { onMount } from 'svelte';
-	import { locale, t } from '#lib/i18n/index.ts';
+	import { locale, t, tCode } from '#lib/i18n/index.ts';
 	import { on, updateCheck, updateInstall, updateStatus, type UpdateStatus } from '#lib/ipc/index.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { errText, getSettingsContext } from './context.svelte';
@@ -48,7 +48,7 @@
 			case 'ready':
 				return t('update.state.ready');
 			case 'error':
-				return t('update.state.error', { message: update?.error ?? '' });
+				return t('update.state.error', { message: tCode('update.errors', update?.errorCode, update?.error ?? '') });
 			case 'unsupported':
 				return t('update.state.unsupported');
 			default:

@@ -31,6 +31,16 @@
 			"system": "Sistem",
 			"media": "Medya",
 			"pomodoro": "Pomodoro"
+		},
+		"errors": {
+			"no-manifest": "manifest.json bulunamadı.",
+			"bad-json": "manifest.json geçerli bir JSON değil.",
+			"api-version": "Desteklenmeyen apiVersion (1 olmalı).",
+			"id-mismatch": "Manifest id değeri klasör adıyla aynı olmalı.",
+			"bad-sizes": "sizes veya defaultSize geçersiz.",
+			"missing-entry": "Giriş dosyası bulunamadı.",
+			"too-large": "Bileşen klasörü çok büyük.",
+			"too-many": "Çok fazla bileşen kurulu (en fazla 64)."
 		}
 	},
 	"lan": {
@@ -65,7 +75,13 @@
 		"qrAlt": "İlk adresin QR kodu",
 		"qrHelp": "Tabletin kamerasıyla tarayın.",
 		"qrHidden": "QR kodu görmek için Göster’e basın.",
-		"warning": "Bu bağlantıya sahip herkes deck’i kontrol edebilir. Yalnızca güvendiğiniz cihazlarla paylaşın."
+		"warning": "Bu bağlantıya sahip herkes deck’i kontrol edebilir. Yalnızca güvendiğiniz cihazlarla paylaşın.",
+		"errors": {
+			"port-in-use": "Bu port başka bir uygulama tarafından kullanılıyor. Başka bir port seçin.",
+			"permission-denied": "Sistem bu porta izin vermedi. 1024 üstü bir port seçin.",
+			"bind-failed": "Sunucu bu portta başlatılamadı.",
+			"token-unreadable": "Erişim anahtarı okunamadı."
+		}
 	},
 	"update": {
 		"title": "Güncellemeler",
@@ -88,6 +104,13 @@
 			"unsupported": "Geliştirme sürümlerinde güncellemeler kapalıdır",
 			"upToDate": "Kotilo Deck güncel",
 			"never": "Henüz kontrol edilmedi"
+		},
+		"errors": {
+			"no-release": "Bu platform için henüz yayınlanmış bir sürüm yok.",
+			"network": "Güncelleme sunucusuna ulaşılamadı.",
+			"signature": "Güncelleme imzası geçersiz; kurulmadı.",
+			"install-failed": "Güncelleme kurulamadı.",
+			"other": "Güncelleme başarısız oldu."
 		}
 	},
 	"remote": {

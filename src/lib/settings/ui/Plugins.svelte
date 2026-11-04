@@ -4,7 +4,7 @@
 	 * widgets folder and how to add one. Live on `plugin://changed` through the shared registry.
 	 */
 	import { isTauri, pluginOpenFolder, type PluginWidget } from '#lib/ipc/index.ts';
-	import { t } from '#lib/i18n/index.ts';
+	import { t, tCode } from '#lib/i18n/index.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { plugins } from '#lib/plugins/registry.svelte.ts';
 	import { errText, getSettingsContext } from './context.svelte';
@@ -64,7 +64,7 @@
 								{#if !bad && meta(p)}<span class="s-help">{meta(p)}</span>{/if}
 							</div>
 							{#if bad}
-								<span class="s-help error">{p.error ?? t('plugins.page.noManifest')}</span>
+								<span class="s-help error">{p.error ? tCode('plugins.errors', p.errorCode, p.error) : t('plugins.page.noManifest')}</span>
 							{:else if m}
 								{#if m.description}<span class="s-help">{m.description}</span>{/if}
 								<div class="facts">

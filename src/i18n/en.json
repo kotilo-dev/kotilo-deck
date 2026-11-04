@@ -31,6 +31,16 @@
 			"system": "System",
 			"media": "Media",
 			"pomodoro": "Pomodoro"
+		},
+		"errors": {
+			"no-manifest": "manifest.json is missing.",
+			"bad-json": "manifest.json is not valid JSON.",
+			"api-version": "Unsupported apiVersion (expected 1).",
+			"id-mismatch": "The manifest id must match the folder name.",
+			"bad-sizes": "sizes or defaultSize is invalid.",
+			"missing-entry": "The entry file does not exist.",
+			"too-large": "The widget folder is too large.",
+			"too-many": "Too many widgets installed (max 64)."
 		}
 	},
 	"lan": {
@@ -65,7 +75,13 @@
 		"qrAlt": "QR code for the first address",
 		"qrHelp": "Scan it with the tablet's camera.",
 		"qrHidden": "Press Show to display the QR code.",
-		"warning": "Anyone with this link can control the deck. Share it only with devices you trust."
+		"warning": "Anyone with this link can control the deck. Share it only with devices you trust.",
+		"errors": {
+			"port-in-use": "The port is already used by another app. Pick another port.",
+			"permission-denied": "The system refused this port. Pick a port above 1024.",
+			"bind-failed": "The server could not start on this port.",
+			"token-unreadable": "The access token could not be read."
+		}
 	},
 	"update": {
 		"title": "Updates",
@@ -88,6 +104,13 @@
 			"unsupported": "Updates are disabled in development builds",
 			"upToDate": "Kotilo Deck is up to date",
 			"never": "Not checked yet"
+		},
+		"errors": {
+			"no-release": "No release is published for this platform yet.",
+			"network": "Could not reach the update server.",
+			"signature": "The update signature is invalid; it was not installed.",
+			"install-failed": "The update could not be installed.",
+			"other": "The update failed."
 		}
 	},
 	"remote": {
