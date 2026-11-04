@@ -5,7 +5,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use super::manifest::valid_relative_path;
+use super::manifest::{code, valid_relative_path, Rejection};
 use super::SCHEME;
 
 /// Files per plugin folder that may be served (plugin-api.md ▸ Folder).
@@ -123,7 +123,8 @@ pub fn read(dir: &Path, rel: &str) -> Option<Vec<u8>> {
 }
 
 /// Checks the per-folder limits without following symlinked directories.
-pub fn check_limits(dir: &Path) -> Result<(), String> {
+pub fn check_limits(dir: &Path) -> Result<(), Rejection> {
+    let too_large = |msg: String| Rejection::new(code::TOO_LARGE, msg);
     let mut files = 0usize;
     let mut bytes = 0u64;
     let mut dirs = 0usize;
@@ -131,7 +132,7 @@ pub fn check_limits(dir: &Path) -> Result<(), String> {
     while let Some(d) = stack.pop() {
         dirs += 1;
         if dirs > MAX_DIRS {
-            return Err(format!("more than {MAX_DIRS} sub-folders"));
+            return Err(too_large(format!("more than {MAX_DIRS} sub-folders")));
         }
         let entries = fs::read_dir(&d).map_err(|e| format!("cannot read folder: {e}"))?;
         for entry in entries.filter_map(Result::ok) {
@@ -142,12 +143,12 @@ pub fn check_limits(dir: &Path) -> Result<(), String> {
             }
             files += 1;
             if files > MAX_FILES {
-                return Err(format!("more than {MAX_FILES} files"));
+                return Err(too_large(format!("more than {MAX_FILES} files")));
             }
             if ft.is_file() {
                 bytes += entry.metadata().map(|m| m.len()).unwrap_or(0);
                 if bytes > MAX_FOLDER_BYTES {
-                    return Err("folder is larger than 20 MB".into());
+                    return Err(too_large("folder is larger than 20 MB".into()));
                 }
             }
         }
@@ -351,13 +352,15 @@ mod tests {
             fs::write(many.join(format!("{i}.txt")), "").unwrap();
         }
         let err = check_limits(dir).unwrap_err();
-        assert!(err.contains("1000 files"), "{err}");
+        assert!(err.message.contains("1000 files"), "{err:?}");
+        assert_eq!(err.code, code::TOO_LARGE);
 
         let big = tempfile::tempdir().unwrap();
         let f = fs::File::create(big.path().join("big.bin")).unwrap();
         f.set_len(MAX_FOLDER_BYTES + 1).unwrap();
         let err = check_limits(big.path()).unwrap_err();
-        assert!(err.contains("20 MB"), "{err}");
+        assert!(err.message.contains("20 MB"), "{err:?}");
+        assert_eq!(err.code, code::TOO_LARGE);
     }
 
     #[test]

@@ -63,8 +63,44 @@ pub struct UpdateStatus {
     /// 0–1 while downloading.
     pub progress: Option<f64>,
     pub error: Option<String>,
+    /// Machine-readable `error` ([`code`]) for translation.
+    pub error_code: Option<&'static str>,
     /// Unix ms of the last finished check.
     pub last_checked: Option<i64>,
+}
+
+/// `UpdateStatus.errorCode` values (mirrored in `src/lib/ipc/index.ts`).
+pub mod code {
+    /// No `latest.json` published, or none for this platform.
+    pub const NO_RELEASE: &str = "no-release";
+    /// Unreachable server, timeout or another transport error.
+    pub const NETWORK: &str = "network";
+    /// The minisign signature or the signed version did not verify.
+    pub const SIGNATURE: &str = "signature";
+    pub const INSTALL_FAILED: &str = "install-failed";
+    pub const OTHER: &str = "other";
+}
+
+/// A failed backend step: machine-readable `code` plus a short English message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateError {
+    pub code: &'static str,
+    pub message: String,
+}
+
+impl UpdateError {
+    pub fn new(code: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+}
+
+impl From<&str> for UpdateError {
+    fn from(message: &str) -> Self {
+        Self::new(code::OTHER, message)
+    }
 }
 
 /// Download progress callback: `(bytes in this chunk, total length if known)`.
@@ -73,15 +109,17 @@ pub type ProgressFn<'a> = Box<dyn FnMut(u64, Option<u64>) + Send + 'a>;
 /// The network side of updating.
 pub trait Backend: Send + Sync + 'static {
     /// `Ok(None)` = up to date.
-    fn check(&self) -> impl Future<Output = Result<Option<UpdateInfo>, String>> + Send;
+    fn check(&self) -> impl Future<Output = Result<Option<UpdateInfo>, UpdateError>> + Send;
     /// Downloads and verifies the update found by the last successful `check`.
     fn download<'a>(
         &'a self,
         on_progress: ProgressFn<'a>,
-    ) -> impl Future<Output = Result<Vec<u8>, String>> + Send + 'a;
-    /// Installs the downloaded package and relaunches; may not return (Windows installers
-    /// exit the app).
-    fn install(&self, bytes: Vec<u8>) -> Result<(), String>;
+    ) -> impl Future<Output = Result<Vec<u8>, UpdateError>> + Send + 'a;
+    /// Installs the downloaded package without blocking the async worker; may not return
+    /// (Windows installers exit the app).
+    fn install(&self, bytes: Vec<u8>) -> impl Future<Output = Result<(), UpdateError>> + Send;
+    /// Restarts the app into the installed version; does not return in the app.
+    fn relaunch(&self);
 }
 
 type EmitFn = Box<dyn Fn(&UpdateStatus) + Send + Sync>;
@@ -144,29 +182,41 @@ impl<B: Backend> Engine<B> {
         snapshot
     }
 
-    fn busy(state: UpdateState) -> bool {
-        matches!(
-            state,
-            UpdateState::Checking
-                | UpdateState::Downloading
-                | UpdateState::Ready
-                | UpdateState::Unsupported
-        )
+    /// Sets `Error` with the short message and code; returns the message.
+    fn fail(&self, during: &str, e: &UpdateError) -> String {
+        tracing::warn!(code = e.code, "update {during} failed: {}", e.message);
+        let msg = short(&e.message);
+        self.transition(|s| {
+            s.state = UpdateState::Error;
+            s.progress = None;
+            s.error = Some(msg.clone());
+            s.error_code = Some(e.code);
+        });
+        msg
     }
 
-    /// Checks now. A check while busy (or unsupported) just returns the current status.
+    /// Checks now. A check while checking, downloading, ready or unsupported just returns
+    /// the current status. The busy test and the switch to `Checking` happen under one
+    /// lock, so two concurrent calls never both reach the backend.
     pub async fn check(&self) -> UpdateStatus {
-        {
-            let s = self.lock();
-            if Self::busy(s.state) {
+        let started = {
+            let mut s = self.lock();
+            if matches!(
+                s.state,
+                UpdateState::Checking
+                    | UpdateState::Downloading
+                    | UpdateState::Ready
+                    | UpdateState::Unsupported
+            ) {
                 return s.clone();
             }
-        }
-        self.transition(|s| {
             s.state = UpdateState::Checking;
             s.error = None;
+            s.error_code = None;
             s.progress = None;
-        });
+            s.clone()
+        };
+        (self.emit)(&started);
         let result = self.backend.check().await;
         self.transition(|s| {
             s.last_checked = Some(now_ms());
@@ -177,42 +227,56 @@ impl<B: Backend> Engine<B> {
                     s.state = UpdateState::Available;
                     s.available = Some(info);
                     s.error = None;
+                    s.error_code = None;
                 }
                 Ok(None) => {
                     tracing::info!("no update available");
                     s.state = UpdateState::Idle;
                     s.available = None;
                     s.error = None;
+                    s.error_code = None;
                 }
                 Err(e) => {
-                    tracing::warn!("update check failed: {e}");
+                    tracing::warn!(code = e.code, "update check failed: {}", e.message);
                     s.state = UpdateState::Error;
                     s.available = None;
-                    s.error = Some(short(&e));
+                    s.error = Some(short(&e.message));
+                    s.error_code = Some(e.code);
                 }
             }
         })
     }
 
-    /// Downloads (with throttled progress), then installs and relaunches.
+    /// Downloads (with throttled progress), installs and relaunches. In `Ready` (installed,
+    /// relaunch pending) it only relaunches. The state test and the switch to
+    /// `Downloading` happen under one lock, so two concurrent calls never both download.
     pub async fn install(&self) -> Result<(), String> {
-        {
-            let s = self.lock();
-            if s.state == UpdateState::Unsupported {
-                return Err("updates are not available in this build".into());
+        let started = {
+            let mut s = self.lock();
+            match s.state {
+                UpdateState::Unsupported => {
+                    return Err("updates are not available in this build".into())
+                }
+                UpdateState::Checking | UpdateState::Downloading => {
+                    return Err("an update is already in progress".into())
+                }
+                UpdateState::Ready => None,
+                _ if s.available.is_none() => return Err("no update available".into()),
+                _ => {
+                    s.state = UpdateState::Downloading;
+                    s.progress = Some(0.0);
+                    s.error = None;
+                    s.error_code = None;
+                    Some(s.clone())
+                }
             }
-            if Self::busy(s.state) {
-                return Err("an update is already in progress".into());
-            }
-            if s.available.is_none() {
-                return Err("no update available".into());
-            }
-        }
-        self.transition(|s| {
-            s.state = UpdateState::Downloading;
-            s.progress = Some(0.0);
-            s.error = None;
-        });
+        };
+        let Some(started) = started else {
+            tracing::info!("update already installed; relaunching");
+            self.backend.relaunch();
+            return Ok(());
+        };
+        (self.emit)(&started);
 
         let mut downloaded = 0u64;
         let mut last_emit: Option<Instant> = None;
@@ -229,58 +293,58 @@ impl<B: Backend> Engine<B> {
             let p = (downloaded as f64 / total as f64).clamp(0.0, 1.0);
             self.transition(|s| s.progress = Some(p));
         });
+        // `available` stays on failure so the user can retry.
         let bytes = match self.backend.download(on_progress).await {
             Ok(b) => b,
-            Err(e) => {
-                tracing::warn!("update download failed: {e}");
-                let msg = short(&e);
-                // `available` stays so the user can retry.
-                self.transition(|s| {
-                    s.state = UpdateState::Error;
-                    s.progress = None;
-                    s.error = Some(msg.clone());
-                });
-                return Err(msg);
-            }
+            Err(e) => return Err(self.fail("download", &e)),
         };
+        if self.lock().progress != Some(1.0) {
+            self.transition(|s| s.progress = Some(1.0)); // total length was unknown
+        }
+        // Still `Downloading` while the installer runs: a second click must not relaunch
+        // into a half-installed app.
+        tracing::info!("update downloaded; installing");
+        if let Err(e) = self.backend.install(bytes).await {
+            return Err(self.fail("install", &e));
+        }
         self.transition(|s| {
             s.state = UpdateState::Ready;
             s.progress = Some(1.0);
         });
-        tracing::info!("update downloaded; installing");
-        if let Err(e) = self.backend.install(bytes) {
-            tracing::warn!("update install failed: {e}");
-            let msg = short(&e);
-            self.transition(|s| {
-                s.state = UpdateState::Error;
-                s.progress = None;
-                s.error = Some(msg.clone());
-            });
-            return Err(msg);
-        }
+        tracing::info!("update installed; relaunching");
+        self.backend.relaunch();
         Ok(())
     }
 }
 
-/// Short, URL-free message for an updater error.
-fn describe(e: &tauri_plugin_updater::Error, during: &str) -> String {
+/// Short, URL-free message and code for an updater error.
+fn describe(e: &tauri_plugin_updater::Error, during: &str) -> UpdateError {
     use tauri_plugin_updater::Error as E;
-    match e {
-        E::ReleaseNotFound => "no release information is published yet".into(),
-        E::Reqwest(r) if r.is_timeout() => format!("the update server timed out ({during})"),
-        E::Reqwest(r) if r.is_connect() => {
-            format!("cannot reach the update server ({during})")
-        }
-        E::Reqwest(_) | E::Network(_) => format!("network error ({during})"),
+    let (c, msg) = match e {
+        E::ReleaseNotFound => (
+            code::NO_RELEASE,
+            "no release information is published yet".into(),
+        ),
+        E::Reqwest(r) if r.is_timeout() => (
+            code::NETWORK,
+            format!("the update server timed out ({during})"),
+        ),
+        E::Reqwest(r) if r.is_connect() => (
+            code::NETWORK,
+            format!("cannot reach the update server ({during})"),
+        ),
+        E::Reqwest(_) | E::Network(_) => (code::NETWORK, format!("network error ({during})")),
         E::Minisign(_) | E::SignedVersionMismatch { .. } | E::MissingSignedVersion => {
-            "the update signature is invalid".into()
+            (code::SIGNATURE, "the update signature is invalid".into())
         }
-        E::TargetNotFound(_) | E::TargetsNotFound(_) => {
-            "no update is published for this platform".into()
-        }
-        E::Serialization(_) => "the update manifest is malformed".into(),
-        other => format!("{during} failed: {other}"),
-    }
+        E::TargetNotFound(_) | E::TargetsNotFound(_) => (
+            code::NO_RELEASE,
+            "no update is published for this platform".into(),
+        ),
+        E::Serialization(_) => (code::OTHER, "the update manifest is malformed".into()),
+        other => (code::OTHER, format!("{during} failed: {other}")),
+    };
+    UpdateError::new(c, msg)
 }
 
 /// `tauri-plugin-updater` (endpoint + pubkey from `tauri.conf.json`).
@@ -299,7 +363,7 @@ impl TauriBackend {
 }
 
 impl Backend for TauriBackend {
-    async fn check(&self) -> Result<Option<UpdateInfo>, String> {
+    async fn check(&self) -> Result<Option<UpdateInfo>, UpdateError> {
         let updater = self
             .app
             .updater()
@@ -322,7 +386,10 @@ impl Backend for TauriBackend {
         Ok(info)
     }
 
-    async fn download<'a>(&'a self, mut on_progress: ProgressFn<'a>) -> Result<Vec<u8>, String> {
+    async fn download<'a>(
+        &'a self,
+        mut on_progress: ProgressFn<'a>,
+    ) -> Result<Vec<u8>, UpdateError> {
         let update = self.pending().ok_or("no update available")?;
         update
             .download(|chunk, total| on_progress(chunk as u64, total), || {})
@@ -330,10 +397,17 @@ impl Backend for TauriBackend {
             .map_err(|e| describe(&e, "download"))
     }
 
-    fn install(&self, bytes: Vec<u8>) -> Result<(), String> {
+    async fn install(&self, bytes: Vec<u8>) -> Result<(), UpdateError> {
         let update = self.pending().ok_or("no update available")?;
-        update.install(bytes).map_err(|e| describe(&e, "install"))?;
-        // Windows: the installer already quit the app and relaunches it itself.
+        // Unpacks / runs the installer synchronously: keep it off the async workers.
+        tauri::async_runtime::spawn_blocking(move || update.install(bytes))
+            .await
+            .map_err(|_| UpdateError::new(code::INSTALL_FAILED, "the installer task stopped"))?
+            .map_err(|e| UpdateError::new(code::INSTALL_FAILED, describe(&e, "install").message))
+    }
+
+    fn relaunch(&self) {
+        // Windows: the installer has usually quit the app already and relaunches it itself.
         self.app.restart()
     }
 }
@@ -457,26 +531,39 @@ mod tests {
 
     #[derive(Default)]
     struct Fake {
-        check: Mutex<Vec<Result<Option<UpdateInfo>, String>>>,
-        download: Mutex<Option<Result<Vec<u8>, String>>>,
-        install: Mutex<Option<Result<(), String>>>,
+        check: Mutex<Vec<Result<Option<UpdateInfo>, UpdateError>>>,
+        download: Mutex<Option<Result<Vec<u8>, UpdateError>>>,
+        install: Mutex<Option<Result<(), UpdateError>>>,
         /// Chunks reported by `download` (bytes each), total = sum.
         chunks: Vec<u64>,
+        /// How long `check` and `download` take (lets concurrent calls overlap).
+        delay: Duration,
         calls: AtomicUsize,
+        checks: AtomicUsize,
+        downloads: AtomicUsize,
+        installs: AtomicUsize,
+        relaunches: AtomicUsize,
     }
 
     impl Backend for Fake {
-        fn check(&self) -> impl Future<Output = Result<Option<UpdateInfo>, String>> + Send {
+        fn check(&self) -> impl Future<Output = Result<Option<UpdateInfo>, UpdateError>> + Send {
             self.calls.fetch_add(1, Ordering::SeqCst);
+            self.checks.fetch_add(1, Ordering::SeqCst);
             let r = self.check.lock().unwrap().remove(0);
-            async move { r }
+            let delay = self.delay;
+            async move {
+                tokio::time::sleep(delay).await;
+                r
+            }
         }
         fn download<'a>(
             &'a self,
             mut on_progress: ProgressFn<'a>,
-        ) -> impl Future<Output = Result<Vec<u8>, String>> + Send + 'a {
+        ) -> impl Future<Output = Result<Vec<u8>, UpdateError>> + Send + 'a {
             self.calls.fetch_add(1, Ordering::SeqCst);
+            self.downloads.fetch_add(1, Ordering::SeqCst);
             async move {
+                tokio::time::sleep(self.delay).await;
                 let total: u64 = self.chunks.iter().sum();
                 for c in &self.chunks {
                     on_progress(*c, Some(total));
@@ -484,10 +571,20 @@ mod tests {
                 self.download.lock().unwrap().take().unwrap_or(Ok(vec![1]))
             }
         }
-        fn install(&self, _bytes: Vec<u8>) -> Result<(), String> {
+        fn install(&self, _bytes: Vec<u8>) -> impl Future<Output = Result<(), UpdateError>> + Send {
             self.calls.fetch_add(1, Ordering::SeqCst);
-            self.install.lock().unwrap().take().unwrap_or(Ok(()))
+            self.installs.fetch_add(1, Ordering::SeqCst);
+            let r = self.install.lock().unwrap().take().unwrap_or(Ok(()));
+            async move { r }
         }
+        fn relaunch(&self) {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.relaunches.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    fn err(code: &'static str, msg: &str) -> UpdateError {
+        UpdateError::new(code, msg)
     }
 
     fn info(v: &str) -> UpdateInfo {
@@ -545,6 +642,9 @@ mod tests {
         // First chunk and the final one are emitted; the rest fall inside the 200 ms window.
         assert_eq!(progress, [0.25, 1.0]);
         assert_eq!(e.status().progress, Some(1.0));
+        // Installed, then relaunched once.
+        assert_eq!(e.backend.installs.load(Ordering::SeqCst), 1);
+        assert_eq!(e.backend.relaunches.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
@@ -552,22 +652,28 @@ mod tests {
         let fake = Fake {
             check: Mutex::new(vec![
                 Ok(None),
-                Err("no release information is published yet".into()),
-                Err("x".repeat(500)),
+                Err(err(
+                    code::NO_RELEASE,
+                    "no release information is published yet",
+                )),
+                Err(err(code::OTHER, &"x".repeat(500))),
             ]),
             ..Default::default()
         };
         let (e, _log) = engine(fake, true);
-        assert_eq!(e.check().await.state, UpdateState::Idle);
+        let s = e.check().await;
+        assert_eq!((s.state, s.error_code), (UpdateState::Idle, None));
         let s = e.check().await;
         assert_eq!(s.state, UpdateState::Error);
         assert_eq!(
             s.error.as_deref(),
             Some("no release information is published yet")
         );
+        assert_eq!(s.error_code, Some(code::NO_RELEASE));
         // Errors are retryable and kept short.
         let s = e.check().await;
         assert_eq!(s.state, UpdateState::Error);
+        assert_eq!(s.error_code, Some(code::OTHER));
         assert!(s.error.unwrap().chars().count() <= MAX_ERROR_CHARS + 1);
         assert!(e.install().await.is_err(), "nothing to install");
     }
@@ -576,7 +682,7 @@ mod tests {
     async fn download_failure_keeps_the_offer() {
         let fake = Fake {
             check: Mutex::new(vec![Ok(Some(info("0.2.0")))]),
-            download: Mutex::new(Some(Err("network error (download)".into()))),
+            download: Mutex::new(Some(Err(err(code::NETWORK, "network error (download)")))),
             ..Default::default()
         };
         let (e, _log) = engine(fake, true);
@@ -584,28 +690,34 @@ mod tests {
         assert_eq!(e.install().await.unwrap_err(), "network error (download)");
         let s = e.status();
         assert_eq!(s.state, UpdateState::Error);
+        assert_eq!(s.error_code, Some(code::NETWORK));
         assert!(s.available.is_some());
         assert!(s.progress.is_none());
-        // Retry succeeds.
+        // Retry succeeds and clears the error.
         e.install().await.unwrap();
-        assert_eq!(e.status().state, UpdateState::Ready);
+        let s = e.status();
+        assert_eq!(s.state, UpdateState::Ready);
+        assert_eq!((s.error, s.error_code), (None, None));
     }
 
     #[tokio::test]
     async fn install_failure_is_reported() {
         let fake = Fake {
             check: Mutex::new(vec![Ok(Some(info("0.2.0")))]),
-            install: Mutex::new(Some(Err("the update signature is invalid".into()))),
+            install: Mutex::new(Some(Err(err(code::INSTALL_FAILED, "install failed: x")))),
             ..Default::default()
         };
         let (e, _log) = engine(fake, true);
         e.check().await;
         assert!(e.install().await.is_err());
-        assert_eq!(e.status().state, UpdateState::Error);
+        let s = e.status();
+        assert_eq!(s.state, UpdateState::Error);
+        assert_eq!(s.error_code, Some(code::INSTALL_FAILED));
+        assert_eq!(e.backend.relaunches.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
-    async fn ready_blocks_further_checks() {
+    async fn ready_blocks_checks_and_install_relaunches() {
         let fake = Fake {
             check: Mutex::new(vec![Ok(Some(info("0.2.0")))]),
             ..Default::default()
@@ -613,9 +725,56 @@ mod tests {
         let (e, _log) = engine(fake, true);
         e.check().await;
         e.install().await.unwrap();
+        assert_eq!(e.status().state, UpdateState::Ready);
         // A scheduled check after install does nothing (and would panic the fake).
         assert_eq!(e.check().await.state, UpdateState::Ready);
-        assert!(e.install().await.is_err());
+        // Install in `ready` relaunches instead of erroring or downloading again.
+        e.install().await.unwrap();
+        assert_eq!(e.backend.downloads.load(Ordering::SeqCst), 1);
+        assert_eq!(e.backend.installs.load(Ordering::SeqCst), 1);
+        assert_eq!(e.backend.relaunches.load(Ordering::SeqCst), 2);
+    }
+
+    /// Concurrent `check`s / `install`s (on the multi-threaded Tauri runtime) reach the
+    /// backend once each: the busy test and the state switch are one locked step.
+    #[tokio::test]
+    async fn concurrent_calls_never_double_check_or_download() {
+        let fake = Fake {
+            check: Mutex::new(vec![Ok(Some(info("0.3.0")))]),
+            delay: Duration::from_millis(50),
+            ..Default::default()
+        };
+        let (e, _log) = engine(fake, true);
+        let e = Arc::new(e);
+        let checks: Vec<_> = (0..16)
+            .map(|_| {
+                let e = e.clone();
+                tauri::async_runtime::spawn(async move { e.check().await })
+            })
+            .collect();
+        for c in checks {
+            c.await.expect("check task");
+        }
+        assert_eq!(e.backend.checks.load(Ordering::SeqCst), 1);
+        assert_eq!(e.status().state, UpdateState::Available);
+
+        let installs: Vec<_> = (0..16)
+            .map(|_| {
+                let e = e.clone();
+                tauri::async_runtime::spawn(async move { e.install().await })
+            })
+            .collect();
+        let mut ok = 0;
+        for i in installs {
+            match i.await.expect("install task") {
+                Ok(()) => ok += 1,
+                Err(m) => assert_eq!(m, "an update is already in progress"),
+            }
+        }
+        assert!(ok >= 1);
+        assert_eq!(e.backend.downloads.load(Ordering::SeqCst), 1);
+        assert_eq!(e.backend.installs.load(Ordering::SeqCst), 1);
+        assert_eq!(e.status().state, UpdateState::Ready);
     }
 
     #[tokio::test]
@@ -648,7 +807,8 @@ mod tests {
             state: UpdateState::Downloading,
             available: Some(info("0.1.0")),
             progress: Some(0.5),
-            error: None,
+            error: Some("network error (download)".into()),
+            error_code: Some(code::NETWORK),
             last_checked: Some(1),
         })
         .unwrap();
@@ -657,7 +817,8 @@ mod tests {
             serde_json::json!({
                 "current": "0.0.1", "state": "downloading",
                 "available": {"version": "0.1.0", "date": "2026-11-04T10:00:00Z", "notes": "Fixes"},
-                "progress": 0.5, "error": null, "lastChecked": 1
+                "progress": 0.5, "error": "network error (download)", "errorCode": "network",
+                "lastChecked": 1
             })
         );
         assert_eq!(

@@ -68,6 +68,7 @@ Validation (the backend rejects the folder with a readable `error`, shown in Set
 - Files are served by the backend with
   `Content-Security-Policy: default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self'`.
   No `connect-src` → no network, no remote code. Plugins get data only through the messages below.
+- Navigating the iframe to a remote page is blocked by the parent page's `frame-src` (`http://kotilo-widget.localhost kotilo-widget:` in `tauri.conf.json`, `'self'` in the LAN page CSP), not by the plugin CSP. That `frame-src` must never be loosened.
 - Path traversal (`..`, absolute paths, symlinks leaving the folder) returns 404.
 - URLs: `http://kotilo-widget.localhost/<folder>/<path>` (Windows), `kotilo-widget://localhost/<folder>/<path>` (Linux/macOS), `/plugins/<folder>/<path>` in LAN mode.
 

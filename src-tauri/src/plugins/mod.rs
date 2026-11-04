@@ -24,6 +24,7 @@ use tauri::{AppHandle, Emitter, Manager, UriSchemeContext, UriSchemeResponder};
 
 use crate::paths;
 use crate::platform::{self, PlatformError};
+use manifest::{code, Rejection};
 
 pub const EVENT_PLUGIN_CHANGED: &str = "plugin://changed";
 /// URI scheme for plugin files: `http://kotilo-widget.localhost/<folder>/<path>` on
@@ -50,6 +51,8 @@ pub struct PluginWidget {
     pub manifest: Option<Value>,
     /// Why the folder was rejected (shown in Settings ▸ Widgets).
     pub error: Option<String>,
+    /// Machine-readable `error` ([`manifest::code`]); `None` when valid.
+    pub error_code: Option<&'static str>,
     /// iframe `src` for the entry file inside the Tauri webview; `None` when invalid.
     pub entry_url: Option<String>,
 }
@@ -85,12 +88,13 @@ impl Plugins {
     }
 }
 
-fn invalid(folder: &str, error: String) -> PluginWidget {
+fn invalid(folder: &str, why: Rejection) -> PluginWidget {
     PluginWidget {
         id: format!("ext.{folder}"),
         folder: folder.to_string(),
         manifest: None,
-        error: Some(error),
+        error: Some(why.message),
+        error_code: Some(why.code),
         entry_url: None,
     }
 }
@@ -106,29 +110,45 @@ fn load(dir: &Path, folder: &str) -> PluginWidget {
                 entry_url: Some(serve::entry_url(folder, entry)),
                 manifest: Some(m),
                 error: None,
+                error_code: None,
             }
         }
         Err(e) => invalid(folder, e),
     }
 }
 
-fn load_manifest(dir: &Path, folder: &str) -> Result<Value, String> {
+fn load_manifest(dir: &Path, folder: &str) -> Result<Value, Rejection> {
     serve::check_limits(dir)?;
     let path = dir.join("manifest.json");
     let meta = match fs::symlink_metadata(&path) {
         Ok(m) if m.is_file() => m,
-        Ok(_) => return Err("manifest.json must be a regular file".into()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Err("manifest.json is missing".into())
+        Ok(_) => {
+            return Err(Rejection::new(
+                code::NO_MANIFEST,
+                "manifest.json must be a regular file",
+            ))
         }
-        Err(e) => return Err(format!("cannot read manifest.json: {e}")),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(Rejection::new(
+                code::NO_MANIFEST,
+                "manifest.json is missing",
+            ))
+        }
+        Err(e) => return Err(format!("cannot read manifest.json: {e}").into()),
     };
     if meta.len() > manifest::MAX_MANIFEST_BYTES {
-        return Err("manifest.json is larger than 64 KB".into());
+        return Err(Rejection::new(
+            code::TOO_LARGE,
+            "manifest.json is larger than 64 KB",
+        ));
     }
     let bytes = fs::read(&path).map_err(|e| format!("cannot read manifest.json: {e}"))?;
-    let raw: Value = serde_json::from_slice(&bytes)
-        .map_err(|e| format!("manifest.json is not valid JSON: {e}"))?;
+    let raw: Value = serde_json::from_slice(&bytes).map_err(|e| {
+        Rejection::new(
+            code::BAD_JSON,
+            format!("manifest.json is not valid JSON: {e}"),
+        )
+    })?;
     manifest::validate(folder, &raw, |entry| serve::resolve(dir, entry).is_some())
 }
 
@@ -155,7 +175,10 @@ pub fn scan(root: &Path) -> Vec<PluginWidget> {
             if i >= MAX_PLUGINS {
                 invalid(
                     name,
-                    format!("more than {MAX_PLUGINS} plugins installed; this one is not loaded"),
+                    Rejection::new(
+                        code::TOO_MANY,
+                        format!("more than {MAX_PLUGINS} plugins installed; this one is not loaded"),
+                    ),
                 )
             } else if !manifest::valid_folder_id(name) {
                 invalid(
@@ -371,11 +394,17 @@ mod tests {
             .unwrap()
             .ends_with("/alpha/index.html"));
 
-        for (i, want) in [(0, "folder name"), (2, "missing"), (3, "folder name")] {
+        assert!(alpha.error_code.is_none());
+        for (i, want, code) in [
+            (0, "folder name", code::OTHER),
+            (2, "missing", code::NO_MANIFEST),
+            (3, "folder name", code::ID_MISMATCH),
+        ] {
             let p = &list[i];
             assert!(p.manifest.is_none() && p.entry_url.is_none());
             let err = p.error.as_deref().unwrap();
             assert!(err.contains(want), "{}: {err}", p.folder);
+            assert_eq!(p.error_code, Some(code), "{}", p.folder);
         }
         assert!(scan(&root.join("nope")).is_empty());
     }
@@ -403,6 +432,15 @@ mod tests {
         assert!(err(0).contains("64 KB"), "{}", err(0));
         assert!(err(1).contains("not valid JSON"), "{}", err(1));
         assert!(err(2).contains("does not exist"), "{}", err(2));
+        let codes: Vec<_> = list.iter().map(|p| p.error_code).collect();
+        assert_eq!(
+            codes,
+            [
+                Some(code::TOO_LARGE),
+                Some(code::BAD_JSON),
+                Some(code::MISSING_ENTRY)
+            ]
+        );
     }
 
     #[test]
@@ -418,6 +456,7 @@ mod tests {
         let last = list.last().unwrap();
         assert!(last.manifest.is_none());
         assert!(last.error.as_deref().unwrap().contains("64 plugins"));
+        assert_eq!(last.error_code, Some(code::TOO_MANY));
     }
 
     #[test]
@@ -500,7 +539,7 @@ mod tests {
         let v = serde_json::to_value(invalid("x", "bad".into())).unwrap();
         assert_eq!(
             v,
-            json!({"id": "ext.x", "folder": "x", "manifest": null, "error": "bad", "entryUrl": null})
+            json!({"id": "ext.x", "folder": "x", "manifest": null, "error": "bad", "errorCode": "other", "entryUrl": null})
         );
     }
 }

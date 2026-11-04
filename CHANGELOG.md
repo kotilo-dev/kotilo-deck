@@ -44,3 +44,4 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - GPU is sampled every 3 s; deck widgets and timers pause while the deck is hidden; logs keep 14 days.
 - System 4×2: the CPU sparkline fills the tile and the per-core strip grows on large displays.
 - Settings dialogs are centred (Tailwind preflight zeroed dialog margins).
+- Tablet/browser mode: plugin widgets load their scripts, styles and images; large video wallpapers stream instead of loading whole; `lan://status` (token URLs, QR) stays on the host. Install in the "ready" state relaunches the app. LAN, update and plugin errors carry an `errorCode` for translation.
