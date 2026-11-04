@@ -15,6 +15,51 @@ const MAX_GRID: u32 = 12;
 const MAX_NAME_CHARS: usize = 64;
 const MAX_SETTING_KEY_CHARS: usize = 64;
 
+/// Why a plugin folder was rejected: a machine-readable `code` (`PluginWidget.errorCode`,
+/// translated by the frontend) and the English `message` (`PluginWidget.error`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rejection {
+    pub code: &'static str,
+    pub message: String,
+}
+
+impl Rejection {
+    pub fn new(code: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+        }
+    }
+}
+
+/// Every rule without its own code.
+impl From<String> for Rejection {
+    fn from(message: String) -> Self {
+        Self::new(code::OTHER, message)
+    }
+}
+
+impl From<&str> for Rejection {
+    fn from(message: &str) -> Self {
+        Self::new(code::OTHER, message)
+    }
+}
+
+/// `PluginWidget.errorCode` values (mirrored in `src/lib/ipc/index.ts`).
+pub mod code {
+    pub const NO_MANIFEST: &str = "no-manifest";
+    pub const BAD_JSON: &str = "bad-json";
+    pub const API_VERSION: &str = "api-version";
+    pub const ID_MISMATCH: &str = "id-mismatch";
+    pub const BAD_SIZES: &str = "bad-sizes";
+    pub const MISSING_ENTRY: &str = "missing-entry";
+    /// Manifest over 64 KB, or the folder over its file / sub-folder / byte limits.
+    pub const TOO_LARGE: &str = "too-large";
+    /// More than `MAX_PLUGINS` plugins installed.
+    pub const TOO_MANY: &str = "too-many";
+    pub const OTHER: &str = "other";
+}
+
 /// `^[a-z0-9][a-z0-9-]{0,31}$`.
 pub fn valid_folder_id(id: &str) -> bool {
     let b = id.as_bytes();
@@ -193,51 +238,64 @@ pub fn validate(
     folder: &str,
     raw: &Value,
     entry_ok: impl FnOnce(&str) -> bool,
-) -> Result<Value, String> {
+) -> Result<Value, Rejection> {
     let m = raw
         .as_object()
-        .ok_or("manifest.json must be a JSON object")?;
+        .ok_or_else(|| Rejection::new(code::BAD_JSON, "manifest.json must be a JSON object"))?;
 
     // `as_u64` is `None` for floats, so `1.0` and `"1"` are rejected too.
     if m.get("apiVersion").and_then(Value::as_u64) != Some(1) {
-        return Err("\"apiVersion\" must be 1".into());
+        return Err(Rejection::new(
+            code::API_VERSION,
+            "\"apiVersion\" must be 1",
+        ));
     }
 
     let id = string_field(m, "id")?.ok_or("\"id\" is missing")?;
     if id != folder {
-        return Err(format!(
-            "\"id\" (\"{}\") must equal the folder name",
-            id.chars().take(40).collect::<String>()
+        return Err(Rejection::new(
+            code::ID_MISMATCH,
+            format!(
+                "\"id\" (\"{}\") must equal the folder name",
+                id.chars().take(40).collect::<String>()
+            ),
         ));
     }
 
     let name = string_field(m, "name")?.ok_or("\"name\" is missing")?;
     let name_len = name.chars().count();
     if name.trim().is_empty() || name_len > MAX_NAME_CHARS {
-        return Err(format!("\"name\" must be 1–{MAX_NAME_CHARS} characters"));
+        return Err(format!("\"name\" must be 1–{MAX_NAME_CHARS} characters").into());
     }
 
     let icon = string_field(m, "icon")?.unwrap_or("puzzle");
 
-    let sizes = string_array(m, "sizes")?.ok_or("\"sizes\" is missing")?;
+    let bad_sizes = |msg: String| Rejection::new(code::BAD_SIZES, msg);
+    let sizes = string_array(m, "sizes")
+        .map_err(bad_sizes)?
+        .ok_or_else(|| bad_sizes("\"sizes\" is missing".into()))?;
     if sizes.is_empty() || sizes.len() > MAX_SIZES {
-        return Err(format!("\"sizes\" must list 1–{MAX_SIZES} sizes"));
+        return Err(bad_sizes(format!(
+            "\"sizes\" must list 1–{MAX_SIZES} sizes"
+        )));
     }
     for (i, s) in sizes.iter().enumerate() {
         if !valid_size_key(s) {
-            return Err(format!(
+            return Err(bad_sizes(format!(
                 "size \"{}\" is not \"WxH\" with 1 ≤ W,H ≤ {MAX_GRID}",
                 s.chars().take(16).collect::<String>()
-            ));
+            )));
         }
         if sizes[..i].contains(s) {
-            return Err(format!("size \"{s}\" is listed twice"));
+            return Err(bad_sizes(format!("size \"{s}\" is listed twice")));
         }
     }
 
-    let default_size = string_field(m, "defaultSize")?.ok_or("\"defaultSize\" is missing")?;
+    let default_size = string_field(m, "defaultSize")
+        .map_err(bad_sizes)?
+        .ok_or_else(|| bad_sizes("\"defaultSize\" is missing".into()))?;
     if !sizes.iter().any(|s| s == default_size) {
-        return Err("\"defaultSize\" must be one of \"sizes\"".into());
+        return Err(bad_sizes("\"defaultSize\" must be one of \"sizes\"".into()));
     }
 
     let capabilities = dedup(string_array(m, "capabilities")?.unwrap_or_default());
@@ -246,7 +304,8 @@ pub fn validate(
             return Err(format!(
                 "unknown capability \"{}\"",
                 c.chars().take(32).collect::<String>()
-            ));
+            )
+            .into());
         }
     }
 
@@ -261,9 +320,12 @@ pub fn validate(
         return Err("\"entry\" must be a relative path inside the folder".into());
     }
     if !entry_ok(entry) {
-        return Err(format!(
-            "entry file \"{}\" does not exist",
-            entry.chars().take(64).collect::<String>()
+        return Err(Rejection::new(
+            code::MISSING_ENTRY,
+            format!(
+                "entry file \"{}\" does not exist",
+                entry.chars().take(64).collect::<String>()
+            ),
         ));
     }
 
@@ -272,7 +334,8 @@ pub fn validate(
         return Err(format!(
             "unknown topic \"{}\" (system, media, pomodoro)",
             t.chars().take(32).collect::<String>()
-        ));
+        )
+        .into());
     }
 
     let settings = validate_settings(m.get("settings"))?;
@@ -327,7 +390,28 @@ mod tests {
     }
 
     fn check(v: &Value) -> Result<Value, String> {
-        validate("hello", v, |_| true)
+        validate("hello", v, |_| true).map_err(|e| e.message)
+    }
+
+    fn code_of(v: &Value) -> &'static str {
+        validate("hello", v, |_| true).expect_err("invalid").code
+    }
+
+    #[test]
+    fn error_codes() {
+        assert_eq!(code_of(&json!([1])), code::BAD_JSON);
+        assert_eq!(code_of(&with("apiVersion", json!(2))), code::API_VERSION);
+        assert_eq!(code_of(&without("apiVersion")), code::API_VERSION);
+        assert_eq!(code_of(&with("id", json!("other"))), code::ID_MISMATCH);
+        assert_eq!(code_of(&without("sizes")), code::BAD_SIZES);
+        assert_eq!(code_of(&with("sizes", json!([]))), code::BAD_SIZES);
+        assert_eq!(code_of(&with("sizes", json!(["13x1"]))), code::BAD_SIZES);
+        assert_eq!(code_of(&with("sizes", json!("2x2"))), code::BAD_SIZES);
+        assert_eq!(code_of(&with("defaultSize", json!("4x4"))), code::BAD_SIZES);
+        assert_eq!(code_of(&with("name", json!(""))), code::OTHER);
+        assert_eq!(code_of(&with("topics", json!(["x"]))), code::OTHER);
+        let e = validate("hello", &base(), |_| false).unwrap_err();
+        assert_eq!(e.code, code::MISSING_ENTRY);
     }
 
     fn with(key: &str, value: Value) -> Value {
@@ -584,7 +668,7 @@ mod tests {
 
     #[test]
     fn missing_entry_is_rejected() {
-        let err = validate("hello", &base(), |_| false).unwrap_err();
+        let err = validate("hello", &base(), |_| false).unwrap_err().message;
         assert!(err.contains("does not exist"), "{err}");
     }
 

@@ -530,8 +530,13 @@ export interface LanStatus {
 	qrSvg: string | null;
 	/** Open browser connections. */
 	clients: number;
-	/** Last bind/serve error, e.g. "port 47832 is in use". */
+	/** Last bind/serve error, e.g. "port 47832 is in use". English; translate via `errorCode`. */
 	error: string | null;
+	/**
+	 * Machine-readable `error`: "port-in-use" | "permission-denied" | "bind-failed" | "token-unreadable".
+	 * Unknown codes may be added later; fall back to `error`.
+	 */
+	errorCode?: string | null;
 }
 
 export const lanStatus = () => invoke<LanStatus>('lan_status');
@@ -569,8 +574,15 @@ export interface PluginWidget {
 	id: string;
 	folder: string;
 	manifest: PluginManifest | null;
-	/** Why the folder was rejected (Settings ▸ Widgets). */
+	/** Why the folder was rejected (Settings ▸ Widgets). English; translate via `errorCode`. */
 	error: string | null;
+	/**
+	 * Machine-readable `error`: "no-manifest" (manifest.json missing / not a file) | "bad-json" |
+	 * "api-version" | "id-mismatch" (id ≠ folder name) | "bad-sizes" (sizes / defaultSize) |
+	 * "missing-entry" (entry file not found) | "too-large" (manifest > 64 KB, or folder over its
+	 * file / sub-folder / 20 MB limits) | "too-many" (more than 64 plugins) | "other". Null when valid.
+	 */
+	errorCode?: string | null;
 	/** iframe src inside the Tauri webview (`http://kotilo-widget.localhost/<folder>/<entry>` on Windows). In LAN mode use `/plugins/<folder>/<entry>`. */
 	entryUrl: string | null;
 }
@@ -597,7 +609,13 @@ export interface UpdateStatus {
 	available: UpdateInfo | null;
 	/** 0–1 while downloading. */
 	progress: number | null;
+	/** English; translate via `errorCode`. */
 	error: string | null;
+	/**
+	 * Machine-readable `error`: "no-release" (nothing published, or not for this platform) |
+	 * "network" | "signature" (signature / signed version invalid) | "install-failed" | "other".
+	 */
+	errorCode?: string | null;
 	/** Unix ms of the last finished check. */
 	lastChecked: number | null;
 }
@@ -605,7 +623,7 @@ export interface UpdateStatus {
 export const updateStatus = () => invoke<UpdateStatus>('update_status');
 /** Checks now, also when autoCheck is off. */
 export const updateCheck = () => invoke<UpdateStatus>('update_check');
-/** Downloads + installs the available update, then relaunches. */
+/** Downloads + installs the available update, then relaunches; in state "ready" it only relaunches. */
 export const updateInstall = () => invoke<void>('update_install');
 
 // ── Events (backend → UI) ───────────────────────────────────────────────────
