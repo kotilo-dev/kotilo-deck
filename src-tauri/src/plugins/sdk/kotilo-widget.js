@@ -47,9 +47,8 @@
 			if (next.indexOf(name) < 0) style.removeProperty(name);
 		});
 		applied = next;
-		if (theme.variant === 'dark' || theme.variant === 'light') {
-			style.setProperty('color-scheme', theme.variant);
-		}
+		// No `color-scheme` here: the deck sets `color-scheme: normal` on the iframe, and a
+		// mismatch makes Chromium paint an opaque backdrop over the card surface.
 		kotilo.theme = theme;
 	}
 
