@@ -1,0 +1,21 @@
+{
+	"apiVersion": 1,
+	"id": "hello",
+	"name": "Hello",
+	"icon": "puzzle",
+	"sizes": ["2x1", "2x2"],
+	"defaultSize": "2x2",
+	"capabilities": [],
+	"multiInstance": true,
+	"entry": "index.html",
+	"topics": ["system"],
+	"settings": {
+		"type": "object",
+		"properties": {
+			"greeting": { "type": "string", "title": "Greeting", "default": "Hello" }
+		}
+	},
+	"description": "Example plugin widget: greeting plus live CPU load",
+	"author": "Kotilo",
+	"version": "1.0.0"
+}

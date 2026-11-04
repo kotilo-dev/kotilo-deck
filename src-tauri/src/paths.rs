@@ -46,6 +46,11 @@ pub fn window_state_file() -> PathBuf {
     deck_dir().join("window-state.json")
 }
 
+/// Phase 4 plugin widgets, one folder each (`docs/plugin-api.md`).
+pub fn plugin_widgets_dir() -> PathBuf {
+    deck_dir().join("widgets")
+}
+
 pub fn backups_dir() -> PathBuf {
     deck_dir().join("backups")
 }

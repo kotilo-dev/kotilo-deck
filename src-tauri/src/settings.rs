@@ -804,7 +804,10 @@ mod tests {
     fn lan_port_is_validated() {
         let base = DeckSettings::default();
         for bad in [80, 1023, 47831] {
-            assert!(merge(&base, &obj(json!({"lan": {"port": bad}}))).is_err(), "{bad}");
+            assert!(
+                merge(&base, &obj(json!({"lan": {"port": bad}}))).is_err(),
+                "{bad}"
+            );
         }
         let s = merge(&base, &obj(json!({"lan": {"enabled": true}}))).unwrap();
         assert!(s.lan.enabled);
