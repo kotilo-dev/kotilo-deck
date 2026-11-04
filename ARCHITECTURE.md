@@ -93,7 +93,7 @@ Windows: COM/WinRT calls run on dedicated MTA worker threads (`platform/windows/
 - Frontend: a reactive registry merges built-in widgets with `ext.<folder>` plugin definitions; a plugin's component is the generic `PluginFrame.svelte` (sandboxed iframe + postMessage bridge). The deck CSP gains `frame-src http://kotilo-widget.localhost kotilo-widget:`.
 
 ### Auto-update (`src-tauri/src/update.rs`)
-- `tauri-plugin-updater` + `tauri-plugin-process`; endpoint `https://github.com/kotilo/kotilo-deck/releases/latest/download/latest.json`; minisign public key in `tauri.conf.json`, private key outside the repo. Backend checks at startup (+30 s) and every 24 h when `updates.autoCheck`; never installs without `update_install`. Debug builds report `unsupported`. Settings ▸ About shows status, Check now, Install.
+- `tauri-plugin-updater` + `tauri-plugin-process`; endpoint `https://github.com/kotilo-dev/kotilo-deck/releases/latest/download/latest.json`; minisign public key in `tauri.conf.json`, private key outside the repo. Backend checks at startup (+30 s) and every 24 h when `updates.autoCheck`; never installs without `update_install`. Debug builds report `unsupported`. Settings ▸ About shows status, Check now, Install.
 
 ## Data
 

@@ -20,7 +20,7 @@ Versions follow SemVer; the same version lives in `package.json`, `src-tauri/Car
    ```
    Output (Windows): MSI + NSIS installers in `src-tauri/target/release/bundle/{msi,nsis}/`, each with a `.sig` next to it. AppImage/Flatpak on Linux from Phase 5. Never commit, print or upload `kotilo-deck.key`; only `kotilo-deck.key.pub` is in `tauri.conf.json` (`plugins.updater.pubkey`). It is a different key from `~/.tauri/kotilo.key`.
 6. Sign the Windows installers (code signing set up in Phase 5).
-7. Create the GitHub Release `vx.y.z` on `kotilo/kotilo-deck` with the changelog section and the installers attached. Then publish the updater manifest. The app polls `https://github.com/kotilo/kotilo-deck/releases/latest/download/latest.json`, so the file must be an asset named exactly `latest.json` on the newest non-draft, non-prerelease release:
+7. Create the GitHub Release `vx.y.z` on `kotilo-dev/kotilo-deck` with the changelog section and the installers attached. Then publish the updater manifest. The app polls `https://github.com/kotilo-dev/kotilo-deck/releases/latest/download/latest.json`, so the file must be an asset named exactly `latest.json` on the newest non-draft, non-prerelease release:
    ```json
    {
      "version": "x.y.z",
@@ -29,7 +29,7 @@ Versions follow SemVer; the same version lives in `package.json`, `src-tauri/Car
      "platforms": {
        "windows-x86_64": {
          "signature": "<contents of Kotilo Deck_x.y.z_x64-setup.exe.sig>",
-         "url": "https://github.com/kotilo/kotilo-deck/releases/download/vx.y.z/Kotilo.Deck_x.y.z_x64-setup.exe"
+         "url": "https://github.com/kotilo-dev/kotilo-deck/releases/download/vx.y.z/Kotilo.Deck_x.y.z_x64-setup.exe"
        }
      }
    }
