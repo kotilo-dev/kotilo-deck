@@ -14,15 +14,8 @@ use windows::Win32::System::Registry::{
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
+use crate::platform::shared::scheme_of;
 use crate::platform::{PlatformError, Result};
-
-/// `scheme` from `scheme:rest`, if it is a syntactically valid URL scheme.
-pub fn scheme_of(url: &str) -> Option<&str> {
-    let (scheme, _) = url.split_once(':')?;
-    let mut chars = scheme.chars();
-    let first_ok = chars.next().is_some_and(|c| c.is_ascii_alphabetic());
-    (first_ok && chars.all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))).then_some(scheme)
-}
 
 /// True when `HKCR\<scheme>` exists and carries the `URL Protocol` marker value
 /// (covers per-user `HKCU\Software\Classes` registrations too, HKCR merges them).
@@ -92,15 +85,6 @@ fn shell_open(url: HSTRING, what: &'static str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn scheme_parsing() {
-        assert_eq!(scheme_of("kotilo://open"), Some("kotilo"));
-        assert_eq!(scheme_of("ms-settings:sound"), Some("ms-settings"));
-        assert_eq!(scheme_of("no scheme"), None);
-        assert_eq!(scheme_of("1abc://x"), None);
-        assert_eq!(scheme_of("://x"), None);
-    }
 
     #[test]
     fn unregistered_scheme_is_an_error_not_a_prompt() {
