@@ -70,10 +70,17 @@ impl Backend for Fake {
             .lock()
             .unwrap()
             .push((folder.into(), path.into()));
-        (folder == "clock" && path == "index.html").then(|| PluginFile {
-            bytes: b"<p>plugin</p>".to_vec(),
-            mime: "text/html; charset=utf-8",
-        })
+        match (folder, path) {
+            ("clock", "index.html") => Some(PluginFile {
+                bytes: b"<p>plugin</p>".to_vec(),
+                mime: "text/html; charset=utf-8",
+            }),
+            ("_sdk", "kotilo-widget.js") => Some(PluginFile {
+                bytes: b"window.kotilo = {}".to_vec(),
+                mime: "text/javascript; charset=utf-8",
+            }),
+            _ => None,
+        }
     }
 
     fn invoke(
@@ -334,7 +341,11 @@ async fn auth_cookie_bearer_and_401() {
     assert_eq!(r.status, 200);
     assert_eq!(r.body, INDEX.as_bytes());
     let csp = r.header("content-security-policy").unwrap();
-    assert!(csp.contains("'sha256-") && csp.contains("connect-src 'self' ws:"));
+    assert!(csp.contains("'sha256-"), "{csp}");
+    assert!(
+        csp.contains(&format!("connect-src 'self' ws://{addr};")),
+        "{csp}"
+    );
     assert_eq!(r.header("x-content-type-options"), Some("nosniff"));
     assert_eq!(r.header("cache-control"), Some("no-cache"));
 
@@ -387,6 +398,13 @@ async fn ten_failures_per_minute_get_429() {
     }
     // Locked out, even with the right token now.
     assert_eq!(get(addr, "/api/hello").await.status, 429);
+    // Plugin files are outside the token check, so the limiter doesn't apply to them.
+    assert_eq!(
+        http(addr, "GET", "/plugins/clock/index.html", &[], "")
+            .await
+            .status,
+        200
+    );
     assert_eq!(
         http(addr, "GET", &format!("/?token={TOKEN}"), &[], "")
             .await
@@ -600,6 +618,56 @@ async fn wallpapers_are_confined_and_support_ranges() {
 }
 
 #[tokio::test]
+async fn large_wallpapers_stream_and_ranges_are_capped() {
+    const CAP: usize = 4 << 20;
+    let (h, addr) = started().await;
+    let len = CAP + 1000;
+    let data: Vec<u8> = (0..len).map(|i| (i % 251) as u8).collect();
+    std::fs::write(h.fake.wallpapers.join("big.webm"), &data).unwrap();
+    let auth = bearer();
+
+    // Whole file, streamed with an exact length (no chunked framing).
+    let r = get(addr, "/wallpapers/big.webm").await;
+    assert_eq!(r.status, 200);
+    assert_eq!(r.header("content-length"), Some(len.to_string().as_str()));
+    assert!(r.header("transfer-encoding").is_none());
+    assert_eq!(r.header("accept-ranges"), Some("bytes"));
+    assert!(r.body == data, "streamed body differs");
+
+    // An explicit range wider than the cap gets a 206 truncated to 4 MiB.
+    let range = format!("bytes=10-{}", len - 1);
+    let r = http(
+        addr,
+        "GET",
+        "/wallpapers/big.webm",
+        &[("Authorization", &auth), ("Range", &range)],
+        "",
+    )
+    .await;
+    assert_eq!(r.status, 206);
+    let last = 10 + CAP - 1;
+    assert_eq!(
+        r.header("content-range"),
+        Some(format!("bytes 10-{last}/{len}").as_str())
+    );
+    assert_eq!(r.body.len(), CAP);
+    assert!(r.body == data[10..=last]);
+
+    // The rest, as the client would ask for it next.
+    let range = format!("bytes={}-", last + 1);
+    let r = http(
+        addr,
+        "GET",
+        "/wallpapers/big.webm",
+        &[("Authorization", &auth), ("Range", &range)],
+        "",
+    )
+    .await;
+    assert_eq!(r.status, 206);
+    assert!(r.body == data[last + 1..]);
+}
+
+#[tokio::test]
 async fn plugin_files_get_the_plugin_csp_and_no_traversal() {
     let (h, addr) = started().await;
     let r = get(addr, "/plugins/clock/index.html").await;
@@ -626,6 +694,68 @@ async fn plugin_files_get_the_plugin_csp_and_no_traversal() {
         h.fake.plugin_calls.lock().unwrap().is_empty(),
         "traversal reached plugins::read_file"
     );
+}
+
+/// S2: the sandboxed plugin iframe has an opaque origin, so its sub-resource requests
+/// arrive without the SameSite=Strict cookie. Plugin files and the SDK are served anyway;
+/// everything else still needs the token.
+#[tokio::test]
+async fn plugin_files_need_no_cookie_but_everything_else_does() {
+    let (h, addr) = started().await;
+    let r = http(addr, "GET", "/plugins/clock/index.html", &[], "").await;
+    assert_eq!((r.status, r.body.as_slice()), (200, &b"<p>plugin</p>"[..]));
+    assert_eq!(r.header("content-security-policy"), Some(PLUGIN_CSP));
+    let r = http(addr, "GET", "/plugins/_sdk/kotilo-widget.js", &[], "").await;
+    assert_eq!(r.status, 200);
+    assert_eq!(r.body, b"window.kotilo = {}");
+    assert_eq!(
+        http(addr, "HEAD", "/plugins/clock/index.html", &[], "")
+            .await
+            .status,
+        200
+    );
+    assert_eq!(
+        http(addr, "POST", "/plugins/clock/index.html", &[], "")
+            .await
+            .status,
+        405
+    );
+    // Path checks still apply without a credential.
+    h.fake.plugin_calls.lock().unwrap().clear();
+    for bad in ["/plugins/clock/../../secret", "/plugins/clock/%2e%2e/x"] {
+        assert_eq!(http(addr, "GET", bad, &[], "").await.status, 404, "{bad}");
+    }
+    assert!(h.fake.plugin_calls.lock().unwrap().is_empty());
+    // A wrong cookie on plugin requests is ignored, never counted as a failure.
+    for _ in 0..12 {
+        let r = http(
+            addr,
+            "GET",
+            "/plugins/clock/index.html",
+            &[("Cookie", "kotilo_deck_token=wrong")],
+            "",
+        )
+        .await;
+        assert_eq!(r.status, 200);
+    }
+    assert_eq!(get(addr, "/api/hello").await.status, 200, "not locked out");
+
+    // Everything else is still behind the token.
+    for target in ["/api/hello", "/", "/settings", "/_app/immutable/a.js"] {
+        assert_eq!(
+            http(addr, "GET", target, &[], "").await.status,
+            401,
+            "{target}"
+        );
+    }
+    assert_eq!(
+        http(addr, "POST", "/api/invoke/todo_list", &[], "{}")
+            .await
+            .status,
+        401
+    );
+    assert_eq!(ws_connect(addr, None).await.err(), Some(401));
+    assert!(h.fake.invoked.lock().unwrap().is_empty());
 }
 
 // ── events + subscriptions ───────────────────────────────────────────────────

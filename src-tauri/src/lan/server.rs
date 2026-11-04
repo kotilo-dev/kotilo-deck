@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::future::Future;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::SeekFrom;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -27,14 +27,16 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use futures_util::{SinkExt, StreamExt};
-use http_body_util::{BodyExt, Full, Limited};
-use hyper::body::{Bytes, Incoming};
+use http_body_util::combinators::UnsyncBoxBody;
+use http_body_util::{BodyExt, Full, Limited, StreamBody};
+use hyper::body::{Bytes, Frame, Incoming};
 use hyper::header::{self, HeaderMap, HeaderValue};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use serde_json::{json, Map, Value};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
@@ -53,7 +55,9 @@ use crate::companion::token;
 use crate::plugins::{PluginFile, PLUGIN_CSP};
 
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
-type Resp = Response<Full<Bytes>>;
+/// Buffered for everything except wallpaper files, which are streamed.
+type Body = UnsyncBoxBody<Bytes, std::io::Error>;
+type Resp = Response<Body>;
 
 /// `POST /api/invoke` body cap (a workspace file is the largest argument).
 pub const MAX_BODY: usize = 1 << 20;
@@ -63,8 +67,10 @@ const MAX_WS_IN: usize = 64 << 10;
 pub const MAX_SOCKETS: usize = 32;
 /// HTTP connections at once (a tablet opens ~6); more are dropped.
 const MAX_CONNECTIONS: usize = 128;
-/// An open-ended `Range: bytes=N-` gets at most this much per response.
+/// A `Range` request gets at most this much per response (the client asks for the rest).
 const MAX_RANGE_CHUNK: u64 = 4 << 20;
+/// Read size while streaming a wallpaper.
+const STREAM_CHUNK: usize = 64 << 10;
 const BROADCAST_CAPACITY: usize = 256;
 pub const SOCKET_HEADER: &str = "x-kotilo-socket";
 /// First frame on every events socket.
@@ -170,6 +176,9 @@ struct Shared {
     events: broadcast::Sender<Arc<str>>,
     hub: mpsc::UnboundedSender<HubOp>,
     connections: AtomicUsize,
+    /// Called by `remote_subscription` right after it releases the state lock.
+    #[cfg(test)]
+    after_unlock: Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
 }
 
 /// Cheap to clone; all clones drive the same server.
@@ -210,6 +219,8 @@ impl Server {
                 events,
                 hub,
                 connections: AtomicUsize::new(0),
+                #[cfg(test)]
+                after_unlock: Mutex::new(None),
             }),
         }
     }
@@ -321,6 +332,7 @@ impl Shared {
         }
         st.status.listening = false;
         st.status.error = None;
+        st.status.error_code = None;
         st.status.urls.clear();
         st.status.qr_svg = None;
         st.bound = None;
@@ -334,6 +346,7 @@ impl Shared {
         }
     }
 
+    /// Queues one hub change. Callers hold the state lock so ops stay in decision order.
     fn hub_op(&self, topic: Topic, on: bool, done: Option<oneshot::Sender<()>>) {
         let _ = self.hub.send(HubOp { topic, on, done });
     }
@@ -374,6 +387,11 @@ impl Shared {
 
     /// A browser's `*_subscribe` / `*_unsubscribe` for the socket named by
     /// `X-Kotilo-Socket`; returns once the hub has applied it.
+    ///
+    /// Every hub op (here, in [`Self::socket_closed`] and [`Self::stop_run`]) is enqueued
+    /// while the state lock is held, so the hub sees ON/OFF in the same order as the
+    /// `totals` 0↔1 transitions; enqueueing after the unlock let a concurrent close's OFF
+    /// overtake this ON and leak a running watcher.
     async fn remote_subscription(
         &self,
         socket: Option<&str>,
@@ -381,7 +399,7 @@ impl Shared {
         on: bool,
     ) -> Result<(), &'static str> {
         let i = topic.index();
-        let op = {
+        let done = {
             let mut guard = self.lock();
             let st = &mut *guard;
             let id = socket.ok_or("missing X-Kotilo-Socket header")?;
@@ -389,7 +407,7 @@ impl Shared {
                 .sockets
                 .get_mut(id)
                 .ok_or("unknown or closed events socket")?;
-            if on {
+            let edge = if on {
                 sock.subs[i] += 1;
                 st.totals[i] += 1;
                 st.totals[i] == 1
@@ -400,11 +418,19 @@ impl Shared {
                 sock.subs[i] -= 1;
                 st.totals[i] -= 1;
                 st.totals[i] == 0
-            }
+            };
+            edge.then(|| {
+                let (tx, rx) = oneshot::channel();
+                self.hub_op(topic, on, Some(tx));
+                rx
+            })
         };
-        if op {
-            let (tx, rx) = oneshot::channel();
-            self.hub_op(topic, on, Some(tx));
+        // Tests run a concurrent socket close exactly here, after the unlock.
+        #[cfg(test)]
+        if let Some(hook) = self.after_unlock.lock().unwrap().as_ref() {
+            hook();
+        }
+        if let Some(rx) = done {
             let _ = rx.await;
         }
         Ok(())
@@ -456,13 +482,21 @@ fn new_socket_id(seq: u64) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn bind_error(port: u16, e: &std::io::Error) -> String {
-    if e.kind() == std::io::ErrorKind::AddrInUse {
-        format!("Port {port} is already in use by another app; retrying")
-    } else if e.kind() == std::io::ErrorKind::PermissionDenied {
-        format!("Not allowed to listen on port {port}; retrying")
-    } else {
-        format!("Cannot listen on port {port}; retrying")
+/// `(LanStatus.errorCode, English message)` for a failed bind.
+fn bind_error(port: u16, e: &std::io::Error) -> (&'static str, String) {
+    match e.kind() {
+        std::io::ErrorKind::AddrInUse => (
+            "port-in-use",
+            format!("Port {port} is already in use by another app; retrying"),
+        ),
+        std::io::ErrorKind::PermissionDenied => (
+            "permission-denied",
+            format!("Not allowed to listen on port {port}; retrying"),
+        ),
+        _ => (
+            "bind-failed",
+            format!("Cannot listen on port {port}; retrying"),
+        ),
     }
 }
 
@@ -495,11 +529,12 @@ async fn listen(shared: Arc<Shared>, gen: u64, port: u16, mut stop: watch::Recei
                     quick -= 1;
                     Duration::from_millis(100)
                 } else {
-                    let msg = bind_error(port, &e);
+                    let (code, msg) = bind_error(port, &e);
                     tracing::warn!(port, kind = ?e.kind(), attempt, "LAN server cannot bind");
                     shared.set_status(gen, |st| {
                         st.status.listening = false;
                         st.status.error = Some(msg);
+                        st.status.error_code = Some(code);
                     });
                     let d = cfg.retry_delay(attempt);
                     attempt = attempt.saturating_add(1);
@@ -523,6 +558,7 @@ async fn listen(shared: Arc<Shared>, gen: u64, port: u16, mut stop: watch::Recei
         st.status.error = token
             .is_none()
             .then(|| "Cannot read the companion token file".to_string());
+        st.status.error_code = token.is_none().then_some("token-unreadable");
         st.status.urls = urls;
         st.status.qr_svg = qr;
     });
@@ -534,12 +570,12 @@ async fn listen(shared: Arc<Shared>, gen: u64, port: u16, mut stop: watch::Recei
         tokio::select! {
             accepted = listener.accept() => match accepted {
                 Ok((stream, peer)) => {
-                    if shared.connections.load(Ordering::Acquire) >= MAX_CONNECTIONS {
+                    let Some(slot) = ConnGuard::acquire(&shared) else {
                         tracing::debug!("LAN: too many connections; dropping one");
                         continue;
-                    }
+                    };
                     let _ = stream.set_nodelay(true);
-                    tauri::async_runtime::spawn(serve_connection(shared.clone(), stream, peer.ip(), stop.clone()));
+                    tauri::async_runtime::spawn(serve_connection(shared.clone(), slot, stream, peer.ip(), stop.clone()));
                 }
                 Err(e) => {
                     tracing::debug!(kind = ?e.kind(), "LAN accept failed");
@@ -552,22 +588,39 @@ async fn listen(shared: Arc<Shared>, gen: u64, port: u16, mut stop: watch::Recei
     tracing::info!(port, "LAN server stopped");
 }
 
-struct ConnGuard<'a>(&'a AtomicUsize);
+/// One of the [`MAX_CONNECTIONS`] slots; released on drop.
+struct ConnGuard(Arc<Shared>);
 
-impl Drop for ConnGuard<'_> {
+impl ConnGuard {
+    /// Check and increment in one atomic step, so a burst of accepts can't overshoot.
+    fn acquire(shared: &Arc<Shared>) -> Option<Self> {
+        let slots = &shared.connections;
+        let mut n = slots.load(Ordering::Acquire);
+        loop {
+            if n >= MAX_CONNECTIONS {
+                return None;
+            }
+            match slots.compare_exchange_weak(n, n + 1, Ordering::AcqRel, Ordering::Acquire) {
+                Ok(_) => return Some(Self(shared.clone())),
+                Err(now) => n = now,
+            }
+        }
+    }
+}
+
+impl Drop for ConnGuard {
     fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::AcqRel);
+        self.0.connections.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
 async fn serve_connection(
     shared: Arc<Shared>,
+    _slot: ConnGuard,
     stream: tokio::net::TcpStream,
     ip: IpAddr,
     mut stop: watch::Receiver<bool>,
 ) {
-    shared.connections.fetch_add(1, Ordering::AcqRel);
-    let _guard = ConnGuard(&shared.connections);
     let svc_shared = shared.clone();
     let svc_stop = stop.clone();
     let service = service_fn(move |req: Request<Incoming>| {
@@ -607,7 +660,8 @@ async fn serve_connection(
 // ── responses ────────────────────────────────────────────────────────────────
 
 fn response(status: StatusCode, mime: &str, body: impl Into<Bytes>) -> Resp {
-    let mut r = Response::new(Full::new(body.into()));
+    let body = Full::new(body.into()).map_err(|never| match never {});
+    let mut r = Response::new(body.boxed_unsync());
     *r.status_mut() = status;
     if let Ok(v) = HeaderValue::from_str(mime) {
         r.headers_mut().insert(header::CONTENT_TYPE, v);
@@ -655,6 +709,18 @@ async fn route(
 ) -> Resp {
     let path = req.uri().path().to_string();
     let api = path.starts_with("/api/");
+
+    // Plugin files need no credential: the plugin iframe is `sandbox="allow-scripts"` (an
+    // opaque origin), so browsers withhold the SameSite=Strict cookie on its sub-resource
+    // requests. They are the user's installed, read-only plugin files and the SDK, served
+    // with PLUGIN_CSP and no secrets; path checks still apply, failures never count.
+    if let Some(rest) = path.strip_prefix("/plugins/") {
+        if !matches!(*req.method(), Method::GET | Method::HEAD) {
+            return error(StatusCode::METHOD_NOT_ALLOWED, "method not allowed");
+        }
+        return plugin(&shared, rest).await;
+    }
+
     if shared.blocked(ip) {
         return error(
             StatusCode::TOO_MANY_REQUESTS,
@@ -713,10 +779,11 @@ async fn route(
     if let Some(rest) = path.strip_prefix("/wallpapers/") {
         return wallpaper(&shared, rest, req.headers()).await;
     }
-    if let Some(rest) = path.strip_prefix("/plugins/") {
-        return plugin(&shared, rest).await;
-    }
-    static_file(&shared, &path)
+    let host = req
+        .headers()
+        .get(header::HOST)
+        .and_then(|h| h.to_str().ok());
+    static_file(&shared, &path, host)
 }
 
 async fn invoke(shared: &Arc<Shared>, req: Request<Incoming>) -> Resp {
@@ -765,7 +832,7 @@ async fn invoke(shared: &Arc<Shared>, req: Request<Incoming>) -> Resp {
     }
 }
 
-fn static_file(shared: &Shared, path: &str) -> Resp {
+fn static_file(shared: &Shared, path: &str, host: Option<&str>) -> Resp {
     let Some(keys) = assets::candidates(path) else {
         return error(StatusCode::NOT_FOUND, "not found");
     };
@@ -781,7 +848,7 @@ fn static_file(shared: &Shared, path: &str) -> Resp {
         if html && !key.ends_with(".html") {
             continue;
         }
-        let csp = html.then(|| assets::page_csp(&a.bytes));
+        let csp = html.then(|| assets::page_csp(&a.bytes, host));
         let mut r = response(StatusCode::OK, &a.mime, a.bytes);
         let h = r.headers_mut();
         h.insert(
@@ -828,6 +895,7 @@ pub enum Range {
     Unsatisfiable,
 }
 
+/// At most [`MAX_RANGE_CHUNK`] bytes per part, whatever the client asked for.
 pub fn parse_range(header: Option<&str>, len: u64) -> Range {
     let Some(spec) = header.and_then(|h| h.trim().strip_prefix("bytes=")) else {
         return Range::Full;
@@ -856,7 +924,7 @@ pub fn parse_range(header: Option<&str>, len: u64) -> Range {
             return Range::Unsatisfiable;
         }
         let end = if b.is_empty() {
-            (start + MAX_RANGE_CHUNK - 1).min(len - 1)
+            len - 1
         } else {
             match b.parse::<u64>() {
                 Ok(e) if e >= start => e.min(len - 1),
@@ -865,45 +933,74 @@ pub fn parse_range(header: Option<&str>, len: u64) -> Range {
         };
         (start, end)
     };
-    Range::Part(range.0, range.1)
+    // Every range is capped (206 with a shorter Content-Range; the client asks for more).
+    let (start, end) = range;
+    Range::Part(start, end.min(start + MAX_RANGE_CHUNK - 1))
 }
 
-fn read_wallpaper(dir: &Path, name: &str, range: Option<String>) -> Option<Resp> {
+/// Streams `len` bytes of `file` from its current position in [`STREAM_CHUNK`] reads, so a
+/// large wallpaper is never buffered whole.
+fn file_body(file: tokio::fs::File, len: u64) -> Body {
+    let chunks = futures_util::stream::unfold((file, len), |(mut f, left)| async move {
+        if left == 0 {
+            return None;
+        }
+        let want = usize::try_from(left).map_or(STREAM_CHUNK, |l| l.min(STREAM_CHUNK));
+        let mut buf = vec![0u8; want];
+        match f.read(&mut buf).await {
+            Ok(0) => {
+                let e = std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "file shrank");
+                Some((Err(e), (f, 0)))
+            }
+            Ok(n) => {
+                buf.truncate(n);
+                let left = left.saturating_sub(n as u64);
+                Some((Ok(Frame::data(Bytes::from(buf))), (f, left)))
+            }
+            Err(e) => Some((Err(e), (f, 0))),
+        }
+    });
+    StreamBody::new(chunks).boxed_unsync()
+}
+
+async fn read_wallpaper(dir: &Path, name: &str, range: Option<&str>) -> Option<Resp> {
     let path = dir.join(name);
     // Symlinks pointing outside the wallpapers folder are not served.
-    let real = path.canonicalize().ok()?;
-    let real_dir = dir.canonicalize().ok()?;
+    let real = tokio::fs::canonicalize(&path).await.ok()?;
+    let real_dir = tokio::fs::canonicalize(dir).await.ok()?;
     if !real.starts_with(&real_dir) {
         return None;
     }
-    let mut f = std::fs::File::open(&real).ok()?;
-    let len = f.metadata().ok().filter(|m| m.is_file())?.len();
+    let mut f = tokio::fs::File::open(&real).await.ok()?;
+    let len = f.metadata().await.ok().filter(|m| m.is_file())?.len();
     let mime = assets::mime_for(name);
-    let mut r = match parse_range(range.as_deref(), len) {
-        Range::Full => {
-            let mut buf = Vec::with_capacity(usize::try_from(len).ok()?);
-            f.read_to_end(&mut buf).ok()?;
-            response(StatusCode::OK, mime, buf)
-        }
-        Range::Part(start, end) => {
-            f.seek(SeekFrom::Start(start)).ok()?;
-            let mut buf = vec![0u8; usize::try_from(end - start + 1).ok()?];
-            f.read_exact(&mut buf).ok()?;
-            let mut r = response(StatusCode::PARTIAL_CONTENT, mime, buf);
-            if let Ok(v) = HeaderValue::from_str(&format!("bytes {start}-{end}/{len}")) {
-                r.headers_mut().insert(header::CONTENT_RANGE, v);
-            }
-            r
-        }
+    let (status, start, count) = match parse_range(range, len) {
+        Range::Full => (StatusCode::OK, 0, len),
+        Range::Part(start, end) => (StatusCode::PARTIAL_CONTENT, start, end - start + 1),
         Range::Unsatisfiable => {
             let mut r = response(StatusCode::RANGE_NOT_SATISFIABLE, "text/plain", "");
+            let h = r.headers_mut();
             if let Ok(v) = HeaderValue::from_str(&format!("bytes */{len}")) {
-                r.headers_mut().insert(header::CONTENT_RANGE, v);
+                h.insert(header::CONTENT_RANGE, v);
             }
-            r
+            h.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
+            return Some(r);
         }
     };
+    if start > 0 {
+        f.seek(SeekFrom::Start(start)).await.ok()?;
+    }
+    let mut r = Response::new(file_body(f, count));
+    *r.status_mut() = status;
     let h = r.headers_mut();
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static(mime));
+    h.insert(header::CONTENT_LENGTH, HeaderValue::from(count));
+    if status == StatusCode::PARTIAL_CONTENT {
+        let last = start + count - 1;
+        if let Ok(v) = HeaderValue::from_str(&format!("bytes {start}-{last}/{len}")) {
+            h.insert(header::CONTENT_RANGE, v);
+        }
+    }
     h.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
     h.insert(
         header::CACHE_CONTROL,
@@ -923,14 +1020,9 @@ async fn wallpaper(shared: &Arc<Shared>, rest: &str, headers: &HeaderMap) -> Res
         _ => return error(StatusCode::NOT_FOUND, "not found"),
     };
     let dir = shared.backend.wallpapers_dir();
-    let range = headers
-        .get(header::RANGE)
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_string);
-    tauri::async_runtime::spawn_blocking(move || read_wallpaper(&dir, &name, range))
+    let range = headers.get(header::RANGE).and_then(|v| v.to_str().ok());
+    read_wallpaper(&dir, &name, range)
         .await
-        .ok()
-        .flatten()
         .unwrap_or_else(|| error(StatusCode::NOT_FOUND, "not found"))
 }
 
@@ -1062,6 +1154,147 @@ async fn pump<S>(
 mod tests {
     use super::*;
 
+    /// Records hub ops; everything else is inert.
+    #[derive(Default)]
+    struct HubLog(Mutex<Vec<(Topic, bool)>>);
+
+    impl Backend for HubLog {
+        fn status_changed(&self, _: &LanStatus) {}
+        fn asset(&self, _: &str) -> Option<Asset> {
+            None
+        }
+        fn wallpapers_dir(&self) -> PathBuf {
+            PathBuf::new()
+        }
+        fn plugin_file(&self, _: &str, _: &str) -> Option<PluginFile> {
+            None
+        }
+        fn invoke(
+            &self,
+            _: String,
+            _: Map<String, Value>,
+        ) -> BoxFuture<Result<Value, InvokeError>> {
+            Box::pin(async { Ok(Value::Null) })
+        }
+        fn subscription(&self, topic: Topic, on: bool) -> BoxFuture<()> {
+            self.0.lock().unwrap().push((topic, on));
+            Box::pin(async {})
+        }
+    }
+
+    /// S1: a `*_subscribe` racing its socket's close must never leave the hub with a
+    /// subscription the server no longer counts (OFF overtaking ON leaked a watcher).
+    #[test]
+    fn subscribe_racing_socket_close_never_leaks() {
+        let log = Arc::new(HubLog::default());
+        let srv = Server::new(Config::new(PathBuf::from("unused.token")), log.clone());
+        let shared = srv.shared.clone();
+        {
+            // A live run without a listener: enough for sockets to register.
+            let (stop, _) = watch::channel(false);
+            shared.lock().run = Some(Run {
+                gen: 0,
+                port: 0,
+                stop,
+            });
+        }
+        for _ in 0..300 {
+            let id = shared.socket_opened().expect("socket slot");
+            let gate = Arc::new(std::sync::Barrier::new(2));
+            let sub = {
+                let (shared, id, gate) = (shared.clone(), id.clone(), gate.clone());
+                std::thread::spawn(move || {
+                    gate.wait();
+                    let _ = tauri::async_runtime::block_on(shared.remote_subscription(
+                        Some(&id),
+                        Topic::System,
+                        true,
+                    ));
+                })
+            };
+            let close = {
+                let (shared, gate) = (shared.clone(), gate.clone());
+                std::thread::spawn(move || {
+                    gate.wait();
+                    shared.socket_closed(&id);
+                })
+            };
+            sub.join().unwrap();
+            close.join().unwrap();
+        }
+        assert_eq!(shared.lock().totals, [0, 0, 0]);
+        // One more subscribe on a fresh socket: awaiting it drains every earlier op.
+        let id = shared.socket_opened().expect("socket slot");
+        tauri::async_runtime::block_on(shared.remote_subscription(Some(&id), Topic::System, true))
+            .unwrap();
+        let ops = log.0.lock().unwrap().clone();
+        // Strict ON, OFF, ON, OFF, …, ON: the hub's count is 1, like the server's.
+        assert_eq!(ops.len() % 2, 1, "{ops:?}");
+        for (i, (topic, on)) in ops.iter().enumerate() {
+            assert_eq!(*topic, Topic::System);
+            assert_eq!(*on, i % 2 == 0, "op {i} out of order: {ops:?}");
+        }
+        assert_eq!(shared.lock().totals, [1, 0, 0]);
+    }
+
+    /// S1, deterministic: the socket closes in the exact window between the subscribe's
+    /// unlock and its await. Its OFF must still reach the hub after the ON.
+    #[test]
+    fn socket_close_right_after_subscribe_unlock_keeps_hub_order() {
+        let log = Arc::new(HubLog::default());
+        let srv = Server::new(Config::new(PathBuf::from("unused.token")), log.clone());
+        let shared = srv.shared.clone();
+        let (stop, _) = watch::channel(false);
+        shared.lock().run = Some(Run {
+            gen: 0,
+            port: 0,
+            stop,
+        });
+        let id = shared.socket_opened().expect("socket slot");
+        let weak = Arc::downgrade(&shared);
+        let closing = id.clone();
+        *shared.after_unlock.lock().unwrap() = Some(Box::new(move || {
+            if let Some(s) = weak.upgrade() {
+                s.socket_closed(&closing);
+            }
+        }));
+        tauri::async_runtime::block_on(shared.remote_subscription(Some(&id), Topic::Media, true))
+            .unwrap();
+        *shared.after_unlock.lock().unwrap() = None;
+        // The hub applies ops in order; a fresh subscribe drains it.
+        let probe = shared.socket_opened().expect("socket slot");
+        tauri::async_runtime::block_on(shared.remote_subscription(
+            Some(&probe),
+            Topic::System,
+            true,
+        ))
+        .unwrap();
+        assert_eq!(
+            *log.0.lock().unwrap(),
+            [
+                (Topic::Media, true),
+                (Topic::Media, false),
+                (Topic::System, true)
+            ]
+        );
+        assert_eq!(shared.lock().totals, [1, 0, 0]);
+    }
+
+    #[test]
+    fn connection_slots_are_capped() {
+        let srv = Server::new(
+            Config::new(PathBuf::from("unused.token")),
+            Arc::new(HubLog::default()),
+        );
+        let slots: Vec<_> = (0..MAX_CONNECTIONS)
+            .map(|_| ConnGuard::acquire(&srv.shared).expect("slot"))
+            .collect();
+        assert!(ConnGuard::acquire(&srv.shared).is_none());
+        drop(slots);
+        assert_eq!(srv.shared.connections.load(Ordering::Acquire), 0);
+        assert!(ConnGuard::acquire(&srv.shared).is_some());
+    }
+
     #[test]
     fn ranges() {
         assert_eq!(parse_range(None, 100), Range::Full);
@@ -1072,8 +1305,18 @@ mod tests {
         assert_eq!(parse_range(Some("bytes=100-"), 100), Range::Unsatisfiable);
         assert_eq!(parse_range(Some("bytes=5-1"), 100), Range::Unsatisfiable);
         assert_eq!(parse_range(Some("bytes=0-1,5-6"), 100), Range::Full);
+        let big = 10 * MAX_RANGE_CHUNK;
         assert_eq!(
-            parse_range(Some("bytes=0-"), 10 * MAX_RANGE_CHUNK),
+            parse_range(Some("bytes=0-"), big),
+            Range::Part(0, MAX_RANGE_CHUNK - 1)
+        );
+        // Explicit and suffix ranges are capped too.
+        assert_eq!(
+            parse_range(Some(&format!("bytes=5-{}", big - 1)), big),
+            Range::Part(5, 5 + MAX_RANGE_CHUNK - 1)
+        );
+        assert_eq!(
+            parse_range(Some(&format!("bytes=-{big}")), big),
             Range::Part(0, MAX_RANGE_CHUNK - 1)
         );
     }

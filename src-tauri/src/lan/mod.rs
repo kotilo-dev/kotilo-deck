@@ -50,6 +50,9 @@ pub struct LanStatus {
     pub clients: u32,
     /// Last bind/serve error, e.g. "port 47832 is in use".
     pub error: Option<String>,
+    /// Machine-readable `error` for translation: "port-in-use", "permission-denied",
+    /// "bind-failed", "token-unreadable".
+    pub error_code: Option<&'static str>,
 }
 
 /// Managed state; created by [`start`] (it needs the app handle).

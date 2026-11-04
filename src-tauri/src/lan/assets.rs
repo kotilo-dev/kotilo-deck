@@ -11,10 +11,13 @@ pub struct Asset {
     pub mime: String,
 }
 
-/// Page CSP for LAN browsers; `{scripts}` gets the inline-script hashes. Everything is
-/// same-origin: the backend does every network call, `ws:` is for `/api/events`, plugins
-/// load from `/plugins/…` in sandboxed iframes.
-const PAGE_CSP: &str = "default-src 'self'; script-src 'self'{scripts}; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; media-src 'self'; connect-src 'self' ws:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+/// Page CSP for LAN browsers; `{scripts}` gets the inline-script hashes and `{ws}` the
+/// explicit same-host `ws://` source for `/api/events`. Everything is same-origin: the
+/// backend does every network call, plugins load from `/plugins/…` in sandboxed iframes.
+/// (CSP3 `'self'` already matches same-host `ws:`, but older WebKit needs it spelled out;
+/// a bare `ws:` would allow any host.) `frame-src` must stay `'self'`: it is what stops a
+/// plugin iframe from navigating to a remote page.
+const PAGE_CSP: &str = "default-src 'self'; script-src 'self'{scripts}; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; media-src 'self'; connect-src 'self'{ws}; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 /// Decodes `%XX` escapes; `None` for malformed escapes or non-UTF-8 results.
 pub fn percent_decode(s: &str) -> Option<String> {
@@ -135,14 +138,28 @@ fn inline_script_hashes(html: &str) -> Vec<String> {
     out
 }
 
-/// CSP header for an HTML page.
-pub fn page_csp(html: &[u8]) -> String {
+/// `Host` header values safe to put into a CSP source (`host`, `host:port`, `[v6]:port`).
+fn csp_host(host: &str) -> Option<&str> {
+    let ok = !host.is_empty()
+        && host.len() <= 255
+        && host
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b':' | b'[' | b']'));
+    ok.then_some(host)
+}
+
+/// CSP header for an HTML page requested with `Host: <host>`.
+pub fn page_csp(html: &[u8], host: Option<&str>) -> String {
     let html = String::from_utf8_lossy(html);
     let scripts: String = inline_script_hashes(&html)
         .into_iter()
         .map(|h| format!(" {h}"))
         .collect();
-    PAGE_CSP.replace("{scripts}", &scripts)
+    let ws = host
+        .and_then(csp_host)
+        .map(|h| format!(" ws://{h}"))
+        .unwrap_or_default();
+    PAGE_CSP.replace("{scripts}", &scripts).replace("{ws}", &ws)
 }
 
 /// Reads `<build>/<key>` from the frontend build folder (debug builds only: dev uses the
@@ -200,14 +217,23 @@ mod tests {
     #[test]
     fn csp_hashes_inline_scripts_only() {
         let html = br#"<head><script src="/a.js"></script><SCRIPT>boot()</SCRIPT></head>"#;
-        let csp = page_csp(html);
+        let csp = page_csp(html, Some("10.0.0.5:47832"));
         let expected = base64::engine::general_purpose::STANDARD.encode(Sha256::digest(b"boot()"));
         assert!(
             csp.contains(&format!("script-src 'self' 'sha256-{expected}';")),
             "{csp}"
         );
         assert_eq!(csp.matches("sha256-").count(), 1);
-        assert!(csp.contains("connect-src 'self' ws:"));
+        assert!(
+            csp.contains("connect-src 'self' ws://10.0.0.5:47832;"),
+            "{csp}"
+        );
+        assert!(!csp.contains("ws: "), "{csp}");
+        // A hostile Host header can't inject directives; it just drops the ws source.
+        let csp = page_csp(html, Some("x; script-src *"));
+        assert!(csp.contains("connect-src 'self';"), "{csp}");
+        assert!(!csp.contains("script-src *"));
+        assert!(page_csp(html, None).contains("connect-src 'self';"));
         assert!(csp.contains("frame-src 'self'"));
         assert!(csp.contains("frame-ancestors 'none'"));
     }

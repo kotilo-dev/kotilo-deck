@@ -1,8 +1,9 @@
 //! Backend events forwarded to LAN browsers over `/api/events`: every key of `DeckEvents`
 //! in `src/lib/ipc/index.ts` except the host-only ones (a test keeps the lists in sync).
 
-/// About the host's deck window (hotkeys, tray, monitor, visibility, quit); a browser has
-/// its own workspace state, so these never leave the machine. (Documentation + test only.)
+/// Never leave the machine: the host's deck window (hotkeys, tray, monitor, visibility,
+/// quit), which a browser keeps its own state for, and `lan://status`, which carries the
+/// token URLs and QR code. (Documentation + test only.)
 #[cfg(test)]
 pub const HOST_ONLY: &[&str] = &[
     "workspace://cycle",
@@ -10,6 +11,7 @@ pub const HOST_ONLY: &[&str] = &[
     "monitor://changed",
     "deck://visibility",
     "deck://quitting",
+    "lan://status",
 ];
 
 pub const FORWARDED: &[&str] = &[
@@ -27,7 +29,6 @@ pub const FORWARDED: &[&str] = &[
     "companion://snapshot",
     "companion://suggest",
     "calendar://changed",
-    "lan://status",
     "plugin://changed",
     "update://status",
 ];
@@ -71,6 +72,9 @@ mod tests {
         ours.sort_unstable();
         assert_eq!(ours, names);
         assert!(FORWARDED.iter().all(|e| !HOST_ONLY.contains(e)));
+        // Carries the token URLs and the QR code: host UI only.
+        assert!(!FORWARDED.contains(&"lan://status"));
+        assert!(HOST_ONLY.contains(&"lan://status"));
     }
 
     #[test]
