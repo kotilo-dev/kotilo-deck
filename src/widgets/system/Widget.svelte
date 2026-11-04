@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { locale, t } from '#lib/i18n/index.ts';
 	import {
-		isTauri,
+		hasBackend,
 		on,
 		systemInfo,
 		systemSubscribe,
@@ -21,7 +21,7 @@
 	const threshold = $derived(
 		Number.isFinite(Number(s.threshold)) ? Math.min(99, Math.max(1, Number(s.threshold))) : defaults.threshold
 	);
-	const tauri = isTauri();
+	const tauri = hasBackend();
 
 	let info = $state<SystemInfo | null>(null);
 	let sample = $state<SystemSample | null>(null);

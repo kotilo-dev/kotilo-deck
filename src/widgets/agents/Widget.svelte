@@ -5,7 +5,7 @@
 		companionRespond,
 		companionSnapshot,
 		companionStatus,
-		isTauri,
+		hasBackend,
 		on,
 		type Agent,
 		type Approval,
@@ -32,7 +32,7 @@
 	let { size, settings, editing, available }: WidgetProps<AgentsSettings> = $props();
 
 	const s = $derived({ ...defaults, ...settings });
-	const tauri = isTauri();
+	const tauri = hasBackend();
 
 	/** Agent row height and gap; approval card height (8+8 padding, 2 border, 16+14 lines, 2+2 gaps, 6 + 36 px buttons) and gap. */
 	const ROW = 28;

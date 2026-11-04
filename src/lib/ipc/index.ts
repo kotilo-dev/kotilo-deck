@@ -2,13 +2,13 @@
  * Typed IPC contract between the deck UI and the Tauri backend (ARCHITECTURE.md "IPC contract").
  * Rust side mirrors these types with `#[serde(rename_all = "camelCase")]`.
  *
- * Outside Tauri (plain `pnpm dev` in a browser) `isTauri()` is false; callers fall back
- * (workspaces → localStorage, system/weather → "not available" states) instead of throwing.
+ * Transport (`./transport.ts`): Tauri IPC in the webview, HTTP + WebSocket on a LAN tablet/browser
+ * (`isRemote()`), nothing in plain `pnpm dev` (`hasBackend()` false → callers fall back to
+ * localStorage / "not available" states instead of throwing).
  */
-import { invoke } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { hasBackend, invoke, isRemote, isTauri, listen, type UnlistenFn } from './transport';
 
-export const isTauri = (): boolean => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+export { hasBackend, isRemote, isTauri, type UnlistenFn };
 
 // ── Platform ────────────────────────────────────────────────────────────────
 
@@ -652,6 +652,6 @@ export interface DeckEvents {
 }
 
 export function on<K extends keyof DeckEvents>(event: K, handler: (payload: DeckEvents[K]) => void): Promise<UnlistenFn> {
-	if (!isTauri()) return Promise.resolve(() => {});
+	// No backend → a no-op unlisten (the transport decides).
 	return listen<DeckEvents[K]>(event, (e) => handler(e.payload));
 }

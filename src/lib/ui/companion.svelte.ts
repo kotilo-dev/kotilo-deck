@@ -1,9 +1,9 @@
 /**
  * Live companion server status (protocol.md) for the deck top bar and the settings window:
- * `companionStatus()` once, then `companion://status` pushes. Outside Tauri the status stays null.
+ * `companionStatus()` once, then `companion://status` pushes (also on a LAN tablet). Without a backend the status stays null.
  */
 import { emitTo } from '@tauri-apps/api/event';
-import { companionStatus, isTauri, on, settingsOpen, type CompanionStatus } from '#lib/ipc/index.ts';
+import { companionStatus, hasBackend, isRemote, isTauri, on, settingsOpen, type CompanionStatus } from '#lib/ipc/index.ts';
 import { t } from '#lib/i18n/index.ts';
 
 export class CompanionWatch {
@@ -11,7 +11,7 @@ export class CompanionWatch {
 
 	/** Returns the stop function (usable from onMount / $effect). */
 	start(): () => void {
-		if (!isTauri()) return () => {};
+		if (!hasBackend()) return () => {};
 		let alive = true;
 		companionStatus()
 			.then((s) => alive && (this.status = s))
@@ -56,8 +56,12 @@ export const SETTINGS_SECTION_KEY = 'kotilo-deck:settings-section';
 /** Frontend-only event to an already open settings window. */
 export const SETTINGS_NAVIGATE_EVENT = 'settings://navigate';
 
-/** Opens the settings window, optionally at a section (e.g. "companion"). */
+/** Settings can be opened from here (not on a LAN tablet/browser: settings stay on the host). */
+export const canOpenSettings = (): boolean => !isRemote();
+
+/** Opens the settings window, optionally at a section (e.g. "companion"). No-op in remote mode. */
 export async function openSettingsAt(section?: string): Promise<void> {
+	if (isRemote()) return;
 	if (!isTauri()) {
 		window.open(section ? `/settings#${section}` : '/settings', 'kotilo-deck-settings', 'width=960,height=680');
 		return;

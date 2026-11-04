@@ -1,5 +1,5 @@
 /** Loads `~/.kotilo/themes/*.json` through the backend and swaps the user layer of the theme registry. */
-import { isTauri, themeUserList } from '#lib/ipc/index.ts';
+import { hasBackend, themeUserList } from '#lib/ipc/index.ts';
 import { parseUserThemes, setUserThemes } from '#lib/theme/index.ts';
 
 /**
@@ -7,7 +7,7 @@ import { parseUserThemes, setUserThemes } from '#lib/theme/index.ts';
  * returned as `errors` (also logged) so the caller can show a toast.
  */
 export async function refreshUserThemes(): Promise<{ label: string; message: string }[]> {
-	if (!isTauri()) return [];
+	if (!hasBackend()) return [];
 	let raw: unknown[];
 	try {
 		raw = await themeUserList();

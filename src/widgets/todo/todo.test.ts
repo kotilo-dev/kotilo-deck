@@ -11,7 +11,7 @@ const ipc = vi.hoisted(() => ({
 	todoSnooze: vi.fn()
 }));
 vi.mock('#lib/ipc/index.ts', () => ({
-	isTauri: () => false,
+	hasBackend: () => false,
 	on: (event: string, h: (p: unknown) => void) => {
 		ipc.handlers[event] = h;
 		return Promise.resolve(() => delete ipc.handlers[event]);

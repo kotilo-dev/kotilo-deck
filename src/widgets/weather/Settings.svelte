@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { t } from '#lib/i18n/index.ts';
-	import { isTauri, weatherGeocode, type Place } from '#lib/ipc/index.ts';
+	import { hasBackend, weatherGeocode, type Place } from '#lib/ipc/index.ts';
 	import type { WidgetSettingsProps } from '../types';
 	import { asLocation, fromPlace, placeLine, validCoords } from './logic';
 	import { defaults, type WeatherSettings } from './settings';
@@ -9,7 +9,7 @@
 
 	const s = $derived({ ...defaults, ...settings });
 	const current = $derived(asLocation(s.location));
-	const tauri = isTauri();
+	const tauri = hasBackend();
 	const uid = Math.random().toString(36).slice(2, 8);
 
 	let query = $state('');

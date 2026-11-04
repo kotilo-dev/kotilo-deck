@@ -4,7 +4,7 @@
  * `LocalPomodoro` stands in, so the widget is usable with `pnpm dev`.
  */
 import {
-	isTauri,
+	hasBackend,
 	on,
 	pomodoroPause,
 	pomodoroReset,
@@ -101,6 +101,6 @@ let shared: PomodoroApi | null = null;
 
 /** One api per page, shared by every Pomodoro instance (all show the one timer). */
 export function pomodoroApi(): PomodoroApi {
-	if (!shared) shared = isTauri() ? createTauriPomodoroApi() : createLocalPomodoroApi();
+	if (!shared) shared = hasBackend() ? createTauriPomodoroApi() : createLocalPomodoroApi();
 	return shared;
 }

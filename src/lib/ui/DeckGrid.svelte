@@ -20,6 +20,7 @@
 	import Icon from './Icon.svelte';
 	import WidgetFrame from './WidgetFrame.svelte';
 	import { fmtSize, getDeck, removeWithUndo, sizesOf, widgetName } from './deck.svelte';
+	import { plugins } from '#lib/plugins/registry.svelte.ts';
 
 	const LONG_PRESS_MS = 500;
 	const SWIPE_PX = 64;
@@ -28,6 +29,9 @@
 	const TRASH_BAND_PX = 44;
 	/** Gesture opt-out: widgets can mark any subtree with `data-no-gesture`. */
 	const NO_GESTURE = '[data-no-gesture], input[type="range"], dialog, [popover]';
+
+	// External widgets (docs/plugin-api.md): load the list and follow `plugin://changed` while the deck lives.
+	plugins.start();
 
 	const deck = getDeck();
 	const { store, ui } = deck;

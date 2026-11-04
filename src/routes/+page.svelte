@@ -6,8 +6,8 @@
 	 */
 	import { onMount, untrack } from 'svelte';
 	import { fly } from 'svelte/transition';
-	import { convertFileSrc } from '@tauri-apps/api/core';
-	import { calendarUpcoming, isTauri, on, pomodoroState, wallpaperList, type Wallpaper } from '#lib/ipc/index.ts';
+	import { calendarUpcoming, hasBackend, isRemote, isTauri, on, pomodoroState, wallpaperList, type Wallpaper } from '#lib/ipc/index.ts';
+	import { wallpaperSrc } from '#lib/ipc/transport.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { applyTheme, effectiveThemeId, getTheme, pairFor, themes } from '#lib/theme/index.ts';
 	import { AutoSwitcher, defaultBackend, needsCalendar, WorkspaceStore } from '#lib/workspace/index.ts';
@@ -71,7 +71,7 @@
 	const wantsCalendar = $derived(needsCalendar(store.settings.autoSwitch));
 
 	async function loadEvents() {
-		if (!isTauri() || !wantsCalendar) {
+		if (!hasBackend() || !wantsCalendar) {
 			switcher.setEvents([]);
 			return;
 		}
@@ -110,7 +110,7 @@
 	const wallpaper = $derived.by(() => {
 		if (background.mode !== 'wallpaper') return null;
 		const w = wallpapers.find((x) => x.name === background.wallpaper);
-		return w ? { kind: w.kind, src: convertFileSrc(w.path) } : null;
+		return w ? { kind: w.kind, src: wallpaperSrc(w) } : null;
 	});
 
 	$effect(() => {
@@ -136,7 +136,7 @@
 	// A wallpaper named in settings but not in our list (just imported in the settings window) → re-list.
 	$effect(() => {
 		const name = background.mode === 'wallpaper' ? background.wallpaper : null;
-		if (!name || !isTauri()) return;
+		if (!name || !hasBackend()) return;
 		untrack(() => {
 			if (!wallpapers.some((w) => w.name === name)) void loadWallpapers();
 		});
@@ -157,7 +157,7 @@
 	});
 
 	async function loadWallpapers() {
-		if (!isTauri()) return;
+		if (!hasBackend()) return;
 		try {
 			wallpapers = await wallpaperList();
 		} catch (e) {
@@ -179,7 +179,7 @@
 		motion.addEventListener('change', onMotion);
 		const stopAmbient = ambient.start();
 		const stopCompanion = ui.companion.start();
-		if (isTauri()) void pomodoroState().then((s) => switcher.seedPomodoro(s), () => switcher.seedPomodoro(null));
+		if (hasBackend()) void pomodoroState().then((s) => switcher.seedPomodoro(s), () => switcher.seedPomodoro(null));
 
 		void store.init();
 		void loadUserThemes();
@@ -198,13 +198,19 @@
 			}
 		});
 
+		// The host's tray, hotkey and monitor drive the host deck only: a remote device keeps its own workspace.
+		const hostOnly = isTauri()
+			? [
+					on('workspace://switch', ({ id }) => store.switchTo(id)),
+					on('workspace://cycle', ({ dir }) => store.cycle(dir)),
+					on('monitor://changed', (m) => {
+						store.setMonitor(m.name);
+						store.applyViewport();
+					})
+				]
+			: [];
 		const unlisten = [
-			on('workspace://switch', ({ id }) => store.switchTo(id)),
-			on('workspace://cycle', ({ dir }) => store.cycle(dir)),
-			on('monitor://changed', (m) => {
-				store.setMonitor(m.name);
-				store.applyViewport();
-			}),
+			...hostOnly,
 			on('theme://user-changed', () => void loadUserThemes()),
 			// Before the store is ready the switcher sees no workspaces, so these only record the state.
 			on('pomodoro://state', (s) => switcher.pomodoroState(s)),
@@ -252,6 +258,8 @@
 	}
 
 	function openSettings() {
+		// Settings live on the host computer only (ARCHITECTURE LAN mode).
+		if (isRemote()) return;
 		void openSettingsAt().catch((e) => ui.say(String(e), 'warning'));
 	}
 

@@ -2,7 +2,8 @@
 import { getContext, setContext } from 'svelte';
 import type { Capability, SizeKey, WidgetInstance } from '#lib/ipc/index.ts';
 import { t } from '#lib/i18n/index.ts';
-import { parseSize, widgets, type WidgetDefinition } from '../../widgets/index';
+import { parseSize, type WidgetDefinition } from '../../widgets/index';
+import { allWidgets, builtinWidgets, getWidget, pluginWidgets, type PluginDefinition } from '#lib/plugins/registry.svelte.ts';
 import type { Size } from '#lib/grid/index.ts';
 import type { WorkspaceStore } from '#lib/workspace/index.ts';
 import { CompanionWatch } from './companion.svelte';
@@ -125,9 +126,10 @@ export function removeWithUndo({ store, ui }: DeckContext, instance: string): vo
 
 // ── registry helpers ────────────────────────────────────────────────────────
 
-export const definition = (widget: string): WidgetDefinition | undefined => widgets.get(widget);
+/** Built-in or `ext.*` plugin definition (reactive: plugins come and go at runtime). */
+export const definition = (widget: string): WidgetDefinition | undefined => getWidget(widget);
 
-export const sizesOf = (widget: string): Size[] | undefined => widgets.get(widget)?.manifest.sizes.map(parseSize);
+export const sizesOf = (widget: string): Size[] | undefined => getWidget(widget)?.manifest.sizes.map(parseSize);
 
 /** "2×2" (DESIGN size chip). */
 export const fmtSize = (s: Size | SizeKey): string => {
@@ -141,7 +143,7 @@ const tOr = (key: string, fallback: string) => {
 };
 
 /** Localised widget name: `widgets.<id>.name`, else the manifest name, else the raw id. */
-export const widgetName = (widget: string): string => tOr(`widgets.${widget}.name`, widgets.get(widget)?.manifest.name ?? widget);
+export const widgetName = (widget: string): string => tOr(`widgets.${widget}.name`, getWidget(widget)?.manifest.name ?? widget);
 
 /** Generic settings label: `widgets.<id>.settings.<key>`, else schema title, else the key. */
 export const settingLabel = (widget: string, key: string, title?: string) => tOr(`widgets.${widget}.settings.${key}`, title ?? key);
@@ -150,12 +152,17 @@ export const settingLabel = (widget: string, key: string, title?: string) => tOr
 export const optionLabel = (widget: string, key: string, value: string) => tOr(`widgets.${widget}.options.${key}.${value}`, value);
 
 export const mergedSettings = (inst: WidgetInstance): Record<string, unknown> => ({
-	...(widgets.get(inst.widget)?.defaults ?? {}),
+	...(getWidget(inst.widget)?.defaults ?? {}),
 	...(inst.settings ?? {})
 });
 
-export const allDefinitions = (): WidgetDefinition[] =>
-	[...widgets.values()].sort((a, b) => widgetName(a.manifest.id).localeCompare(widgetName(b.manifest.id)));
+const byName = (a: WidgetDefinition, b: WidgetDefinition) => widgetName(a.manifest.id).localeCompare(widgetName(b.manifest.id));
+
+/** Every placeable widget (built-ins + valid plugins), by localised name. */
+export const allDefinitions = (): WidgetDefinition[] => allWidgets().sort(byName);
+/** Drawer sections (DESIGN §6): built-ins first, then "External" plugins. */
+export const builtinDefinitions = (): WidgetDefinition[] => builtinWidgets().sort(byName);
+export const pluginDefinitions = (): PluginDefinition[] => pluginWidgets().sort(byName);
 
 /** Surface opacity a widget gets without its own override (workspace > global setting > theme). */
 export const surfaceDefault = (ui: DeckUi): number => ui.look.surfaceOpacity;

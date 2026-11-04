@@ -8,13 +8,15 @@
 	import WorkspaceMenu from './WorkspaceMenu.svelte';
 	import WorkspaceSwitcher from './WorkspaceSwitcher.svelte';
 	import { getDeck, unplacedText, widgetName } from './deck.svelte';
-	import { companionText, companionView, openSettingsAt } from './companion.svelte';
+	import { canOpenSettings, companionText, companionView, openSettingsAt } from './companion.svelte';
 
 	const { store, ui } = getDeck();
 	const companion = ui.companion;
 	const ws = $derived(store.active);
 	const view = $derived(companionView(store.settings.companion.enabled, companion.status));
 	const text = $derived(companionText(view, companion.status));
+	/** On a LAN tablet the status is shown but can't open Settings (they live on the host). */
+	const linkSettings = canOpenSettings();
 
 	function openCompanion() {
 		void openSettingsAt('companion').catch((e) => ui.say(String(e), 'warning'));
@@ -44,10 +46,17 @@
 			<WorkspaceSwitcher />
 		</div>
 		<div class="side end" data-tauri-drag-region={drag}>
-			<button type="button" class="companion" title={text.title} aria-label={t('shell.topbar.companionOpen', { status: text.title })} onclick={openCompanion}>
-				<span class="dot" class:on={view === 'connected'} aria-hidden="true"></span>
-				<span class="companion-label">{text.label}</span>
-			</button>
+			{#if linkSettings}
+				<button type="button" class="companion" title={text.title} aria-label={t('shell.topbar.companionOpen', { status: text.title })} onclick={openCompanion}>
+					<span class="dot" class:on={view === 'connected'} aria-hidden="true"></span>
+					<span class="companion-label">{text.label}</span>
+				</button>
+			{:else}
+				<span class="companion static" title={text.title}>
+					<span class="dot" class:on={view === 'connected'} aria-hidden="true"></span>
+					<span class="companion-label">{text.label}</span>
+				</span>
+			{/if}
 			<ThemePicker />
 			<button type="button" class="k-btn k-btn-icon" aria-label={t('shell.topbar.edit')} title={t('shell.topbar.edit')} onclick={() => ui.enterEdit()}>
 				<Icon name="edit" size={18} />
@@ -147,6 +156,12 @@
 	}
 	.companion:hover {
 		color: var(--k-text);
+	}
+	.companion.static {
+		cursor: default;
+	}
+	.companion.static:hover {
+		color: var(--k-text-muted);
 	}
 	.dot {
 		width: 8px;
