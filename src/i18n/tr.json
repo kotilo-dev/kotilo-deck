@@ -94,7 +94,9 @@
 		"settingsTitle": "Ayarları ana bilgisayarda açın",
 		"settingsText": "Bu cihaz yalnızca deck’i gösterir. Ayarlar, monitörler ve dosyalar Kotilo Deck’in çalıştığı bilgisayarda kalır.",
 		"backToDeck": "Deck’e dön",
-		"hostOnly": "Yalnızca ana bilgisayarda kullanılabilir"
+		"hostOnly": "Yalnızca ana bilgisayarda kullanılabilir",
+		"rotateToEditLandscape": "Yerleşimi düzenlemek için yatay çevirin",
+		"rotateToEditPortrait": "Yerleşimi düzenlemek için dikey çevirin"
 	},
 	"shell": {
 		"appName": "Kotilo Deck",

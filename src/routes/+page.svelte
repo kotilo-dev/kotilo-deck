@@ -38,6 +38,12 @@
 	});
 	const ambient = new Ambient({ settings: () => store.settings });
 	setDeck({ store, ui });
+	// LAN remote: a layout shown reflowed for this device's orientation is a view only (DECISIONS 68).
+	const lockReason = () => {
+		const lock = store.layoutLock;
+		return lock ? t(lock === 'portrait' ? 'remote.rotateToEditPortrait' : 'remote.rotateToEditLandscape') : null;
+	};
+	ui.editBlock = lockReason;
 
 	// Auto-switch rules (SPEC §4.1): evaluated here on the shared minute tick and pomodoro/calendar events.
 	const AUTO_SWITCH_KEY = 'kotilo-deck:autoswitch-last';
@@ -223,7 +229,15 @@
 		let resizeTimer: ReturnType<typeof setTimeout> | undefined;
 		const onResize = () => {
 			clearTimeout(resizeTimer);
-			resizeTimer = setTimeout(() => store.applyViewport(), 150);
+			resizeTimer = setTimeout(() => {
+				store.applyViewport();
+				// Rotated mid-edit onto a reflowed view: leave edit mode rather than edit a layout that isn't saved.
+				const reason = ui.editing ? lockReason() : null;
+				if (reason) {
+					ui.exitEdit();
+					ui.say(reason);
+				}
+			}, 150);
 		};
 		const onHide = () => {
 			if (document.visibilityState === 'hidden') void store.flush();

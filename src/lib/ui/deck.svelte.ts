@@ -68,8 +68,18 @@ export class DeckUi {
 		this.#highlightTimer = setTimeout(() => (this.highlight = null), 1600);
 	}
 
-	enterEdit() {
+	/** Why edit mode can't open right now (shown as a toast), or null. The deck page wires it to the store. */
+	editBlock: () => string | null = () => null;
+
+	/** Enters edit mode unless `editBlock` refuses (then says why); returns whether it did. */
+	enterEdit(): boolean {
+		const reason = this.editBlock();
+		if (reason) {
+			this.say(reason);
+			return false;
+		}
 		this.editing = true;
+		return true;
 	}
 
 	exitEdit() {

@@ -73,6 +73,12 @@ export class WorkspaceStore {
 	#dirty = new Set<string>();
 	#timer: ReturnType<typeof setTimeout> | null = null;
 	#portrait: boolean | null = null;
+	/**
+	 * Remote (LAN) deck only: the host's stored layout of every workspace this device shows reflowed for
+	 * its own orientation. The reflow is a view: saves write this layout, and layout edits are refused
+	 * until the device matches it again (`layoutLock`).
+	 */
+	#stored = new Map<string, { grid: GridSize; widgets: WidgetInstance[] }>();
 	/** Per workspace id: tail of its save/delete chain. */
 	#chains = new Map<string, Promise<void>>();
 	/** Last disk version we listed or wrote, per id (normalized JSON), to detect changes made elsewhere. */
@@ -96,6 +102,20 @@ export class WorkspaceStore {
 
 	#isDeck(): boolean {
 		return this.role === 'deck';
+	}
+
+	#isRemoteDeck(): boolean {
+		return this.#isDeck() && this.backend.remote === true;
+	}
+
+	/**
+	 * Remote mode: the orientation the active workspace's stored layout needs when this device shows it
+	 * reflowed (layout edits are refused until then); null when it can be edited.
+	 */
+	get layoutLock(): 'landscape' | 'portrait' | null {
+		const base = this.active && this.#stored.get(this.active.id);
+		if (!base) return null;
+		return base.grid.rows > base.grid.cols ? 'portrait' : 'landscape';
 	}
 
 	// ── lifecycle ───────────────────────────────────────────────────────────
@@ -172,7 +192,7 @@ export class WorkspaceStore {
 				// Snapshot when the job runs, so a queued save always writes the newest state.
 				const ws = this.#find(id);
 				if (!ws) return;
-				const snap = $state.snapshot(ws) as Workspace;
+				const snap = this.#persistable(ws);
 				await this.backend.saveWorkspace(snap);
 				this.#remember(snap);
 				this.#wrote();
@@ -213,8 +233,11 @@ export class WorkspaceStore {
 			const keepLocal = local && this.#dirty.has(ws.id) && this.#known.get(ws.id) === disk;
 			if (local && this.#dirty.has(ws.id) && !keepLocal) this.#dirty.delete(ws.id);
 			if (keepLocal) next.push(local);
-			else if (local && stable($state.snapshot(local)) === disk) next.push(local);
-			else next.push(ws);
+			else if (local && stable(this.#persistable(local)) === disk) next.push(local);
+			else {
+				next.push(ws);
+				this.#stored.delete(ws.id);
+			}
 			this.#known.set(ws.id, disk);
 		}
 		for (const id of [...this.#dirty]) {
@@ -230,6 +253,13 @@ export class WorkspaceStore {
 		for (const id of [...this.#known.keys()]) if (!seen.has(id)) this.#known.delete(id);
 		if (next.length === 0) return; // never leave the deck without a workspace
 		this.workspaces = sortWorkspaces(next);
+		for (const id of [...this.#stored.keys()]) if (!this.#find(id)) this.#stored.delete(id);
+		// A remote device re-applies its orientation view to what the host sent; nothing is saved.
+		if (this.#isRemoteDeck() && this.#portrait !== null) {
+			const { width, height } = this.opts.viewport();
+			const target = defaultDensity(width, height);
+			for (const w of this.workspaces) this.#applyView(w, target);
+		}
 		if (!this.workspaces.some((w) => w.id === this.activeId)) {
 			const remembered = this.settings.activeWorkspace[this.monitor];
 			const id = this.workspaces.some((w) => w.id === remembered) ? remembered : this.workspaces[0].id;
@@ -346,7 +376,7 @@ export class WorkspaceStore {
 	duplicate(id: string): Workspace | null {
 		const src = this.#find(id);
 		if (!src) return null;
-		const copy = structuredClone($state.snapshot(src)) as Workspace;
+		const copy = structuredClone(this.#persistable(src));
 		copy.name = t('shell.workspace.copyName', { name: src.name });
 		copy.id = uniqueId(slugify(copy.name), this.workspaces.map((w) => w.id));
 		this.#insert(copy);
@@ -364,6 +394,7 @@ export class WorkspaceStore {
 		}
 		this.workspaces = this.workspaces.filter((w) => w.id !== id);
 		this.#dirty.delete(id);
+		this.#stored.delete(id);
 		const map = { ...this.settings.activeWorkspace };
 		let changed = false;
 		for (const [mon, ws] of Object.entries(map)) {
@@ -386,7 +417,7 @@ export class WorkspaceStore {
 	/** Replaces layout, theme and appearance with a preset's; keeps id and name. */
 	resetToPreset(id: string, preset: PresetId): void {
 		const ws = this.#find(id);
-		if (!ws) return;
+		if (!ws || this.#stored.has(id)) return;
 		const portrait = ws.grid.rows > ws.grid.cols;
 		ws.theme = null;
 		delete ws.appearance;
@@ -420,7 +451,7 @@ export class WorkspaceStore {
 	exportJson(id: string): string {
 		const ws = this.#find(id);
 		if (!ws) throw new WorkspaceError('shell.errors.notFound');
-		return JSON.stringify($state.snapshot(ws), null, 2) + '\n';
+		return JSON.stringify(this.#persistable(ws), null, 2) + '\n';
 	}
 
 	// ── theme ───────────────────────────────────────────────────────────────
@@ -441,7 +472,7 @@ export class WorkspaceStore {
 
 	setWidgets(widgets: WidgetInstance[]): void {
 		const ws = this.active;
-		if (!ws) return;
+		if (!ws || this.#stored.has(ws.id)) return;
 		ws.widgets = widgets;
 		this.#touch(ws.id);
 	}
@@ -449,7 +480,7 @@ export class WorkspaceStore {
 	/** Places a new instance of `widget` at `size` in the first free slot; null when there's no room. */
 	addWidget(widget: string, size: Size, settings: Record<string, unknown> = {}): WidgetInstance | null {
 		const ws = this.active;
-		if (!ws) return null;
+		if (!ws || this.#stored.has(ws.id)) return null;
 		const slot = firstFreeSlot(size, ws.widgets, ws.grid);
 		if (!slot) return null;
 		const inst: WidgetInstance = {
@@ -469,7 +500,7 @@ export class WorkspaceStore {
 	removeWidget(instance: string): { workspace: string; widget: WidgetInstance } | null {
 		const ws = this.active;
 		const found = ws?.widgets.find((w) => w.instance === instance);
-		if (!ws || !found) return null;
+		if (!ws || !found || this.#stored.has(ws.id)) return null;
 		const widget = structuredClone($state.snapshot(found)) as WidgetInstance;
 		ws.widgets = ws.widgets.filter((w) => w.instance !== instance);
 		this.#dropUnplaced(ws.id, instance);
@@ -480,7 +511,7 @@ export class WorkspaceStore {
 	/** Undo of `removeWidget`: back in its old cells if they are still free, else the first free slot. Call once. */
 	restoreWidget(workspace: string, widget: WidgetInstance): boolean {
 		const ws = this.#find(workspace);
-		if (!ws) return false;
+		if (!ws || this.#stored.has(ws.id)) return false;
 		const slot = fits(widget, ws.widgets, ws.grid) ? { x: widget.x, y: widget.y } : firstFreeSlot(widget, ws.widgets, ws.grid);
 		if (!slot) return false;
 		// A widget added since may have reused the instance id: the restored one then gets a fresh id.
@@ -496,6 +527,9 @@ export class WorkspaceStore {
 		const inst = ws?.widgets.find((w) => w.instance === instance);
 		if (!ws || !inst) return;
 		inst.settings = settings;
+		// A reflowed remote view saves the stored layout: carry the new settings over to it.
+		const stored = this.#stored.get(ws.id)?.widgets.find((w) => w.instance === instance);
+		if (stored) stored.settings = structuredClone($state.snapshot(settings));
 		this.#touch(ws.id);
 	}
 
@@ -506,7 +540,7 @@ export class WorkspaceStore {
 
 	setGridFor(id: string, grid: GridSize): string[] {
 		const ws = this.#find(id);
-		if (!ws) return [];
+		if (!ws || this.#stored.has(id)) return [];
 		const out = this.#setGrid(ws, grid);
 		this.#touch(ws.id);
 		return out;
@@ -528,7 +562,8 @@ export class WorkspaceStore {
 
 	/**
 	 * Window resized / monitor changed. When the orientation flips, workspaces still on the automatic
-	 * density (8×4 ↔ 4×8) follow it; user-chosen densities are left alone. Deck only.
+	 * density (8×4 ↔ 4×8) follow it; user-chosen densities are left alone. Deck only. On a remote (LAN)
+	 * device that reflow is a per-device view: it never marks anything dirty or saves (DECISIONS 68).
 	 */
 	applyViewport(): void {
 		if (!this.#isDeck()) return;
@@ -537,6 +572,10 @@ export class WorkspaceStore {
 		if (this.#portrait === portrait) return;
 		this.#portrait = portrait;
 		const target = defaultDensity(width, height);
+		if (this.#isRemoteDeck()) {
+			for (const ws of this.workspaces) this.#applyView(ws, target);
+			return;
+		}
 		for (const ws of this.workspaces) {
 			if (!isAutoDensity(ws.grid) || (ws.grid.cols === target.cols && ws.grid.rows === target.rows)) continue;
 			this.#setGrid(ws, target);
@@ -546,13 +585,44 @@ export class WorkspaceStore {
 
 	// ── internals ───────────────────────────────────────────────────────────
 
-	#setGrid(ws: Workspace, grid: GridSize): string[] {
+	#setGrid(ws: Workspace, grid: GridSize, from = $state.snapshot(ws.widgets) as WidgetInstance[]): string[] {
 		const sizesOf = (it: WidgetInstance) => this.opts.sizesOf(it.widget) ?? [{ w: it.w, h: it.h }];
-		const out = reflow($state.snapshot(ws.widgets) as WidgetInstance[], grid, sizesOf);
+		const out = reflow(from, grid, sizesOf);
 		ws.grid = { cols: grid.cols, rows: grid.rows };
 		ws.widgets = out.items;
 		this.unplaced = { ...this.unplaced, [ws.id]: out.unplaced };
 		return out.unplaced;
+	}
+
+	/**
+	 * Remote view of one workspace for this device's automatic density: reflows from the stored layout
+	 * when they differ, restores it when they match again. Never touches (no save, not dirty).
+	 */
+	#applyView(ws: Workspace, target: GridSize) {
+		const same = (a: GridSize, b: GridSize) => a.cols === b.cols && a.rows === b.rows;
+		const base = this.#stored.get(ws.id) ?? {
+			grid: { cols: ws.grid.cols, rows: ws.grid.rows },
+			widgets: $state.snapshot(ws.widgets) as WidgetInstance[]
+		};
+		if (isAutoDensity(base.grid) && !same(base.grid, target)) {
+			this.#stored.set(ws.id, base);
+			if (!same(ws.grid, target)) this.#setGrid(ws, target, structuredClone(base.widgets));
+		} else if (this.#stored.delete(ws.id)) {
+			ws.grid = { ...base.grid };
+			ws.widgets = structuredClone(base.widgets);
+			this.unplaced = { ...this.unplaced, [ws.id]: [] };
+		}
+	}
+
+	/** What a save writes: the workspace, with its stored layout when this remote device shows a reflow. */
+	#persistable(ws: Workspace): Workspace {
+		const snap = $state.snapshot(ws) as Workspace;
+		const base = this.#stored.get(ws.id);
+		if (base) {
+			snap.grid = { ...base.grid };
+			snap.widgets = structuredClone(base.widgets);
+		}
+		return snap;
 	}
 
 	#dropUnplaced(wsId: string, instance: string) {

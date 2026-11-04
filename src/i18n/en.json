@@ -94,7 +94,9 @@
 		"settingsTitle": "Open settings on the host computer",
 		"settingsText": "This device shows the deck only. Settings, monitors and files stay on the computer running Kotilo Deck.",
 		"backToDeck": "Back to the deck",
-		"hostOnly": "Only available on the host computer"
+		"hostOnly": "Only available on the host computer",
+		"rotateToEditLandscape": "Rotate to landscape to edit layout",
+		"rotateToEditPortrait": "Rotate to portrait to edit layout"
 	},
 	"shell": {
 		"appName": "Kotilo Deck",

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DeckSettings } from '#lib/ipc/index.ts';
+import type { DeckSettings, Workspace } from '#lib/ipc/index.ts';
 
 const ipc = vi.hoisted(() => ({
 	handlers: {} as Record<string, (p: unknown) => void>,
@@ -31,7 +31,8 @@ vi.mock('#lib/ipc/index.ts', () => ({
 	traySetWorkspaces: ipc.traySetWorkspaces
 }));
 
-import { BROWSER_MONITOR, defaultBackend, memoryStorage, remoteBackend } from './backend';
+import { BROWSER_MONITOR, defaultBackend, memoryStorage, remoteBackend, type DeckBackend } from './backend';
+import { WorkspaceStore } from './store.svelte';
 
 beforeEach(() => {
 	vi.clearAllMocks();
@@ -97,5 +98,131 @@ describe('remote backend (LAN tablet/browser)', () => {
 		expect(seen.at(-1)?.hotkey).toBe('Ctrl+Alt+L');
 		expect(typeof ipc.handlers['workspace://changed']).toBe('function');
 		off();
+	});
+});
+
+describe('remote orientation view (DECISIONS 68)', () => {
+	const SIZES: Record<string, { w: number; h: number }[]> = {
+		clock: [
+			{ w: 2, h: 1 },
+			{ w: 2, h: 2 }
+		],
+		todo: [
+			{ w: 2, h: 2 },
+			{ w: 4, h: 2 }
+		]
+	};
+	const hostWorkspace = (): Workspace => ({
+		schemaVersion: 1,
+		id: 'ops',
+		name: 'Ops',
+		theme: null,
+		grid: { cols: 8, rows: 4 },
+		widgets: [
+			{ instance: 'clock-1', widget: 'clock', x: 0, y: 0, w: 2, h: 2, settings: {} },
+			{ instance: 'todo-1', widget: 'todo', x: 2, y: 0, w: 4, h: 2, settings: {} },
+			{ instance: 'clock-2', widget: 'clock', x: 6, y: 0, w: 2, h: 1, settings: {} }
+		]
+	});
+	const LANDSCAPE = { width: 1024, height: 600 };
+	const PORTRAIT = { width: 600, height: 1024 };
+	const plain = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+	const lastSaved = () => (ipc.workspaceSave.mock.calls.at(-1) as unknown[] | undefined)?.[0] as Workspace;
+
+	function remoteStore(viewport: { width: number; height: number }, backend: DeckBackend = remoteBackend(memoryStorage())) {
+		const vp = { ...viewport };
+		const store = new WorkspaceStore(backend, { sizesOf: (id) => SIZES[id], viewport: () => vp });
+		return { store, vp };
+	}
+
+	beforeEach(() => {
+		ipc.workspaceList.mockImplementation(async () => [hostWorkspace()] as never);
+	});
+
+	it('a portrait remote init reflows in memory and saves nothing', async () => {
+		const { store } = remoteStore(PORTRAIT);
+		await store.init();
+		expect(store.active.grid).toEqual({ cols: 4, rows: 8 });
+		expect(store.layoutLock).toBe('landscape');
+		await store.flush();
+		expect(ipc.workspaceSave).not.toHaveBeenCalled();
+
+		// Layout edits on the reflowed view are refused; nothing becomes dirty.
+		expect(store.addWidget('clock', { w: 2, h: 1 })).toBeNull();
+		expect(store.removeWidget('clock-1')).toBeNull();
+		expect(store.setGrid({ cols: 6, rows: 4 })).toEqual([]);
+		await store.flush();
+		expect(ipc.workspaceSave).not.toHaveBeenCalled();
+	});
+
+	it('a landscape remote edit saves to the host', async () => {
+		const { store } = remoteStore(LANDSCAPE);
+		await store.init();
+		expect(store.layoutLock).toBeNull();
+		expect(store.addWidget('clock', { w: 2, h: 1 })).not.toBeNull();
+		await store.flush();
+		expect(ipc.workspaceSave).toHaveBeenCalledTimes(1);
+		expect(lastSaved().grid).toEqual({ cols: 8, rows: 4 });
+		expect(lastSaved().widgets).toHaveLength(4);
+	});
+
+	it('an orientation change in remote mode saves nothing and restores the stored layout', async () => {
+		const { store, vp } = remoteStore(LANDSCAPE);
+		await store.init();
+		const before = plain(store.active.widgets);
+		Object.assign(vp, PORTRAIT);
+		store.applyViewport();
+		expect(store.active.grid).toEqual({ cols: 4, rows: 8 });
+		await store.flush();
+		expect(ipc.workspaceSave).not.toHaveBeenCalled();
+
+		Object.assign(vp, LANDSCAPE);
+		store.applyViewport();
+		expect(store.active.grid).toEqual({ cols: 8, rows: 4 });
+		expect(plain(store.active.widgets)).toEqual(before);
+		expect(store.layoutLock).toBeNull();
+		await store.flush();
+		expect(ipc.workspaceSave).not.toHaveBeenCalled();
+	});
+
+	it('non-layout edits on a reflowed view save the stored layout', async () => {
+		const { store } = remoteStore(PORTRAIT);
+		await store.init();
+		store.rename('ops', 'Ops board');
+		store.updateWidgetSettings('clock-1', { seconds: true });
+		await store.flush();
+		expect(lastSaved().name).toBe('Ops board');
+		expect(lastSaved().grid).toEqual({ cols: 8, rows: 4 });
+		const host = hostWorkspace();
+		host.widgets[0].settings = { seconds: true };
+		expect(lastSaved().widgets).toEqual(host.widgets);
+	});
+
+	it('a host change reloads into the reflowed view without saving', async () => {
+		const { store } = remoteStore(PORTRAIT);
+		await store.init();
+		const changed = hostWorkspace();
+		changed.widgets.pop();
+		ipc.workspaceList.mockImplementation(async () => [changed] as never);
+		await store.reload();
+		expect(store.active.grid).toEqual({ cols: 4, rows: 8 });
+		expect(store.active.widgets).toHaveLength(2);
+		await store.flush();
+		expect(ipc.workspaceSave).not.toHaveBeenCalled();
+	});
+
+	it('the host deck reloading after workspace://changed saves nothing', async () => {
+		const host: DeckBackend = { ...remoteBackend(memoryStorage()), remote: false };
+		const { store } = remoteStore(LANDSCAPE, host);
+		await store.init();
+		await store.flush();
+		const changed = hostWorkspace();
+		changed.name = 'Ops (tablet)';
+		ipc.workspaceList.mockImplementation(async () => [changed] as never);
+		await store.reload();
+		store.applyViewport();
+		await store.flush();
+		expect(store.active.name).toBe('Ops (tablet)');
+		expect(ipc.workspaceSave).not.toHaveBeenCalled();
 	});
 });

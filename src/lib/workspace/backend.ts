@@ -86,6 +86,10 @@ export function normalizeSettings(input: unknown): DeckSettings {
 export const BROWSER_MONITOR = 'browser';
 
 export interface DeckBackend {
+	/**
+	 * A LAN tablet/browser: orientation reflows stay a per-device view and are never saved (DECISIONS 68).
+	 */
+	readonly remote?: boolean;
 	getSettings(): Promise<DeckSettings>;
 	setSettings(patch: Partial<DeckSettings>): Promise<DeckSettings>;
 	/** Raw entries; the store validates each one. */
@@ -296,6 +300,7 @@ export function remoteBackend(storage: Pick<Storage, 'getItem' | 'setItem'>): De
 	};
 	const hostOnly = () => Promise.reject(new Error(t('remote.hostOnly')));
 	return {
+		remote: true,
 		async getSettings() {
 			host = normalizeSettings(await settingsGet());
 			return overlay(host);

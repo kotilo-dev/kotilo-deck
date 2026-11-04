@@ -152,7 +152,7 @@
 					// Long-press: enter edit mode and keep the card under the finger lifted.
 					p.timer = null;
 					press = null;
-					ui.enterEdit();
+					if (!ui.enterEdit()) return;
 					navigator.vibrate?.(12);
 					startMove(p.id!, p.pointerId, p.x0, p.y0);
 				}, LONG_PRESS_MS);
@@ -337,8 +337,7 @@
 				type="button"
 				class="k-btn k-btn-primary"
 				onclick={() => {
-					ui.enterEdit();
-					ui.drawerOpen = true;
+					if (ui.enterEdit()) ui.drawerOpen = true;
 				}}
 			>
 				<Icon name="plus" size={16} stroke={2.4} />{t('shell.edit.addWidget')}
