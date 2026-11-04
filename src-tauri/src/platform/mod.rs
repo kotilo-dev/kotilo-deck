@@ -14,7 +14,7 @@ mod stub;
 mod windows;
 
 /// Platform features a widget can require in its manifest (`capabilities`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Capability {
     Monitors,
@@ -250,6 +250,13 @@ pub trait Platform: Send + Sync {
     fn open_url_scheme(&self, _url: &str) -> Result<()> {
         Err(PlatformError::Unsupported(Capability::Companion))
     }
+
+    // Phase 4: Settings ▸ Widgets "Open folder". There is no dedicated capability (it is
+    // not a widget requirement); callers map `Unsupported` to their own message.
+    /// Opens a local folder in the OS file manager.
+    fn open_path(&self, _path: &std::path::Path) -> Result<()> {
+        Err(PlatformError::Unsupported(Capability::SystemInfo))
+    }
 }
 
 /// The implementation for the OS this binary was built for.
@@ -301,6 +308,14 @@ mod tests {
             Err(PlatformError::Unsupported(Capability::Gpu))
         ));
         Bare.gpu_release(); // no-op default
+    }
+
+    #[test]
+    fn open_path_defaults_to_unsupported() {
+        assert!(matches!(
+            Bare.open_path(std::path::Path::new(".")),
+            Err(PlatformError::Unsupported(_))
+        ));
     }
 
     #[test]

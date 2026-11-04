@@ -43,7 +43,13 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        // Phase 4 auto-update: driven from `update.rs`, no JS API is used.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        // Phase 4 widget plugins: files served to sandboxed iframes (docs/plugin-api.md).
+        .manage(plugins::Plugins::default())
+        .register_asynchronous_uri_scheme_protocol(plugins::SCHEME, plugins::protocol);
     let app = startup::manage(builder)
         .setup(startup::setup)
         .on_page_load(|webview, payload| {

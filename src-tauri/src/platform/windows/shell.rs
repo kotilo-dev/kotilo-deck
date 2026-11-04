@@ -48,7 +48,19 @@ pub fn open_url_scheme(url: &str) -> Result<()> {
             "no app is registered for {scheme}:// links"
         )));
     }
-    let url = HSTRING::from(url);
+    shell_open(HSTRING::from(url), "link")
+}
+
+/// Phase 4: opens a local folder in Explorer.
+pub fn open_path(path: &std::path::Path) -> Result<()> {
+    if !path.is_dir() {
+        return Err(PlatformError::Os("folder does not exist".into()));
+    }
+    shell_open(HSTRING::from(path.as_os_str()), "folder")
+}
+
+/// `ShellExecuteW("open", target)`. `what` names the target in error messages.
+fn shell_open(url: HSTRING, what: &'static str) -> Result<()> {
     // ShellExecute wants an STA with OLE1 DDE off; use a throwaway thread so no runtime
     // thread's COM apartment is touched.
     std::thread::Builder::new()
@@ -66,7 +78,7 @@ pub fn open_url_scheme(url: &str) -> Result<()> {
                     Ok(())
                 } else {
                     Err(PlatformError::Os(format!(
-                        "cannot open the link (code {})",
+                        "cannot open the {what} (code {})",
                         r.0 as isize
                     )))
                 }
@@ -94,5 +106,12 @@ mod tests {
     fn unregistered_scheme_is_an_error_not_a_prompt() {
         assert!(!scheme_registered("kotilo-deck-test-unregistered-scheme"));
         assert!(open_url_scheme("kotilo-deck-test-unregistered-scheme://x").is_err());
+    }
+
+    #[test]
+    fn open_path_rejects_missing_folder() {
+        // The success path opens an Explorer window, so it is not exercised here.
+        let dir = tempfile::tempdir().unwrap();
+        assert!(open_path(&dir.path().join("missing")).is_err());
     }
 }
