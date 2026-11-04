@@ -3,13 +3,15 @@
 	 * One widget instance on the grid: explicit placement, merged settings, capability check,
 	 * per-instance surface opacity, error boundary, and the edit-mode affordances (DESIGN §4.3, §6).
 	 */
-	import { isTauri, type Appearance, type WidgetInstance } from '#lib/ipc/index.ts';
+	import { hasBackend, type Appearance, type WidgetInstance } from '#lib/ipc/index.ts';
 	import { backdropValue, clamp } from '#lib/settings/look.ts';
 	import type { Rect } from '#lib/grid/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import FallbackCard from './FallbackCard.svelte';
 	import Icon from './Icon.svelte';
 	import { definition, fmtSize, getDeck, mergedSettings, surfaceDefault, widgetName } from './deck.svelte';
+	import PluginFrame from '#lib/plugins/PluginFrame.svelte';
+	import { isPluginDefinition, pluginPending } from '#lib/plugins/registry.svelte.ts';
 
 	let {
 		inst,
@@ -81,7 +83,7 @@
 	style:--k-backdrop={backdrop}
 >
 	<div class="content" inert={ui.editing}>
-		{#if def && availability === 'unknown'}
+		{#if (def && availability === 'unknown') || (!def && pluginPending(inst.widget))}
 			<div class="k-card" aria-busy="true" aria-label={name}></div>
 		{:else if def && availability === 'no'}
 			<FallbackCard
@@ -89,8 +91,10 @@
 				title={name}
 				meta={fmtSize(size)}
 				icon={def.manifest.icon}
-				body={isTauri() ? t('shell.widget.notAvailable') : t('shell.widget.browserPreview')}
+				body={hasBackend() ? t('shell.widget.notAvailable') : t('shell.widget.browserPreview')}
 			/>
+		{:else if isPluginDefinition(def)}
+			<PluginFrame {size} {settings} instance={inst.instance} editing={ui.editing} available={true} plugin={def.plugin} {name} />
 		{:else if def}
 			{@const Widget = def.component}
 			<svelte:boundary onerror={(e) => console.error(`kotilo-deck: widget ${inst.instance} failed`, e)}>

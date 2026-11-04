@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { t } from '#lib/i18n/index.ts';
 	import {
-		isTauri,
+		hasBackend,
 		mediaControl,
 		mediaSeek,
 		mediaState,
@@ -30,7 +30,7 @@
 	let { size, settings, editing, available }: WidgetProps<MediaSettings> = $props();
 
 	const s = $derived({ ...defaults, ...settings });
-	const tauri = isTauri();
+	const tauri = hasBackend();
 	/** Seek slider resolution. */
 	const SCRUB_MAX = 1000;
 

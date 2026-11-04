@@ -4,13 +4,14 @@
  * Two signals, combined with AND:
  * - `deck://visibility` from the backend (tray, hotkey, close-to-tray). Primary: WebView2 does not
  *   reliably flip `document.hidden` when the native window is hidden.
- * - `document.hidden` (minimised, browser preview, other webviews). Secondary.
+ * - `document.hidden` (minimised, browser preview, other webviews). Secondary; the only signal on a LAN
+ *   tablet/browser, where `deck://visibility` describes the host's window, not this screen.
  *
  * Subscribers are told only when the combined value changes. Listeners on both sources exist only
  * while at least one subscriber does.
  */
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { on } from '#lib/ipc/index.ts';
+import { isRemote, on } from '#lib/ipc/index.ts';
 
 export type VisibilityHandler = (visible: boolean) => void;
 
@@ -105,7 +106,8 @@ export function isDeckWindow(): boolean {
 
 const deck = createVisibility({
 	doc: typeof document === 'undefined' ? undefined : document,
-	listenDeck: (cb) => (isDeckWindow() ? on('deck://visibility', (p) => cb(p.visible)) : Promise.resolve(() => {}))
+	listenDeck: (cb) =>
+		!isRemote() && isDeckWindow() ? on('deck://visibility', (p) => cb(p.visible)) : Promise.resolve(() => {})
 });
 
 /** True while the deck window is shown and the page is not hidden. */

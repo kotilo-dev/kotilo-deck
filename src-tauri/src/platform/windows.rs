@@ -49,6 +49,10 @@ impl Platform for WindowsPlatform {
         shell::open_url_scheme(url)
     }
 
+    fn open_path(&self, path: &std::path::Path) -> Result<()> {
+        shell::open_path(path)
+    }
+
     fn set_window_opacity(&self, window: NativeWindow, opacity: f64) -> Result<()> {
         let hwnd = HWND(window.0 as *mut core::ffi::c_void);
         let layered = WS_EX_LAYERED.0 as i32;

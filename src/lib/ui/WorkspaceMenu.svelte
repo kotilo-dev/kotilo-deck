@@ -4,6 +4,7 @@
 	 * reset to preset, import, export, delete (never the last one).
 	 */
 	import { t } from '#lib/i18n/index.ts';
+	import { isRemote } from '#lib/ipc/index.ts';
 	import { PRESET_IDS, WorkspaceError, type PresetId } from '#lib/workspace/index.ts';
 	import Icon from './Icon.svelte';
 	import Popover from './Popover.svelte';
@@ -12,6 +13,8 @@
 
 	const { store, ui } = getDeck();
 	const ws = $derived(store.active);
+	/** workspace_delete is not reachable from a LAN tablet/browser; deleting stays on the host. */
+	const canDelete = !isRemote();
 
 	let menu = $state<HTMLDivElement>();
 	let nameDialog = $state<HTMLDialogElement>();
@@ -66,7 +69,7 @@
 	async function confirmDelete(e: SubmitEvent) {
 		e.preventDefault();
 		deleteDialog?.close();
-		if (ws && !(await store.remove(ws.id))) ui.say(t('shell.workspace.deleteLast'), 'warning');
+		if (ws && canDelete && !(await store.remove(ws.id))) ui.say(t('shell.workspace.deleteLast'), 'warning');
 	}
 
 	async function chooseImport() {
@@ -121,18 +124,20 @@
 		<button type="button" role="menuitem" class="k-menu-item" onclick={exportActive}>
 			<Icon name="download" size={16} />{t('shell.workspace.export')}
 		</button>
-		<div class="k-menu-sep" role="separator"></div>
-		<button
-			type="button"
-			role="menuitem"
-			class="k-menu-item"
-			data-tone="danger"
-			disabled={store.workspaces.length <= 1}
-			title={store.workspaces.length <= 1 ? t('shell.workspace.deleteLast') : undefined}
-			onclick={openDelete}
-		>
-			<Icon name="trash" size={16} />{t('shell.workspace.delete')}
-		</button>
+		{#if canDelete}
+			<div class="k-menu-sep" role="separator"></div>
+			<button
+				type="button"
+				role="menuitem"
+				class="k-menu-item"
+				data-tone="danger"
+				disabled={store.workspaces.length <= 1}
+				title={store.workspaces.length <= 1 ? t('shell.workspace.deleteLast') : undefined}
+				onclick={openDelete}
+			>
+				<Icon name="trash" size={16} />{t('shell.workspace.delete')}
+			</button>
+		{/if}
 	</div>
 </Popover>
 

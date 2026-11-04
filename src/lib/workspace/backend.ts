@@ -1,10 +1,13 @@
 /**
  * Persistence seam for the workspace store. Inside Tauri everything goes through the typed IPC contract;
  * in a plain browser (`pnpm dev`) settings and workspaces live in localStorage so the deck stays usable.
+ * A LAN tablet/browser (remote mode) reads host settings and workspaces, saves workspaces, and keeps its
+ * own active workspace and theme override in localStorage (settings_set is not reachable remotely).
  */
 import { emitTo } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
+	isRemote,
 	isTauri,
 	monitorList,
 	on,
@@ -44,7 +47,9 @@ export const DEFAULT_SETTINGS: DeckSettings = {
 	companion: { enabled: true, allowWorkspaceSwitch: false, notifyApprovals: true },
 	pomodoro: { focus: 25, shortBreak: 5, longBreak: 15, sessionsPerCycle: 4, autoStartNext: false, dailyGoal: 8 },
 	calendarFeeds: [],
-	autoSwitch: []
+	autoSwitch: [],
+	lan: { enabled: false, port: 47832 },
+	updates: { autoCheck: true }
 };
 
 const obj = (v: unknown): Record<string, unknown> =>
@@ -81,6 +86,10 @@ export function normalizeSettings(input: unknown): DeckSettings {
 export const BROWSER_MONITOR = 'browser';
 
 export interface DeckBackend {
+	/**
+	 * A LAN tablet/browser: orientation reflows stay a per-device view and are never saved (DECISIONS 68).
+	 */
+	readonly remote?: boolean;
 	getSettings(): Promise<DeckSettings>;
 	setSettings(patch: Partial<DeckSettings>): Promise<DeckSettings>;
 	/** Raw entries; the store validates each one. */
@@ -262,5 +271,84 @@ export function memoryStorage(): Pick<Storage, 'getItem' | 'setItem'> {
 	return { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => void map.set(k, v) };
 }
 
+/** Per-device keys a remote deck keeps locally (ARCHITECTURE LAN mode). */
+const REMOTE_KEY = 'kotilo-deck:remote';
+type RemoteLocal = { theme?: string | null; activeWorkspace?: Record<string, string> };
+
+/**
+ * LAN tablet/browser: host settings + workspaces through the remote transport; `theme` and
+ * `activeWorkspace` are per device (localStorage), workspace delete / import / export stay on the host.
+ */
+export function remoteBackend(storage: Pick<Storage, 'getItem' | 'setItem'>): DeckBackend {
+	const readLocal = (): RemoteLocal => {
+		try {
+			const v = JSON.parse(storage.getItem(REMOTE_KEY) ?? '{}');
+			return obj(v) as RemoteLocal;
+		} catch {
+			return {};
+		}
+	};
+	/** Last host settings seen, so per-device writes don't need a round trip. */
+	let host: DeckSettings = { ...DEFAULT_SETTINGS };
+	const overlay = (h: DeckSettings): DeckSettings => {
+		const local = readLocal();
+		return {
+			...h,
+			theme: 'theme' in local ? (local.theme ?? null) : h.theme,
+			activeWorkspace: { ...h.activeWorkspace, ...obj(local.activeWorkspace) } as Record<string, string>
+		};
+	};
+	const hostOnly = () => Promise.reject(new Error(t('remote.hostOnly')));
+	return {
+		remote: true,
+		async getSettings() {
+			host = normalizeSettings(await settingsGet());
+			return overlay(host);
+		},
+		async setSettings(patch) {
+			const { theme, activeWorkspace, ...rest } = patch;
+			const local = readLocal();
+			if ('theme' in patch) local.theme = theme ?? null;
+			if (activeWorkspace) local.activeWorkspace = { ...activeWorkspace };
+			storage.setItem(REMOTE_KEY, JSON.stringify(local));
+			if (Object.keys(rest).length > 0) throw new Error(t('remote.hostOnly'));
+			return overlay(host);
+		},
+		listWorkspaces: workspaceList,
+		saveWorkspace: workspaceSave,
+		deleteWorkspace: hostOnly,
+		async currentMonitor() {
+			return BROWSER_MONITOR;
+		},
+		capabilities: platformCapabilities,
+		async setTray() {},
+		watch(handlers) {
+			const offs = [
+				on('settings://changed', (s) => {
+					host = normalizeSettings(s);
+					handlers.settings?.(overlay(host));
+				}),
+				handlers.workspaces ? on('workspace://changed', () => handlers.workspaces?.()) : null
+			];
+			const onStorage = (e: StorageEvent) => {
+				if (e.key === REMOTE_KEY) handlers.settings?.(overlay(host));
+			};
+			if (typeof window !== 'undefined') window.addEventListener('storage', onStorage);
+			return () => {
+				for (const p of offs) void p?.then((off) => off());
+				if (typeof window !== 'undefined') window.removeEventListener('storage', onStorage);
+			};
+		},
+		// Nobody to tell: emitTo is a webview API; the host deck reloads on its own workspace://changed.
+		async notifyWorkspacesChanged() {},
+		async notifySettingsChanged() {},
+		exportAll: hostOnly,
+		importAll: hostOnly
+	};
+}
+
+const browserStorage = (): Pick<Storage, 'getItem' | 'setItem'> =>
+	typeof localStorage !== 'undefined' ? localStorage : memoryStorage();
+
 export const defaultBackend = (): DeckBackend =>
-	isTauri() ? tauriBackend : storageBackend(typeof localStorage !== 'undefined' ? localStorage : memoryStorage());
+	isTauri() ? tauriBackend : isRemote() ? remoteBackend(browserStorage()) : storageBackend(browserStorage());

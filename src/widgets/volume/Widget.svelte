@@ -7,7 +7,7 @@
 		audioState,
 		audioSubscribe,
 		audioUnsubscribe,
-		isTauri,
+		hasBackend,
 		on,
 		type AudioState
 	} from '#lib/ipc/index.ts';
@@ -21,7 +21,7 @@
 	let { size, settings, editing, available }: WidgetProps<VolumeSettings> = $props();
 
 	const s = $derived({ ...defaults, ...settings });
-	const tauri = isTauri();
+	const tauri = hasBackend();
 	const uid = `vol-${Math.random().toString(36).slice(2, 9)}`;
 	const menuId = `${uid}-menu`;
 	/** DESIGN §5.6: device radio rows are 40 px. */

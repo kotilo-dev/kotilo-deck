@@ -1,4 +1,126 @@
 {
+	"plugins": {
+		"frame": {
+			"timeout": "This widget didn't start. Check its files, then retry.",
+			"noEntry": "This widget has no entry page."
+		},
+		"drawer": {
+			"section": "External",
+			"tag": "external"
+		},
+		"page": {
+			"title": "Widgets",
+			"text": "External widgets from your widgets folder. They appear in the Add widget drawer without a restart.",
+			"installed": "Installed",
+			"loading": "Loading widgets",
+			"loadError": "Could not read the widgets folder: {message}",
+			"empty": "No external widgets yet.",
+			"noManifest": "manifest.json is missing or unreadable.",
+			"by": "by {author}",
+			"sizes": "Sizes",
+			"topics": "Live data",
+			"noTopics": "none",
+			"add": "Add a widget",
+			"addHelp": "Put a folder with a manifest.json and an index.html into the widgets folder. Changes show up right away.",
+			"folder": "Widgets folder",
+			"sandbox": "Widgets run sandboxed: no network, no access to your files or settings. They only get the theme, their settings and the live data they declare.",
+			"docs": "How to write one:",
+			"openFolder": "Open widgets folder"
+		},
+		"topics": {
+			"system": "System",
+			"media": "Media",
+			"pomodoro": "Pomodoro"
+		},
+		"errors": {
+			"no-manifest": "manifest.json is missing.",
+			"bad-json": "manifest.json is not valid JSON.",
+			"api-version": "Unsupported apiVersion (expected 1).",
+			"id-mismatch": "The manifest id must match the folder name.",
+			"bad-sizes": "sizes or defaultSize is invalid.",
+			"missing-entry": "The entry file does not exist.",
+			"too-large": "The widget folder is too large.",
+			"too-many": "Too many widgets installed (max 64)."
+		}
+	},
+	"lan": {
+		"title": "Tablet & browser",
+		"text": "Show the deck on a tablet or another device on your network.",
+		"server": "Server",
+		"enable": "Allow tablets and browsers",
+		"enableHelp": "Serves the deck on your local network. Off by default.",
+		"port": "Port",
+		"portHelp": "Default 47832.",
+		"portRange": "Use a whole number from {min} to {max}.",
+		"portCompanion": "47831 is reserved for the companion.",
+		"portSaved": "Port set to {port}",
+		"view": {
+			"off": "Off",
+			"starting": "Starting…",
+			"error": "Not running"
+		},
+		"listening": "Listening on port {port}",
+		"offHelp": "Turn it on to open the deck from a tablet or phone on the same network.",
+		"errorHelp": "The server couldn't start: {message}",
+		"startingHelp": "Waiting for the server…",
+		"listeningHelp": "Open an address below on a device on the same network, or scan the QR code.",
+		"clients": "connected",
+		"addresses": "Addresses",
+		"show": "Show",
+		"hide": "Hide",
+		"noAddresses": "No network address found. Is this computer on a network?",
+		"copy": "Copy address {n}",
+		"copied": "Address copied",
+		"copyFailed": "Couldn't copy the address",
+		"qrAlt": "QR code for the first address",
+		"qrHelp": "Scan it with the tablet's camera.",
+		"qrHidden": "Press Show to display the QR code.",
+		"warning": "Anyone with this link can control the deck. Share it only with devices you trust.",
+		"errors": {
+			"port-in-use": "The port is already used by another app. Pick another port.",
+			"permission-denied": "The system refused this port. Pick a port above 1024.",
+			"bind-failed": "The server could not start on this port.",
+			"token-unreadable": "The access token could not be read."
+		}
+	},
+	"update": {
+		"title": "Updates",
+		"current": "Current version",
+		"lastChecked": "Last checked",
+		"check": "Check now",
+		"install": "Install",
+		"restart": "Restart now",
+		"progress": "Download progress",
+		"autoCheck": "Check automatically",
+		"autoCheckHelp": "At startup and once a day. Updates never install without your click.",
+		"checkFailed": "Couldn't check for updates: {message}",
+		"installFailed": "Couldn't install the update: {message}",
+		"state": {
+			"checking": "Checking for updates…",
+			"available": "Version {version} is available",
+			"downloading": "Downloading {version}…",
+			"ready": "Update ready. Restart to finish.",
+			"error": "Update failed: {message}",
+			"unsupported": "Updates are disabled in development builds",
+			"upToDate": "Kotilo Deck is up to date",
+			"never": "Not checked yet"
+		},
+		"errors": {
+			"no-release": "No release is published for this platform yet.",
+			"network": "Could not reach the update server.",
+			"signature": "The update signature is invalid; it was not installed.",
+			"install-failed": "The update could not be installed.",
+			"other": "The update failed."
+		}
+	},
+	"remote": {
+		"settingsTitle": "Open settings on the host computer",
+		"settingsText": "This device shows the deck only. Settings, monitors and files stay on the computer running Kotilo Deck.",
+		"backToDeck": "Back to the deck",
+		"hostOnly": "Only available on the host computer",
+		"rotateToEditLandscape": "Rotate to landscape to edit layout",
+		"rotateToEditPortrait": "Rotate to portrait to edit layout"
+	},
 	"shell": {
 		"appName": "Kotilo Deck",
 		"topbar": {
@@ -449,9 +571,11 @@
 			"appearance": "Appearance",
 			"themes": "Themes",
 			"workspaces": "Workspaces",
+			"plugins": "Widgets",
 			"weather": "Weather & calendar",
 			"pomodoro": "Pomodoro",
 			"companion": "Companion",
+			"lan": "Tablet & browser",
 			"burnin": "Burn-in & night",
 			"about": "About · MIT"
 		},

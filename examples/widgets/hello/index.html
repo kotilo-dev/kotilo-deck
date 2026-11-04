@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Hello</title>
+		<script src="../_sdk/kotilo-widget.js"></script>
+		<style>
+			html,
+			body {
+				margin: 0;
+				height: 100%;
+				background: transparent;
+				color: var(--k-text);
+				font-family: var(--k-font-ui, system-ui, sans-serif);
+			}
+			main {
+				box-sizing: border-box;
+				height: 100%;
+				padding: 12px 16px;
+				display: flex;
+				flex-direction: column;
+				justify-content: center;
+				gap: 8px;
+			}
+			.greeting {
+				margin: 0;
+				font-size: 20px;
+				font-weight: 600;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			.cpu {
+				display: flex;
+				align-items: baseline;
+				gap: 6px;
+				color: var(--k-text-muted);
+				font-family: var(--k-font-mono, ui-monospace, monospace);
+			}
+			.cpu b {
+				color: var(--k-accent);
+				font-variant-numeric: tabular-nums;
+			}
+			.bar {
+				height: 6px;
+				border-radius: var(--k-radius, 6px);
+				background: var(--k-border);
+				overflow: hidden;
+			}
+			.bar span {
+				display: block;
+				height: 100%;
+				width: 0;
+				background: var(--k-accent);
+				transition: width 0.4s ease;
+			}
+			/* 2x1: one row, greeting left, CPU right, no bar. */
+			main[data-size='2x1'] {
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-between;
+			}
+			main[data-size='2x1'] .bar {
+				display: none;
+			}
+			/* 2x2: big greeting and CPU figure stacked, with a load bar. */
+			main[data-size='2x2'] .greeting {
+				font-size: 28px;
+			}
+			main[data-size='2x2'] .cpu b {
+				font-size: 40px;
+			}
+			main.hot .cpu b {
+				color: var(--k-warning);
+			}
+			main.hot .bar span {
+				background: var(--k-warning);
+			}
+		</style>
+	</head>
+	<body>
+		<main id="root" data-size="2x2">
+			<p class="greeting" id="greeting">Hello</p>
+			<div class="cpu"><b id="cpu">--</b><span>% CPU</span></div>
+			<div class="bar"><span id="bar"></span></div>
+		</main>
+		<script>
+			const root = document.getElementById('root');
+			const greeting = document.getElementById('greeting');
+			const cpu = document.getElementById('cpu');
+			const bar = document.getElementById('bar');
+
+			function render() {
+				root.dataset.size = kotilo.size || '2x2';
+				greeting.textContent = (kotilo.settings && kotilo.settings.greeting) || 'Hello';
+			}
+
+			function onSample(sample) {
+				const pct = Math.round(sample.cpu);
+				cpu.textContent = String(pct);
+				bar.style.width = pct + '%';
+				root.classList.toggle('hot', pct >= 80);
+			}
+
+			kotilo.on('init', render);
+			kotilo.on('size', render);
+			kotilo.on('settings', render);
+			// Stop live data while the deck is hidden; resume when it is shown again.
+			kotilo.on('visibility', (visible) => {
+				if (visible) kotilo.subscribe('system', onSample);
+				else kotilo.unsubscribe('system', onSample);
+			});
+			kotilo.subscribe('system', onSample);
+		</script>
+	</body>
+</html>

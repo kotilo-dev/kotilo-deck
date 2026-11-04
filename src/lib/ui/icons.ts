@@ -37,12 +37,14 @@ export const ICONS = {
 	image: ['M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z', 'm3 17 5-5 4 4 3-3 6 6', 'M16 7.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z'],
 	video: ['M4 6h11a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z', 'm16 10 5-3v10l-5-3'],
 	link: ['M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1', 'M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1'],
-	palette: ['M12 3a9 9 0 1 0 0 18c1 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.6-.4-1 0-.8.7-1.4 1.5-1.4H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8Z', 'M7.5 11.5h.01M10.5 7.5h.01M15.5 8.5h.01']
+	palette: ['M12 3a9 9 0 1 0 0 18c1 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.6-.4-1 0-.8.7-1.4 1.5-1.4H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8Z', 'M7.5 11.5h.01M10.5 7.5h.01M15.5 8.5h.01'],
+	folder: ['M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z']
 } as const satisfies Record<string, readonly string[]>;
 
 export type IconName = keyof typeof ICONS;
 
-export const isIcon = (name: string): name is IconName => name in ICONS;
+/** Own keys only: plugin manifests carry arbitrary strings ("toString" must not resolve to a prototype member). */
+export const isIcon = (name: string): name is IconName => Object.hasOwn(ICONS, name);
 
 /** Token colour of a widget's drawer tile (DESIGN §6 "icon in a per-widget token colour"). */
 export const ICON_TONE: Partial<Record<string, string>> = {
@@ -56,3 +58,6 @@ export const ICON_TONE: Partial<Record<string, string>> = {
 	music: 'var(--k-accent-2)',
 	agents: 'var(--k-accent-2)'
 };
+
+/** Drawer tile colour for any manifest icon key (own keys only), accent by default. */
+export const iconTone = (name: string): string => (Object.hasOwn(ICON_TONE, name) ? ICON_TONE[name] : undefined) ?? 'var(--k-accent)';

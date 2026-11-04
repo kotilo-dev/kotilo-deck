@@ -5,7 +5,7 @@
 	 * the edit dialog never pre-fills the stored URL (it may contain a secret token).
 	 */
 	import { onMount } from 'svelte';
-	import { calendarRefresh, calendarUpcoming, isTauri, on, type CalendarFeed, type CalendarUpcoming, type FeedColor } from '#lib/ipc/index.ts';
+	import { calendarRefresh, calendarUpcoming, hasBackend, on, type CalendarFeed, type CalendarUpcoming, type FeedColor } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { checkFeedUrl, FEED_COLORS, feedColorVar, maskFeedUrl, moveFeed, newFeedId, nextFeedColor, type FeedUrlProblem } from '../feeds';
@@ -14,7 +14,7 @@
 
 	const { store, ui, save } = getSettingsContext();
 	const feeds = $derived(store.settings.calendarFeeds);
-	const tauri = isTauri();
+	const tauri = hasBackend();
 
 	let upcoming = $state<CalendarUpcoming | null>(null);
 	let statusError = $state<string | null>(null);

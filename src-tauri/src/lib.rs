@@ -3,14 +3,17 @@ pub mod platform;
 mod companion;
 mod files;
 mod hotkeys;
+mod lan;
 mod logging;
 mod migrations;
 mod paths;
+mod plugins;
 mod settings;
 mod settings_window;
 mod startup;
 mod transfer;
 mod tray;
+mod update;
 mod widgets;
 mod window;
 mod workspace;
@@ -40,7 +43,13 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        // Phase 4 auto-update: driven from `update.rs`, no JS API is used.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        // Phase 4 widget plugins: files served to sandboxed iframes (docs/plugin-api.md).
+        .manage(plugins::Plugins::default())
+        .register_asynchronous_uri_scheme_protocol(plugins::SCHEME, plugins::protocol);
     let app = startup::manage(builder)
         .setup(startup::setup)
         .on_page_load(|webview, payload| {
@@ -112,6 +121,13 @@ pub fn run() {
             companion::companion_snapshot,
             companion::companion_respond,
             companion::companion_open_desktop,
+            // Phase 4: LAN mode, widget plugins, auto-update
+            lan::lan_status,
+            plugins::plugin_list,
+            plugins::plugin_open_folder,
+            update::update_status,
+            update::update_check,
+            update::update_install,
         ])
         .build(tauri::generate_context!());
     match app {

@@ -25,7 +25,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: asset: http://asset.localhost; media-src 'self' asset: http://asset.localhost",
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: asset: http://asset.localhost; media-src 'self' asset: http://asset.localhost; frame-src http://kotilo-widget.localhost kotilo-widget:",
       "assetProtocol": {
         "enable": true,
         "scope": [
@@ -43,6 +43,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/kotilo-dev/kotilo-deck/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEwMTZFMTRDMUExNzUzMkQKUldRdFV4Y2FUT0VXb0xRRG1YMjIxU0U4OEUwSFgyaWRJRHd4bXl0aHhvQU9jZFIwYVZSMENrWXQK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

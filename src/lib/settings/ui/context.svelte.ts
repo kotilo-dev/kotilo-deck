@@ -26,9 +26,11 @@ export const SECTIONS = [
 	'appearance',
 	'themes',
 	'workspaces',
+	'plugins',
 	'weather',
 	'pomodoro',
 	'companion',
+	'lan',
 	'burnin',
 	'about'
 ] as const;

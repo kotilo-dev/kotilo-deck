@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ipcHandlers: Record<string, (payload: { visible: boolean }) => void> = {};
 vi.mock('#lib/ipc/index.ts', () => ({
+	isRemote: () => false,
 	on: (event: string, handler: (payload: { visible: boolean }) => void) => {
 		ipcHandlers[event] = handler;
 		return Promise.resolve(() => delete ipcHandlers[event]);

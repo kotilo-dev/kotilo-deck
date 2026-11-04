@@ -23,3 +23,10 @@ export function t(key: string, params: Record<string, string | number> = {}): st
 	const s = lookup(dicts[lang], key) ?? lookup(dicts.en, key) ?? key;
 	return s.replace(/\{(\w+)\}/g, (_, p) => String(params[p] ?? `{${p}}`));
 }
+
+/** Translates a backend `errorCode` under `<prefix>.<code>`; unknown or missing codes fall back to the backend's (English) text. */
+export function tCode(prefix: string, code: string | null | undefined, fallback: string): string {
+	if (!code) return fallback;
+	const key = `${prefix}.${code}`;
+	return lookup(dicts[lang], key) ?? lookup(dicts.en, key) ?? fallback;
+}

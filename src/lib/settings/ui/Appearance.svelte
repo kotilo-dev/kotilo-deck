@@ -3,7 +3,7 @@
 	 * Appearance (DESIGN §7, reference/settings-appearance.html): background layer, widget surfaces,
 	 * dim toggles. Edits are a draft until Apply; "Reset to theme" drafts the theme defaults.
 	 */
-	import { convertFileSrc } from '@tauri-apps/api/core';
+	import { wallpaperSrc } from '#lib/ipc/transport.ts';
 	import type { DeckAppearance } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { getTheme } from '#lib/theme/index.ts';
@@ -133,7 +133,7 @@
 					{:else if o.id === 'wallpaper'}
 						<span
 							class="strip wall"
-							style:background-image={selectedWallpaper?.kind === 'image' ? `url("${convertFileSrc(selectedWallpaper.path)}")` : undefined}
+							style:background-image={selectedWallpaper?.kind === 'image' ? `url("${wallpaperSrc(selectedWallpaper)}")` : undefined}
 						>
 							{#if selectedWallpaper?.kind !== 'image'}<Icon name="image" size={16} />{/if}
 						</span>
@@ -162,7 +162,7 @@
 									onclick={() => set('wallpaper', w.name)}
 								>
 									{#if w.kind === 'image'}
-										<img src={convertFileSrc(w.path)} alt="" loading="lazy" />
+										<img src={wallpaperSrc(w)} alt="" loading="lazy" />
 									{:else}
 										<Icon name="video" size={18} />
 									{/if}

@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -15,6 +15,7 @@ use sysinfo::{
 };
 use tauri::{AppHandle, Emitter, State};
 
+use super::watch::{Owner, Subscription};
 use crate::platform;
 
 pub const EVENT_SAMPLE: &str = "system://sample";
@@ -49,9 +50,9 @@ pub struct ProcessInfo {
     pub memory: u64,
 }
 
-/// Subscriber count + the stop handle of the running sampler (dropping it stops the thread).
+/// Subscriber counts + the stop handle of the running sampler (dropping it stops the thread).
 #[derive(Default)]
-pub struct Sampler(Mutex<(u32, Option<Sender<()>>)>);
+pub struct Sampler(Subscription<Sender<()>>);
 
 /// The PDH `\GPU Engine(*)` wildcard query is the costliest part of a sample, so the GPU
 /// value is refreshed at most every [`GPU_INTERVAL`] and reused in between.
@@ -123,34 +124,36 @@ fn spawn_sampler(app: AppHandle) -> Option<Sender<()>> {
 }
 
 impl Sampler {
-    /// Drops every subscription. Called when the webview (re)loads: a reload never runs the
-    /// widgets' cleanup, so without this the count would leak and the 1 Hz thread run forever.
+    /// Drops every deck subscription. Called when the webview (re)loads: a reload never runs
+    /// the widgets' cleanup, so without this the count would leak and the 1 Hz thread run
+    /// forever. LAN subscribers ([`Owner::Remote`]) keep the sampler running.
     pub fn reset(&self) {
-        let mut s = self.0.lock().unwrap_or_else(|p| p.into_inner());
-        if s.0 > 0 {
-            tracing::debug!(subscribers = s.0, "page load: resetting system sampler");
+        let n = self.0.reset();
+        if n > 0 {
+            tracing::debug!(subscribers = n, "page load: resetting system sampler");
         }
-        *s = (0, None);
+    }
+
+    /// Adds a subscriber; the sampler thread starts on the first one.
+    pub fn subscribe(&self, app: AppHandle, owner: Owner) {
+        self.0.subscribe_as(owner, || spawn_sampler(app));
+    }
+
+    /// Removes a subscriber; the last one disconnects the channel → thread exits at once.
+    pub fn unsubscribe(&self, owner: Owner) {
+        self.0.unsubscribe_as(owner);
     }
 }
 
 #[tauri::command]
 pub async fn system_subscribe(app: AppHandle, sampler: State<'_, Sampler>) -> Result<(), String> {
-    let mut s = sampler.0.lock().unwrap_or_else(|p| p.into_inner());
-    s.0 += 1;
-    if s.1.is_none() {
-        s.1 = spawn_sampler(app);
-    }
+    sampler.subscribe(app, Owner::Deck);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn system_unsubscribe(sampler: State<'_, Sampler>) -> Result<(), String> {
-    let mut s = sampler.0.lock().unwrap_or_else(|p| p.into_inner());
-    s.0 = s.0.saturating_sub(1);
-    if s.0 == 0 {
-        s.1 = None; // disconnects the channel → thread exits immediately
-    }
+    sampler.unsubscribe(Owner::Deck);
     Ok(())
 }
 

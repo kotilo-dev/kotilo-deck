@@ -3,6 +3,7 @@
 	import {
 		calendarRefresh,
 		calendarUpcoming,
+		hasBackend,
 		isTauri,
 		on,
 		settingsOpen,
@@ -38,7 +39,7 @@
 	let { size, settings, editing }: WidgetProps<CalendarSettings> = $props();
 
 	const s = $derived({ ...defaults, ...settings });
-	const tauri = isTauri();
+	const tauri = hasBackend();
 
 	/** Row 32 px (8 px padding + 16 px line), day heading 18 px, 4 px gap. */
 	const ROW = 32;
@@ -90,7 +91,7 @@
 
 	function openSettings() {
 		if (editing) return;
-		if (tauri) void settingsOpen().catch(() => {});
+		if (isTauri()) void settingsOpen().catch(() => {});
 		else window.open('/settings', 'kotilo-deck-settings', 'width=960,height=680');
 	}
 

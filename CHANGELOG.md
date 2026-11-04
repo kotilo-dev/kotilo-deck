@@ -5,6 +5,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- Linux platform layer: volume, devices and per-app mixer via `pactl` (PulseAudio / PipeWire) with a `wpctl` fallback; media via MPRIS (D-Bus); AMD GPU load from sysfs; `kotilo://` links and folders via `xdg-open`. Not yet run on a real Linux machine.
+- Tablet/browser mode: serve the deck on the LAN (off by default, token-protected, QR code in Settings ▸ Tablet & browser); remote browsers get the deck with per-device theme and workspace. Rotating a tablet reflows the layout on that device only and never rewrites the host's workspaces.
+- External widget plugins: drop a folder into `~/.kotilo/deck/widgets/` and it appears in the drawer without a rebuild; sandboxed iframe, no network, theme tokens and system/media/pomodoro data via `docs/plugin-api.md`; example in `examples/widgets/hello/`; Settings ▸ Widgets page.
+- Auto-update via GitHub Releases: check at startup and every 24 h (can be turned off), install only on click; Settings ▸ About shows status and progress.
 - Volume widget (2×1, 2×2): master slider, mute, output device switcher, per-app mixer (Windows Core Audio).
 - Media widget (4×1, 4×2): artwork, title/artist/source, progress with seek, prev/play-pause/next, shuffle/repeat (Windows media transport controls; works with Spotify and browsers).
 - Todo widget (2×2, 4×2, 4×4): add/complete/reorder/delete, due dates, English + Turkish quick-add parser, reminders as OS notifications that fire while the deck is hidden, snooze 10 min.
@@ -40,3 +44,4 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - GPU is sampled every 3 s; deck widgets and timers pause while the deck is hidden; logs keep 14 days.
 - System 4×2: the CPU sparkline fills the tile and the per-core strip grows on large displays.
 - Settings dialogs are centred (Tailwind preflight zeroed dialog margins).
+- Tablet/browser mode: plugin widgets load their scripts, styles and images; large video wallpapers stream instead of loading whole; `lan://status` (token URLs, QR) stays on the host. Install in the "ready" state relaunches the app. LAN, update and plugin errors carry an `errorCode` for translation.

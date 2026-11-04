@@ -24,7 +24,15 @@ pub const EVENT_SETTINGS_CHANGED: &str = "settings://changed";
 
 /// Top-level keys holding plain structs: patches merge into them key by key and stored
 /// values fall back leaf by leaf. (`activeWorkspace` is a map and is replaced as a whole.)
-const NESTED_KEYS: &[&str] = &["appearance", "burnIn", "themeAuto", "companion", "pomodoro"];
+const NESTED_KEYS: &[&str] = &[
+    "appearance",
+    "burnIn",
+    "themeAuto",
+    "companion",
+    "pomodoro",
+    "lan",
+    "updates",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -165,6 +173,41 @@ impl Default for CompanionSettings {
     }
 }
 
+/// Phase 4 tablet/browser mode: the deck UI served on the LAN (`crate::lan`). Off by default;
+/// every request needs the companion token.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LanSettings {
+    pub enabled: bool,
+    /// 1024–65535, never the companion port 47831.
+    pub port: u16,
+}
+
+pub const DEFAULT_LAN_PORT: u16 = 47832;
+
+impl Default for LanSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: DEFAULT_LAN_PORT,
+        }
+    }
+}
+
+/// Phase 4 auto-update (`crate::update`). Checks never install without a click.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSettings {
+    /// Check at startup and every 24 h.
+    pub auto_check: bool,
+}
+
+impl Default for UpdateSettings {
+    fn default() -> Self {
+        Self { auto_check: true }
+    }
+}
+
 /// Lengths in minutes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -275,6 +318,9 @@ pub struct DeckSettings {
     pub pomodoro: PomodoroSettings,
     pub calendar_feeds: Vec<CalendarFeed>,
     pub auto_switch: Vec<AutoSwitchRule>,
+    // Phase 4 (additive, still schemaVersion 1).
+    pub lan: LanSettings,
+    pub updates: UpdateSettings,
 }
 
 impl Default for DeckSettings {
@@ -297,6 +343,8 @@ impl Default for DeckSettings {
             pomodoro: PomodoroSettings::default(),
             calendar_feeds: Vec::new(),
             auto_switch: Vec::new(),
+            lan: LanSettings::default(),
+            updates: UpdateSettings::default(),
         }
     }
 }
@@ -402,6 +450,17 @@ fn validate_phase3(s: &DeckSettings) -> Result<(), String> {
             | AutoSwitchTrigger::PomodoroEnd
             | AutoSwitchTrigger::CalendarStart { feed_id: None } => {}
         }
+    }
+    validate_phase4(s)
+}
+
+fn validate_phase4(s: &DeckSettings) -> Result<(), String> {
+    let port = s.lan.port;
+    if port < 1024 || port == crate::companion::PORT {
+        return Err(format!(
+            "lan.port must be between 1024 and 65535 and not {}",
+            crate::companion::PORT
+        ));
     }
     Ok(())
 }
@@ -663,6 +722,12 @@ pub fn apply_patch(app: &AppHandle, patch: &Map<String, Value>) -> Result<DeckSe
     if old.companion.enabled != new.companion.enabled {
         crate::companion::set_enabled(app, new.companion.enabled);
     }
+    if old.lan != new.lan {
+        crate::lan::settings_changed(app, &new.lan);
+    }
+    if old.updates != new.updates {
+        crate::update::settings_changed(app, &new.updates);
+    }
     if old.pomodoro != new.pomodoro {
         crate::widgets::pomodoro::settings_changed(app, &new.pomodoro);
     }
@@ -727,10 +792,26 @@ mod tests {
                     "autoStartNext": false, "dailyGoal": 8
                 },
                 "calendarFeeds": [],
-                "autoSwitch": []
+                "autoSwitch": [],
+                "lan": {"enabled": false, "port": 47832},
+                "updates": {"autoCheck": true}
             })
         );
         assert!(validate(&DeckSettings::default()).is_ok());
+    }
+
+    #[test]
+    fn lan_port_is_validated() {
+        let base = DeckSettings::default();
+        for bad in [80, 1023, 47831] {
+            assert!(
+                merge(&base, &obj(json!({"lan": {"port": bad}}))).is_err(),
+                "{bad}"
+            );
+        }
+        let s = merge(&base, &obj(json!({"lan": {"enabled": true}}))).unwrap();
+        assert!(s.lan.enabled);
+        assert_eq!(s.lan.port, DEFAULT_LAN_PORT);
     }
 
     #[test]

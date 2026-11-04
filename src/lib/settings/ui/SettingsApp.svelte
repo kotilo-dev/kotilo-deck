@@ -7,8 +7,8 @@
 	import './settings.css';
 	import { onMount } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { listen } from '@tauri-apps/api/event';
 	import { isTauri, on, type DeckSettings } from '#lib/ipc/index.ts';
+	import { listen } from '#lib/ipc/transport.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { applyTheme, effectiveThemeId, getTheme, pairFor, themes } from '#lib/theme/index.ts';
 	import { defaultBackend, WorkspaceStore } from '#lib/workspace/index.ts';
@@ -24,9 +24,11 @@
 	import AppearancePage from './Appearance.svelte';
 	import Themes from './Themes.svelte';
 	import Workspaces from './Workspaces.svelte';
+	import Plugins from './Plugins.svelte';
 	import Weather from './Weather.svelte';
 	import Pomodoro from './Pomodoro.svelte';
 	import Companion from './Companion.svelte';
+	import Lan from './Lan.svelte';
 	import BurnIn from './BurnIn.svelte';
 	import About from './About.svelte';
 
@@ -195,9 +197,11 @@
 				{:else if section === 'appearance'}<AppearancePage />
 				{:else if section === 'themes'}<Themes />
 				{:else if section === 'workspaces'}<Workspaces />
+				{:else if section === 'plugins'}<Plugins />
 				{:else if section === 'weather'}<Weather />
 				{:else if section === 'pomodoro'}<Pomodoro />
 				{:else if section === 'companion'}<Companion />
+				{:else if section === 'lan'}<Lan />
 				{:else if section === 'burnin'}<BurnIn />
 				{:else}<About />
 				{/if}

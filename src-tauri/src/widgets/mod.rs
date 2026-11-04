@@ -7,5 +7,5 @@ pub mod pomodoro;
 pub mod system;
 pub mod todo;
 
-mod watch;
+pub mod watch;
 pub mod weather;

@@ -1,4 +1,126 @@
 {
+	"plugins": {
+		"frame": {
+			"timeout": "Bu bileşen başlamadı. Dosyalarını kontrol edip yeniden deneyin.",
+			"noEntry": "Bu bileşenin giriş sayfası yok."
+		},
+		"drawer": {
+			"section": "Harici",
+			"tag": "harici"
+		},
+		"page": {
+			"title": "Bileşenler",
+			"text": "Bileşenler klasörünüzdeki harici bileşenler. Yeniden başlatmadan Bileşen ekle panelinde görünürler.",
+			"installed": "Yüklü",
+			"loading": "Bileşenler yükleniyor",
+			"loadError": "Bileşenler klasörü okunamadı: {message}",
+			"empty": "Henüz harici bileşen yok.",
+			"noManifest": "manifest.json eksik ya da okunamıyor.",
+			"by": "{author} tarafından",
+			"sizes": "Boyutlar",
+			"topics": "Canlı veri",
+			"noTopics": "yok",
+			"add": "Bileşen ekle",
+			"addHelp": "manifest.json ve index.html içeren bir klasörü bileşenler klasörüne koyun. Değişiklikler hemen görünür.",
+			"folder": "Bileşenler klasörü",
+			"sandbox": "Bileşenler korumalı alanda çalışır: ağ erişimi yok, dosyalarınıza ve ayarlarınıza erişemezler. Yalnızca temayı, kendi ayarlarını ve bildirdikleri canlı verileri alırlar.",
+			"docs": "Nasıl yazılır:",
+			"openFolder": "Bileşenler klasörünü aç"
+		},
+		"topics": {
+			"system": "Sistem",
+			"media": "Medya",
+			"pomodoro": "Pomodoro"
+		},
+		"errors": {
+			"no-manifest": "manifest.json bulunamadı.",
+			"bad-json": "manifest.json geçerli bir JSON değil.",
+			"api-version": "Desteklenmeyen apiVersion (1 olmalı).",
+			"id-mismatch": "Manifest id değeri klasör adıyla aynı olmalı.",
+			"bad-sizes": "sizes veya defaultSize geçersiz.",
+			"missing-entry": "Giriş dosyası bulunamadı.",
+			"too-large": "Bileşen klasörü çok büyük.",
+			"too-many": "Çok fazla bileşen kurulu (en fazla 64)."
+		}
+	},
+	"lan": {
+		"title": "Tablet ve tarayıcı",
+		"text": "Deck’i ağınızdaki bir tablette veya başka bir cihazda gösterin.",
+		"server": "Sunucu",
+		"enable": "Tablet ve tarayıcılara izin ver",
+		"enableHelp": "Deck’i yerel ağınızda sunar. Varsayılan olarak kapalıdır.",
+		"port": "Port",
+		"portHelp": "Varsayılan 47832.",
+		"portRange": "{min} ile {max} arasında bir tam sayı girin.",
+		"portCompanion": "47831 eşlikçiye ayrılmıştır.",
+		"portSaved": "Port {port} olarak ayarlandı",
+		"view": {
+			"off": "Kapalı",
+			"starting": "Başlatılıyor…",
+			"error": "Çalışmıyor"
+		},
+		"listening": "{port} portunda dinleniyor",
+		"offHelp": "Deck’i aynı ağdaki bir tablet veya telefondan açmak için açın.",
+		"errorHelp": "Sunucu başlatılamadı: {message}",
+		"startingHelp": "Sunucu bekleniyor…",
+		"listeningHelp": "Aynı ağdaki bir cihazda aşağıdaki adreslerden birini açın ya da QR kodu tarayın.",
+		"clients": "bağlı",
+		"addresses": "Adresler",
+		"show": "Göster",
+		"hide": "Gizle",
+		"noAddresses": "Ağ adresi bulunamadı. Bu bilgisayar bir ağa bağlı mı?",
+		"copy": "{n}. adresi kopyala",
+		"copied": "Adres kopyalandı",
+		"copyFailed": "Adres kopyalanamadı",
+		"qrAlt": "İlk adresin QR kodu",
+		"qrHelp": "Tabletin kamerasıyla tarayın.",
+		"qrHidden": "QR kodu görmek için Göster’e basın.",
+		"warning": "Bu bağlantıya sahip herkes deck’i kontrol edebilir. Yalnızca güvendiğiniz cihazlarla paylaşın.",
+		"errors": {
+			"port-in-use": "Bu port başka bir uygulama tarafından kullanılıyor. Başka bir port seçin.",
+			"permission-denied": "Sistem bu porta izin vermedi. 1024 üstü bir port seçin.",
+			"bind-failed": "Sunucu bu portta başlatılamadı.",
+			"token-unreadable": "Erişim anahtarı okunamadı."
+		}
+	},
+	"update": {
+		"title": "Güncellemeler",
+		"current": "Geçerli sürüm",
+		"lastChecked": "Son kontrol",
+		"check": "Şimdi kontrol et",
+		"install": "Yükle",
+		"restart": "Şimdi yeniden başlat",
+		"progress": "İndirme ilerlemesi",
+		"autoCheck": "Otomatik kontrol et",
+		"autoCheckHelp": "Açılışta ve günde bir kez. Güncellemeler siz tıklamadan asla yüklenmez.",
+		"checkFailed": "Güncellemeler kontrol edilemedi: {message}",
+		"installFailed": "Güncelleme yüklenemedi: {message}",
+		"state": {
+			"checking": "Güncellemeler kontrol ediliyor…",
+			"available": "{version} sürümü mevcut",
+			"downloading": "{version} indiriliyor…",
+			"ready": "Güncelleme hazır. Tamamlamak için yeniden başlatın.",
+			"error": "Güncelleme başarısız: {message}",
+			"unsupported": "Geliştirme sürümlerinde güncellemeler kapalıdır",
+			"upToDate": "Kotilo Deck güncel",
+			"never": "Henüz kontrol edilmedi"
+		},
+		"errors": {
+			"no-release": "Bu platform için henüz yayınlanmış bir sürüm yok.",
+			"network": "Güncelleme sunucusuna ulaşılamadı.",
+			"signature": "Güncelleme imzası geçersiz; kurulmadı.",
+			"install-failed": "Güncelleme kurulamadı.",
+			"other": "Güncelleme başarısız oldu."
+		}
+	},
+	"remote": {
+		"settingsTitle": "Ayarları ana bilgisayarda açın",
+		"settingsText": "Bu cihaz yalnızca deck’i gösterir. Ayarlar, monitörler ve dosyalar Kotilo Deck’in çalıştığı bilgisayarda kalır.",
+		"backToDeck": "Deck’e dön",
+		"hostOnly": "Yalnızca ana bilgisayarda kullanılabilir",
+		"rotateToEditLandscape": "Yerleşimi düzenlemek için yatay çevirin",
+		"rotateToEditPortrait": "Yerleşimi düzenlemek için dikey çevirin"
+	},
 	"shell": {
 		"appName": "Kotilo Deck",
 		"topbar": {
@@ -449,9 +571,11 @@
 			"appearance": "Görünüm",
 			"themes": "Temalar",
 			"workspaces": "Çalışma alanları",
+			"plugins": "Bileşenler",
 			"weather": "Hava durumu ve takvim",
 			"pomodoro": "Pomodoro",
 			"companion": "Eşlikçi",
+			"lan": "Tablet ve tarayıcı",
 			"burnin": "Ekran yanması ve gece",
 			"about": "Hakkında · MIT"
 		},

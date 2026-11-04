@@ -20,6 +20,7 @@
 	import Icon from './Icon.svelte';
 	import WidgetFrame from './WidgetFrame.svelte';
 	import { fmtSize, getDeck, removeWithUndo, sizesOf, widgetName } from './deck.svelte';
+	import { plugins } from '#lib/plugins/registry.svelte.ts';
 
 	const LONG_PRESS_MS = 500;
 	const SWIPE_PX = 64;
@@ -28,6 +29,9 @@
 	const TRASH_BAND_PX = 44;
 	/** Gesture opt-out: widgets can mark any subtree with `data-no-gesture`. */
 	const NO_GESTURE = '[data-no-gesture], input[type="range"], dialog, [popover]';
+
+	// External widgets (docs/plugin-api.md): load the list and follow `plugin://changed` while the deck lives.
+	plugins.start();
 
 	const deck = getDeck();
 	const { store, ui } = deck;
@@ -148,7 +152,7 @@
 					// Long-press: enter edit mode and keep the card under the finger lifted.
 					p.timer = null;
 					press = null;
-					ui.enterEdit();
+					if (!ui.enterEdit()) return;
 					navigator.vibrate?.(12);
 					startMove(p.id!, p.pointerId, p.x0, p.y0);
 				}, LONG_PRESS_MS);
@@ -333,8 +337,7 @@
 				type="button"
 				class="k-btn k-btn-primary"
 				onclick={() => {
-					ui.enterEdit();
-					ui.drawerOpen = true;
+					if (ui.enterEdit()) ui.drawerOpen = true;
 				}}
 			>
 				<Icon name="plus" size={16} stroke={2.4} />{t('shell.edit.addWidget')}

@@ -4,7 +4,7 @@
  * Every widget instance shows the same list: both implementations broadcast `changed` to all of them.
  */
 import {
-	isTauri,
+	hasBackend,
 	on,
 	todoAdd,
 	todoDelete,
@@ -196,7 +196,7 @@ let shared: TodoApi | null = null;
 /** One store per page, shared by every Todo instance. */
 export function todoApi(): TodoApi {
 	if (!shared) {
-		shared = isTauri()
+		shared = hasBackend()
 			? createTauriTodoApi()
 			: createLocalTodoApi(typeof localStorage === 'undefined' ? null : localStorage);
 	}

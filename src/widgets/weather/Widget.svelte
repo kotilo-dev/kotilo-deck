@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { locale, t } from '#lib/i18n/index.ts';
-	import { isTauri, weatherGet, type WeatherReport } from '#lib/ipc/index.ts';
+	import { hasBackend, weatherGet, type WeatherReport } from '#lib/ipc/index.ts';
 	import { isDeckVisible, minutesSince, onDeckVisibility, subscribeTick } from '#lib/time/index.ts';
 	import type { WidgetProps } from '../types';
 	import {
@@ -26,7 +26,7 @@
 	// Primitives, so unrelated settings edits (e.g. appearance) don't refetch.
 	const lat = $derived(loc?.latitude ?? null);
 	const lon = $derived(loc?.longitude ?? null);
-	const tauri = isTauri();
+	const tauri = hasBackend();
 
 	let report = $state<WeatherReport | null>(null);
 	let failed = $state(false);
