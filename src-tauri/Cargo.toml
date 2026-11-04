@@ -47,6 +47,15 @@ getrandom = "0.3"
 # Phase 4 auto-update (backend-owned; no JS packages)
 tauri-plugin-updater = "2.14.1"
 tauri-plugin-process = "2.4.0"
+# Phase 4 LAN mode: plain hyper (already in the tree via reqwest) + the tungstenite above
+# instead of a framework; sha2/base64 hash the SPA's inline script for the CSP header.
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+sha2 = "0.10"
+base64 = "0.23.1"
+qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
+if-addrs = "0.15.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"
