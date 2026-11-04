@@ -61,6 +61,10 @@ impl Platform for LinuxPlatform {
         shell::open_url_scheme(url)
     }
 
+    fn open_path(&self, path: &std::path::Path) -> Result<()> {
+        shell::open_path(path)
+    }
+
     fn audio_devices(&self) -> Result<Vec<AudioDevice>> {
         audio::state().map(|s| s.devices)
     }

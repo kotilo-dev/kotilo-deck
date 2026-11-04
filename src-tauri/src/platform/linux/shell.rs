@@ -1,4 +1,5 @@
-//! Custom URL schemes (`kotilo://`): `xdg-mime` lookup, then a detached `xdg-open`.
+//! Custom URL schemes (`kotilo://`): `xdg-mime` lookup, then a detached `xdg-open`; also
+//! folders (`open_path`).
 //!
 //! The lookup comes first so a missing handler is an error rather than a desktop "choose an
 //! application" dialog.
@@ -32,11 +33,25 @@ pub fn open_url_scheme(url: &str) -> Result<()> {
     if handler(&xdg_mime, scheme).is_none() {
         return Err(not_registered());
     }
+    // The URL starts with a letter (`scheme_of`), so it can never be parsed as an option.
+    xdg_open(std::ffi::OsStr::new(url))
+}
+
+/// Opens a local folder in the file manager (`xdg-open <dir>`).
+pub fn open_path(path: &Path) -> Result<()> {
+    if !path.is_absolute() {
+        // Absolute paths start with `/`, so they can never be parsed as an option.
+        return Err(PlatformError::Os("path must be absolute".into()));
+    }
+    xdg_open(path.as_os_str())
+}
+
+/// Spawns `xdg-open <target>` detached and reaps it in the background.
+fn xdg_open(target: &std::ffi::OsStr) -> Result<()> {
     let xdg_open = cmd::which("xdg-open")
         .ok_or_else(|| PlatformError::Os("xdg-open is not installed".into()))?;
     let mut c = cmd::command(&xdg_open);
-    // The URL starts with a letter (`scheme_of`), so it can never be parsed as an option.
-    c.arg(url).stdout(Stdio::null()).stderr(Stdio::null());
+    c.arg(target).stdout(Stdio::null()).stderr(Stdio::null());
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -45,7 +60,7 @@ pub fn open_url_scheme(url: &str) -> Result<()> {
     }
     let mut child = c
         .spawn()
-        .map_err(|e| PlatformError::Os(format!("cannot open the link: {e}")))?;
+        .map_err(|e| PlatformError::Os(format!("cannot open: {e}")))?;
     // Detached: reap it in the background so no zombie is left behind.
     let _ = std::thread::Builder::new()
         .name("xdg-open-reaper".into())

@@ -60,6 +60,8 @@ export const BACKOFF_MAX_MS = 30_000;
 export const SOCKET_WAIT_MS = 5000;
 
 const OPEN = 1;
+/** First frame on every events socket (ARCHITECTURE "LAN mode"). */
+const HELLO_EVENT = 'lan://hello';
 const SUBSCRIBE = /^([a-z]+)_subscribe$/;
 const UNSUBSCRIBE = /^([a-z]+)_unsubscribe$/;
 
@@ -80,6 +82,8 @@ export function createTransport(env: TransportEnv) {
 	let lost = false;
 	let disposed = false;
 	let openWaiters: (() => void)[] = [];
+	/** From the server's first frame `lan://hello`; sent as `X-Kotilo-Socket` so subscriptions are tied to this socket. */
+	let socketId: string | null = null;
 	/** Remote `<area>_subscribe` calls not yet matched by an unsubscribe, per area. */
 	const subs = new Map<string, number>();
 
@@ -151,13 +155,6 @@ export function createTransport(env: TransportEnv) {
 		socket = ws;
 		ws.onopen = () => {
 			backoff = BACKOFF_MIN_MS;
-			const waiters = openWaiters;
-			openWaiters = [];
-			for (const w of waiters) w();
-			if (lost) {
-				lost = false;
-				resubscribe();
-			}
 		};
 		ws.onmessage = (ev) => dispatch(ev.data);
 		ws.onerror = () => {
@@ -166,6 +163,7 @@ export function createTransport(env: TransportEnv) {
 		ws.onclose = () => {
 			if (socket !== ws) return;
 			socket = null;
+			socketId = null;
 			// The server released this socket's subscriptions; whatever we hold must be re-sent.
 			lost = true;
 			scheduleReconnect();
@@ -190,6 +188,11 @@ export function createTransport(env: TransportEnv) {
 			return;
 		}
 		if (!msg || typeof msg.event !== 'string') return;
+		if (msg.event === HELLO_EVENT) {
+			const id = (msg.payload as { socketId?: unknown } | null)?.socketId;
+			if (typeof id === 'string' && id) onHello(id);
+			return;
+		}
 		const set = handlers.get(msg.event);
 		if (!set) return;
 		const e: TransportEvent<unknown> = { event: msg.event, payload: msg.payload };
@@ -202,6 +205,18 @@ export function createTransport(env: TransportEnv) {
 		}
 	}
 
+	/** The socket is usable once the server named it: wake waiters, re-send lost subscriptions. */
+	function onHello(id: string) {
+		socketId = id;
+		const waiters = openWaiters;
+		openWaiters = [];
+		for (const w of waiters) w();
+		if (lost) {
+			lost = false;
+			resubscribe();
+		}
+	}
+
 	function resubscribe() {
 		for (const [area, n] of subs) {
 			for (let i = 0; i < n; i++) void post(`${area}_subscribe`, {}).catch(() => {});
@@ -210,7 +225,7 @@ export function createTransport(env: TransportEnv) {
 
 	/** Resolves once the socket is open (or after SOCKET_WAIT_MS), so the server can tie a subscription to it. */
 	function socketReady(): Promise<void> {
-		if (socket?.readyState === OPEN) return Promise.resolve();
+		if (socket?.readyState === OPEN && socketId) return Promise.resolve();
 		connect();
 		return new Promise((resolve) => {
 			const done = () => {
@@ -233,7 +248,11 @@ export function createTransport(env: TransportEnv) {
 			res = await env.fetch(`/api/invoke/${encodeURIComponent(cmd)}`, {
 				method: 'POST',
 				credentials: 'same-origin',
-				headers: { 'content-type': 'application/json', accept: 'application/json' },
+				headers: {
+					'content-type': 'application/json',
+					accept: 'application/json',
+					...(socketId ? { 'x-kotilo-socket': socketId } : {})
+				},
 				body: JSON.stringify(args)
 			});
 		} catch (e) {
@@ -263,13 +282,15 @@ export function createTransport(env: TransportEnv) {
 		const sub = SUBSCRIBE.exec(cmd);
 		const unsub = sub ? null : UNSUBSCRIBE.exec(cmd);
 		if (sub) await socketReady();
-		const result = await post<T>(cmd, args ?? {});
-		if (sub) subs.set(sub[1], (subs.get(sub[1]) ?? 0) + 1);
-		else if (unsub) {
+		if (unsub) {
+			// Drop the local count even if the call fails (e.g. the socket just closed and the
+			// server already released it), so a reconnect never re-subscribes it.
 			const n = (subs.get(unsub[1]) ?? 0) - 1;
 			if (n > 0) subs.set(unsub[1], n);
 			else subs.delete(unsub[1]);
 		}
+		const result = await post<T>(cmd, args ?? {});
+		if (sub) subs.set(sub[1], (subs.get(sub[1]) ?? 0) + 1);
 		return result;
 	}
 

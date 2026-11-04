@@ -18,9 +18,11 @@ class FakeSocket implements SocketLike {
 	constructor(readonly url: string) {
 		FakeSocket.all.push(this);
 	}
-	open() {
+	/** Like the LAN server: open, then the `lan://hello` frame naming the socket. */
+	open(hello = true) {
 		this.readyState = 1;
 		this.onopen?.({});
+		if (hello) this.send('lan://hello', { socketId: `sock-${FakeSocket.all.indexOf(this)}` });
 	}
 	drop() {
 		this.readyState = 3;
@@ -314,6 +316,30 @@ describe('remote events', () => {
 		FakeSocket.all[0].open();
 		await p;
 		expect(invokeCalls(calls, 'system_subscribe')).toBe(1);
+	});
+
+	it('subscribes only after lan://hello and send its socket id as X-Kotilo-Socket', async () => {
+		const { tr, calls } = await remote();
+		const p = tr.invoke('system_subscribe');
+		await Promise.resolve();
+		FakeSocket.all[0].open(false);
+		await Promise.resolve();
+		expect(invokeCalls(calls, 'system_subscribe')).toBe(0);
+		FakeSocket.all[0].send('lan://hello', { socketId: 'abc' });
+		await p;
+		const call = calls.find((c) => c.url === '/api/invoke/system_subscribe')!;
+		expect((call.init?.headers as Record<string, string>)['x-kotilo-socket']).toBe('abc');
+	});
+
+	it('an unsubscribe drops the local count even when the server refuses it', async () => {
+		const { tr, routes } = await remote();
+		routes.set('/api/invoke/media_subscribe', () => json(null));
+		routes.set('/api/invoke/media_unsubscribe', () => json({ error: 'unknown socket' }, 400));
+		await tr.listen('media://state', () => {});
+		FakeSocket.all[0].open();
+		await tr.invoke('media_subscribe');
+		await expect(tr.invoke('media_unsubscribe')).rejects.toBe('unknown socket');
+		expect(tr.subscriptions().size).toBe(0);
 	});
 
 	it('a failed subscribe is not counted', async () => {
