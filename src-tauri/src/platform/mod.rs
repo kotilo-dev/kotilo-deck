@@ -6,8 +6,14 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(target_os = "linux")]
+// Also compiled (not selected) in tests on every OS so the Linux parsers and D-Bus mapping
+// are type-checked and unit-tested on the Windows dev machine (ARCHITECTURE.md).
+#[cfg(any(target_os = "linux", test))]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 mod linux;
+#[cfg(any(target_os = "windows", target_os = "linux", test))]
+#[cfg_attr(not(any(target_os = "windows", target_os = "linux")), allow(dead_code))]
+mod shared;
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 mod stub;
 #[cfg(target_os = "windows")]

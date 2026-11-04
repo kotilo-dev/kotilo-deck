@@ -78,3 +78,12 @@ windows = { version = "0.62", features = [
 ] }
 # `#[implement]` / `#[interface]` (COM callbacks, IPolicyConfig) expand to `::windows_core`.
 windows-core = "0.62"
+
+# Phase 4 Linux media: MPRIS over the session D-Bus (blocking API on the platform's threads).
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = "5"
+
+# `platform::linux` also compiles under `cfg(test)` on other OSes (ARCHITECTURE.md), so its
+# MPRIS code is type-checked and unit-tested on the Windows dev machine.
+[target.'cfg(not(target_os = "linux"))'.dev-dependencies]
+zbus = "5"
