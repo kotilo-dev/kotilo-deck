@@ -3,14 +3,17 @@ pub mod platform;
 mod companion;
 mod files;
 mod hotkeys;
+mod lan;
 mod logging;
 mod migrations;
 mod paths;
+mod plugins;
 mod settings;
 mod settings_window;
 mod startup;
 mod transfer;
 mod tray;
+mod update;
 mod widgets;
 mod window;
 mod workspace;
@@ -112,6 +115,13 @@ pub fn run() {
             companion::companion_snapshot,
             companion::companion_respond,
             companion::companion_open_desktop,
+            // Phase 4: LAN mode, widget plugins, auto-update
+            lan::lan_status,
+            plugins::plugin_list,
+            plugins::plugin_open_folder,
+            update::update_status,
+            update::update_check,
+            update::update_install,
         ])
         .build(tauri::generate_context!());
     match app {

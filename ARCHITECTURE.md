@@ -66,11 +66,33 @@ Windows: COM/WinRT calls run on dedicated MTA worker threads (`platform/windows/
   - `weather_geocode(query) / weather_get(latitude, longitude, unit)` — Open-Meteo, 15 min cache, stale fallback
   - Phase 2: `settings_open / settings_export_all / settings_import_all`, `wallpaper_list / wallpaper_import`, `theme_user_list`, `file_save_as / file_open_text`, `audio_*`, `media_*`, `todo_*` (todos live in a backend-owned SQLite so reminders fire while the UI is hidden)
   - Phase 3: `pomodoro_*` (backend-owned timer + SQLite history), `companion_status / companion_snapshot / companion_respond / companion_open_desktop`, `calendar_upcoming / calendar_refresh`
+  - Phase 4: `lan_status`, `plugin_list / plugin_open_folder`, `update_status / update_check / update_install`
 - Backend → frontend: Tauri events named `<area>://<event>` for pushed data, so the UI never polls:
-  `system://sample`, `workspace://cycle`, `workspace://switch`, `monitor://changed`; Phase 2: `settings://changed`, `deck://visibility`, `audio://state`, `media://state`, `todo://changed`, `todo://reminder`, `theme://user-changed`, `workspace://changed`, `deck://quitting`; Phase 3: `pomodoro://state`, `pomodoro://phase-end`, `companion://status`, `companion://snapshot`, `companion://suggest`, `calendar://changed`.
+  `system://sample`, `workspace://cycle`, `workspace://switch`, `monitor://changed`; Phase 2: `settings://changed`, `deck://visibility`, `audio://state`, `media://state`, `todo://changed`, `todo://reminder`, `theme://user-changed`, `workspace://changed`, `deck://quitting`; Phase 3: `pomodoro://state`, `pomodoro://phase-end`, `companion://status`, `companion://snapshot`, `companion://suggest`, `calendar://changed`; Phase 4: `lan://status`, `plugin://changed`, `update://status`.
 - Windows: `deck` (fullscreen/overlay) and `settings` (960×680 normal window, route `/settings`), same SPA.
 - Widgets: `src/widgets/index.ts` globs every `<id>/manifest.json` + `Widget.svelte` (+ optional `settings.ts`, `Settings.svelte`); contract types in `src/widgets/types.ts`.
 - Companion (Phase 3): `protocol.md` (repo root) is the single source of truth; server in `src-tauri/src/companion/`, reference client `scripts/mock-desktop.mjs`.
+
+## Phase 4
+
+### Linux platform (`platform/linux/`)
+- Audio: `pactl` (works on PulseAudio and on PipeWire via pipewire-pulse) with `-f json` output, `wpctl` as fallback for volume/mute; sessions = sink-inputs; `watch_audio` = one long-lived `pactl subscribe` child, killed on drop. Media: MPRIS over the session D-Bus (`zbus`, blocking API on the platform's own threads); `watch_media` = `PropertiesChanged` + `NameOwnerChanged` signals. `open_url_scheme` = `xdg-mime query default x-scheme-handler/<scheme>` then `xdg-open`. GPU: AMD `gpu_busy_percent` in sysfs when present, otherwise unsupported.
+- The module is compiled for `target_os = "linux"` **and** for `cfg(test)` on every OS, so the parsers and D-Bus mapping are type-checked and unit-tested on the Windows dev machine (fixtures of real `pactl`/MPRIS output). Unix-only APIs stay behind an inner `#[cfg(unix)]`.
+
+### LAN mode (`src-tauri/src/lan/`, `src/lib/ipc/transport.ts`)
+- Off by default. When `lan.enabled`, an HTTP server binds `0.0.0.0:<lan.port>` (default 47832) and serves the prerendered SPA (embedded assets; `../build` from disk in debug builds), `/plugins/<folder>/…` (same CSP as the URI scheme) and `/wallpapers/<file>`.
+- Auth: the companion token. `GET /?token=<t>` sets an `HttpOnly; SameSite=Strict` cookie and redirects to `/`; every other request needs that cookie (or `Authorization: Bearer <t>`), else 401. Constant-time compare; 10 failed attempts per IP per minute → 429. No CORS headers.
+- `POST /api/invoke/<command>` with the JSON args object → `200` JSON result or `4xx/5xx {"error": "..."}`. `GET /api/events` upgrades to a WebSocket that pushes `{ "event": "<area>://<name>", "payload": … }` for every `DeckEvents` name. `GET /api/hello` → `{ "app": "kotilo-deck", "version": "…", "remote": true }` (the SPA uses it to detect remote mode).
+- Allowlist (everything else → 403): `platform_capabilities, settings_get, workspace_list, workspace_save, system_info, system_subscribe, system_unsubscribe, system_top_processes, weather_geocode, weather_get, wallpaper_list, theme_user_list, todo_*, audio_*, media_*, pomodoro_*, companion_status, companion_snapshot, companion_respond, calendar_upcoming, calendar_refresh, plugin_list`. Not reachable: settings_set/open/import/export, workspace_delete, monitor_*, tray_*, file_*, wallpaper_import, companion_open_desktop, lan_*, update_*.
+- Ref-counted subscriptions (`*_subscribe`) made by a browser are tracked per events-socket and released when it closes.
+- Frontend: `transport.ts` exports `invoke`, `listen`, `isTauri()`, `isRemote()` and `hasBackend()`; `ipc/index.ts` imports from it instead of `@tauri-apps/api`. Remote mode is the deck only (`/settings` shows "Open settings on the host"); per-device state (active workspace, theme override) lives in localStorage, never in `settings_set`. `convertFileSrc` → `/wallpapers/<file>` in remote mode.
+
+### Widget plugins (`src-tauri/src/plugins/`, `src/lib/plugins/`)
+- Contract: `docs/plugin-api.md`. Backend scans `~/.kotilo/deck/widgets/`, validates manifests, watches the folder (`plugin://changed`), serves files via the `kotilo-widget` URI scheme with a no-network CSP and the SDK at `_sdk/kotilo-widget.js`.
+- Frontend: a reactive registry merges built-in widgets with `ext.<folder>` plugin definitions; a plugin's component is the generic `PluginFrame.svelte` (sandboxed iframe + postMessage bridge). The deck CSP gains `frame-src http://kotilo-widget.localhost kotilo-widget:`.
+
+### Auto-update (`src-tauri/src/update.rs`)
+- `tauri-plugin-updater` + `tauri-plugin-process`; endpoint `https://github.com/kotilo/kotilo-deck/releases/latest/download/latest.json`; minisign public key in `tauri.conf.json`, private key outside the repo. Backend checks at startup (+30 s) and every 24 h when `updates.autoCheck`; never installs without `update_install`. Debug builds report `unsupported`. Settings ▸ About shows status, Check now, Install.
 
 ## Data
 
@@ -80,6 +102,7 @@ Windows: COM/WinRT calls run on dedicated MTA worker threads (`platform/windows/
 | Workspaces | `~/.kotilo/deck/workspaces/<slug>.json` | JSON (SPEC §4.1), `schemaVersion` |
 | Todos, pomodoro history | SQLite via `tauri-plugin-sql` | migrations in `src-tauri/src/migrations/` |
 | User themes | `~/.kotilo/themes/*.json` | theme contract, hot-reloaded |
+| Plugin widgets | `~/.kotilo/deck/widgets/<folder>/` | `docs/plugin-api.md`, hot-reloaded |
 | Logs | `~/.kotilo/deck/logs/` | `tracing`, daily rotation |
 
 ## Rendering layers (SPEC §5.3)

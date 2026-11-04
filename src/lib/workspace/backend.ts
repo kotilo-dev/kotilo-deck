@@ -44,7 +44,9 @@ export const DEFAULT_SETTINGS: DeckSettings = {
 	companion: { enabled: true, allowWorkspaceSwitch: false, notifyApprovals: true },
 	pomodoro: { focus: 25, shortBreak: 5, longBreak: 15, sessionsPerCycle: 4, autoStartNext: false, dailyGoal: 8 },
 	calendarFeeds: [],
-	autoSwitch: []
+	autoSwitch: [],
+	lan: { enabled: false, port: 47832 },
+	updates: { autoCheck: true }
 };
 
 const obj = (v: unknown): Record<string, unknown> =>

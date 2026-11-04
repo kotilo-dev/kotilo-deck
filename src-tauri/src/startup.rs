@@ -57,6 +57,10 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     companion::setup(&handle, s.companion.enabled);
     files::watch_user_themes(&handle);
     widgets::calendar::start(&handle);
+    // Phase 4
+    crate::lan::start(&handle, &s.lan);
+    crate::plugins::start(&handle);
+    crate::update::start(&handle, &s.updates);
 
     // Closing the deck hides it to the tray ("Quit" lives in the tray menu); overlay
     // geometry is remembered.
@@ -79,6 +83,7 @@ pub fn quit(app: &AppHandle) {
     let _ = app.emit(EVENT_QUITTING, json!({}));
     // Closes the desktop connection with 1001 during the grace period.
     companion::shutdown(app);
+    crate::lan::shutdown(app);
     window::hide(app);
     if let Some(w) = app.get_webview_window(crate::settings_window::SETTINGS_LABEL) {
         let _ = w.hide();
@@ -95,6 +100,7 @@ pub fn quit(app: &AppHandle) {
 pub fn on_exit(app: &AppHandle) {
     app.state::<window::DisplayState>().flush();
     companion::shutdown(app);
+    crate::lan::shutdown(app);
     tracing::info!("Kotilo Deck exiting");
     crate::logging::flush();
 }

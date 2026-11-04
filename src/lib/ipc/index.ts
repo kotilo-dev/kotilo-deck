@@ -63,6 +63,12 @@ export interface DeckSettings {
 	calendarFeeds: CalendarFeed[];
 	/** Workspace auto-switch rules (SPEC §4.1), evaluated by the deck UI. Default []. */
 	autoSwitch: AutoSwitchRule[];
+
+	// ── Phase 4 (additive; defaults in doc comments) ──
+	/** Tablet/browser mode (ARCHITECTURE "LAN mode"). Default enabled false, port 47832 (1024–65535, never 47831). */
+	lan: { enabled: boolean; port: number };
+	/** Auto-update. Default autoCheck true (startup + every 24 h; never installs without a click). */
+	updates: { autoCheck: boolean };
 }
 
 export interface PomodoroSettings {
@@ -512,6 +518,96 @@ export const calendarUpcoming = (limit?: number, days?: number) =>
 /** Forces a refetch of all enabled feeds (Retry button / feed list changed). */
 export const calendarRefresh = () => invoke<void>('calendar_refresh');
 
+// ── Phase 4: LAN mode (tablet/browser) ──────────────────────────────────────
+
+export interface LanStatus {
+	enabled: boolean;
+	listening: boolean;
+	port: number;
+	/** `http://<ipv4>:<port>/?token=…` per non-loopback IPv4; contains the secret token, never log it. */
+	urls: string[];
+	/** SVG markup of a QR code for urls[0]; null when not listening. Rendered as an <img> data URL, never as innerHTML. */
+	qrSvg: string | null;
+	/** Open browser connections. */
+	clients: number;
+	/** Last bind/serve error, e.g. "port 47832 is in use". */
+	error: string | null;
+}
+
+export const lanStatus = () => invoke<LanStatus>('lan_status');
+
+// ── Phase 4: widget plugins (docs/plugin-api.md) ────────────────────────────
+
+/** Live data a plugin may ask for; the deck forwards only topics declared in its manifest. */
+export type PluginTopic = 'system' | 'media' | 'pomodoro';
+
+/** `~/.kotilo/deck/widgets/<folder>/manifest.json`, validated by the backend. Same fields as a built-in manifest plus: */
+export interface PluginManifest {
+	/** Always 1 for now. */
+	apiVersion: 1;
+	/** Equal to the folder name, `^[a-z0-9][a-z0-9-]{0,31}$`. */
+	id: string;
+	name: string;
+	/** Shell icon key; unknown keys fall back to "puzzle". */
+	icon: string;
+	sizes: SizeKey[];
+	defaultSize: SizeKey;
+	capabilities: Capability[];
+	multiInstance: boolean;
+	settings: { type: 'object'; properties: Record<string, unknown> };
+	/** Relative path of the HTML entry inside the folder. Default "index.html". */
+	entry: string;
+	/** Default []. */
+	topics: PluginTopic[];
+	description?: string;
+	author?: string;
+	version?: string;
+}
+
+export interface PluginWidget {
+	/** `ext.<folder>` — the `widget` value in workspace files. Built-in ids never contain a dot. */
+	id: string;
+	folder: string;
+	manifest: PluginManifest | null;
+	/** Why the folder was rejected (Settings ▸ Widgets). */
+	error: string | null;
+	/** iframe src inside the Tauri webview (`http://kotilo-widget.localhost/<folder>/<entry>` on Windows). In LAN mode use `/plugins/<folder>/<entry>`. */
+	entryUrl: string | null;
+}
+
+export const pluginList = () => invoke<PluginWidget[]>('plugin_list');
+/** Opens ~/.kotilo/deck/widgets/ (created if missing) in the file manager. */
+export const pluginOpenFolder = () => invoke<void>('plugin_open_folder');
+
+// ── Phase 4: auto-update ────────────────────────────────────────────────────
+
+export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error' | 'unsupported';
+
+export interface UpdateInfo {
+	version: string;
+	/** RFC 3339. */
+	date: string | null;
+	notes: string | null;
+}
+
+export interface UpdateStatus {
+	/** Running app version. */
+	current: string;
+	state: UpdateState;
+	available: UpdateInfo | null;
+	/** 0–1 while downloading. */
+	progress: number | null;
+	error: string | null;
+	/** Unix ms of the last finished check. */
+	lastChecked: number | null;
+}
+
+export const updateStatus = () => invoke<UpdateStatus>('update_status');
+/** Checks now, also when autoCheck is off. */
+export const updateCheck = () => invoke<UpdateStatus>('update_check');
+/** Downloads + installs the available update, then relaunches. */
+export const updateInstall = () => invoke<void>('update_install');
+
 // ── Events (backend → UI) ───────────────────────────────────────────────────
 
 export interface DeckEvents {
@@ -548,6 +644,11 @@ export interface DeckEvents {
 	'companion://suggest': { reason: string; minutes: number | null };
 	/** Calendar cache refreshed (any feed). */
 	'calendar://changed': Record<string, never>;
+	/** Phase 4 */
+	'lan://status': LanStatus;
+	/** A folder under ~/.kotilo/deck/widgets/ was added/changed/removed; call pluginList again. */
+	'plugin://changed': Record<string, never>;
+	'update://status': UpdateStatus;
 }
 
 export function on<K extends keyof DeckEvents>(event: K, handler: (payload: DeckEvents[K]) => void): Promise<UnlistenFn> {
