@@ -67,7 +67,7 @@
         "compression": "lzma"
       },
       "wix": {
-        "language": ["en-US", "tr-TR"]
+        "language": "en-US"
       }
     },
     "linux": {

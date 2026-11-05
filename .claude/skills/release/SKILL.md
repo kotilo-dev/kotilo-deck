@@ -25,7 +25,7 @@ Full maintainer guide: `docs/releasing.md`. Versions follow SemVer; the same ver
 
 ## Verify and publish
 
-1. Check the draft's assets: setup.exe, two MSIs (en-US, tr-TR), AppImage, deb, rpm, `.sig` files and `latest.json`.
+1. Check the draft's assets: setup.exe, the en-US MSI, AppImage, deb, rpm, `.sig` files and `latest.json`.
 2. Fresh Windows VM: install the setup.exe and reach a working deck in under 2 minutes without docs. Without a certificate, SmartScreen warns ("More info ▸ Run anyway").
 3. Linux: the AppImage and .deb start; volume (`pactl`), media (MPRIS), tray and logs work.
 4. Publish: `gh release edit vx.y.z --draft=false`. Only then does `https://github.com/kotilo-dev/kotilo-deck/releases/latest/download/latest.json` (the updater endpoint) serve the new version. Check it with `curl -L`, then use Settings ▸ About ▸ Check now on an older release build. Debug builds always report `unsupported`.

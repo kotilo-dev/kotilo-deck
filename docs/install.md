@@ -24,7 +24,7 @@ This installs the same per-user installer. `winget upgrade Kotilo.KotiloDeck` up
 
 ### MSI (administrators)
 
-`Kotilo.Deck_<version>_x64_en-US.msi` (or `_tr-TR.msi`) installs for all users into Program Files and needs administrator rights. Use it for managed deployment. Most people should use the setup.exe.
+`Kotilo.Deck_<version>_x64_en-US.msi` installs for all users into Program Files and needs administrator rights. Use it for managed deployment. Most people should use the setup.exe.
 
 ### Uninstall
 

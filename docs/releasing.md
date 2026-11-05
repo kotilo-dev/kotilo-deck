@@ -9,7 +9,7 @@ Maintainer guide. The short version is in `.claude/skills/release/SKILL.md`. Use
 | Asset | Built on | Notes |
 |---|---|---|
 | `Kotilo.Deck_X.Y.Z_x64-setup.exe` (+ `.sig`) | windows-latest | NSIS, per-user install (no admin), English/Turkish by OS language. Default download, winget source, updater target. |
-| `Kotilo.Deck_X.Y.Z_x64_en-US.msi`, `…_tr-TR.msi` (+ `.sig`) | windows-latest | WiX, per-machine. For admins and GPO deployment. |
+| `Kotilo.Deck_X.Y.Z_x64_en-US.msi` (+ `.sig`) | windows-latest | WiX, per-machine. For admins and GPO deployment. |
 | `Kotilo.Deck_X.Y.Z_amd64.AppImage` (+ `.sig`) | ubuntu-22.04 | Portable; the Linux updater target. No GStreamer bundled (`bundleMediaFramework: false`). |
 | `Kotilo.Deck_X.Y.Z_amd64.deb` | ubuntu-22.04 | Debian/Ubuntu; also the Flatpak source. |
 | `Kotilo.Deck-X.Y.Z-1.x86_64.rpm` | ubuntu-22.04 | Fedora/openSUSE. |

@@ -10,7 +10,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - First-run setup on the deck: pick the monitor, theme and starting workspace (Focus / Ops / Agents / Full) with live preview; skippable any time (Skip setup / Esc); Settings ▸ About ▸ "Run setup again". Users upgrading from an earlier version skip it.
 - Crash logs: a crash writes `~/.kotilo/deck/logs/crash-<UTC>.log` (version, OS, backtrace; home folder redacted) and the next start shows "Kotilo Deck closed unexpectedly last time." with Report issue, Open logs and Dismiss.
 - "Report an issue" opens a prefilled GitHub issue (version, OS, arch, WebView, crash summary; no logs or paths are sent), and "Open logs folder" in Settings ▸ About. Uncaught errors in the deck and settings windows are written to the app log (rate-limited).
-- Installers: per-user NSIS setup (English/Turkish, no admin rights, installs WebView2 if missing), MSI (en-US, tr-TR), AppImage, .deb and .rpm.
+- Installers: per-user NSIS setup (English/Turkish, no admin rights, installs WebView2 if missing), MSI (English, for administrators), AppImage, .deb and .rpm.
 - Release workflow: pushing a `v*` tag builds every installer, its updater signature and `latest.json` into a draft GitHub Release with the changelog as notes; optional Windows code signing from repository secrets.
 - winget manifest (`Kotilo.KotiloDeck`) and Flatpak manifest (`dev.kotilo.deck`) with AppStream metadata.
 - Bug report issue template; `docs/install.md` and `docs/releasing.md`.
