@@ -586,14 +586,23 @@ fn set_path(map: &mut Map<String, Value>, path: &[String], value: Value) {
     cur.insert(last.clone(), value);
 }
 
+/// [`from_stored_on_disk`] without a settings file on disk (tests).
+#[cfg(test)]
+pub fn from_stored(entries: Map<String, Value>) -> DeckSettings {
+    from_stored_on_disk(entries, false)
+}
+
 /// Builds settings from raw store entries. Each stored key (each leaf, for the nested
 /// objects) is applied on top of the defaults only if it still deserialises and validates,
 /// so one corrupt value never resets the rest.
 ///
-/// An empty store is a fresh install. A non-empty store without `onboarding` (or with a
-/// corrupt one) was written by an earlier version, so onboarding starts as completed.
-pub fn from_stored(entries: Map<String, Value>) -> DeckSettings {
-    let existing = !entries.is_empty();
+/// An empty store with no `settings.json` on disk is a fresh install. A non-empty store
+/// without `onboarding` (or with a corrupt one) was written by an earlier version, so
+/// onboarding starts as completed. So does an existing file that loaded as an empty store:
+/// the store plugin silently treats an unreadable (corrupt) file that way, and that is not
+/// a fresh install.
+pub fn from_stored_on_disk(entries: Map<String, Value>, file_exists: bool) -> DeckSettings {
+    let existing = file_exists || !entries.is_empty();
     let entries = migrations::migrate_settings(entries);
     let mut defaults = to_map(&DeckSettings::default());
     if existing {
@@ -672,12 +681,24 @@ pub fn merge(base: &DeckSettings, patch: &Map<String, Value>) -> Result<DeckSett
 #[derive(Default)]
 pub struct SettingsLock(Mutex<()>);
 
+/// Whether `settings.json` is on disk (readable or not).
+fn store_file_exists(app: &AppHandle) -> bool {
+    tauri_plugin_store::resolve_store_path(app, STORE_FILE).is_ok_and(|p| p.is_file())
+}
+
 pub fn load(app: &AppHandle) -> DeckSettings {
+    let on_disk = store_file_exists(app);
     match app.store(STORE_FILE) {
-        Ok(store) => from_stored(store.entries().into_iter().collect()),
+        Ok(store) => {
+            let entries: Map<String, Value> = store.entries().into_iter().collect();
+            if on_disk && entries.is_empty() {
+                tracing::warn!("settings file is unreadable, using defaults");
+            }
+            from_stored_on_disk(entries, on_disk)
+        }
         Err(e) => {
             tracing::warn!("settings store unavailable, using defaults: {e}");
-            DeckSettings::default()
+            from_stored_on_disk(Map::new(), on_disk)
         }
     }
 }
@@ -690,7 +711,10 @@ pub fn update(
     let lock = app.state::<SettingsLock>();
     let _guard = lock.0.lock().unwrap_or_else(|p| p.into_inner());
     let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
-    let old = from_stored(store.entries().into_iter().collect());
+    let old = from_stored_on_disk(
+        store.entries().into_iter().collect(),
+        store_file_exists(app),
+    );
     let new = merge(&old, patch)?;
     let map = to_map(&new);
     for (key, value) in map {
@@ -859,6 +883,22 @@ mod tests {
             let s = from_stored(obj(json!({"theme": "nord", "onboarding": bad.clone()})));
             assert!(s.onboarding.completed, "{bad}");
         }
+    }
+
+    #[test]
+    fn unreadable_settings_file_skips_onboarding() {
+        // A corrupt settings.json loads as an empty store: not a fresh install.
+        let s = from_stored_on_disk(Map::new(), true);
+        assert_eq!(s.onboarding, OnboardingSettings::UPGRADED);
+        assert_eq!(s.theme, DeckSettings::default().theme);
+        // No file and no entries: fresh install.
+        assert_eq!(
+            from_stored_on_disk(Map::new(), false).onboarding,
+            OnboardingSettings::default()
+        );
+        // A stored onboarding value still wins.
+        let pending = obj(json!({"onboarding": {"completed": false, "version": 0}}));
+        assert!(!from_stored_on_disk(pending, true).onboarding.completed);
     }
 
     #[test]
