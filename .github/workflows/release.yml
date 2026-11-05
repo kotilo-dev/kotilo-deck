@@ -1,0 +1,199 @@
+name: Release
+
+# Push a tag vX.Y.Z (after the chore(release) commit) to build every installer and attach it to
+# a *draft* GitHub Release. A maintainer checks the draft and publishes it; only then does
+# releases/latest/download/latest.json (the updater endpoint) serve the new version.
+# See docs/releasing.md and .claude/skills/release/SKILL.md.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build, e.g. v1.0.0
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: v
+        name: Tag matches package.json, Cargo.toml and tauri.conf.json
+        run: |
+          node scripts/check-version.mjs "$TAG"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+      - name: CHANGELOG has a section for this version
+        run: node scripts/changelog-section.mjs "$TAG" > /dev/null
+
+  create-release:
+    needs: verify-version
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: release
+        name: Create (or reuse) the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Evaluates to 'true' / 'false'; the secret itself never reaches the shell.
+          HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+        run: |
+          node scripts/changelog-section.mjs "$TAG" > notes.md
+          if [ "$HAS_WINDOWS_CERT" != "true" ]; then
+            cat >> notes.md <<'EOF'
+
+          ---
+          **Windows installers in this release are not code-signed yet.** SmartScreen may show "Windows protected your PC": choose *More info ▸ Run anyway*. The in-app updater still verifies every update with the Kotilo Deck minisign key. See [docs/install.md](https://github.com/kotilo-dev/kotilo-deck/blob/main/docs/install.md).
+          EOF
+          fi
+          if gh release view "$TAG" --json isDraft --jq .isDraft > is_draft.txt 2>/dev/null; then
+            if [ "$(cat is_draft.txt)" != "true" ]; then
+              echo "::error::Release $TAG is already published; refusing to overwrite its assets."
+              exit 1
+            fi
+            gh release edit "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" --draft --verify-tag --title "Kotilo Deck $TAG" --notes-file notes.md
+          fi
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -n1)
+          test -n "$id"
+          echo "release_id=$id" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            bundles: nsis,msi
+          - platform: ubuntu-22.04
+            bundles: appimage,deb,rpm
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Install Tauri system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+
+      # Optional Authenticode signing. With WINDOWS_CERTIFICATE (base64 .pfx) and
+      # WINDOWS_CERTIFICATE_PASSWORD set, the certificate goes into the user store and its
+      # thumbprint reaches the bundler through a generated --config override; without them
+      # the installers are built unsigned.
+      - id: args
+        name: Bundle arguments (and Windows code signing)
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          BUNDLES: ${{ matrix.bundles }}
+        run: |
+          $bundleArgs = "--bundles $env:BUNDLES"
+          if ($IsWindows -and $env:WINDOWS_CERTIFICATE) {
+            $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+            $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+            $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password
+            Remove-Item $pfx
+            $override = Join-Path $env:RUNNER_TEMP 'tauri.signing.json'
+            @{ bundle = @{ windows = @{
+              certificateThumbprint = $cert.Thumbprint
+              digestAlgorithm = 'sha256'
+              timestampUrl = 'http://timestamp.digicert.com'
+            } } } | ConvertTo-Json -Depth 5 | Set-Content -Path $override -Encoding utf8
+            $bundleArgs += " --config $($override -replace '\\', '/')"
+            Write-Host "Authenticode signing enabled (thumbprint $($cert.Thumbprint))."
+          } elseif ($IsWindows) {
+            Write-Host '::warning::WINDOWS_CERTIFICATE is not set; Windows installers are unsigned.'
+          }
+          "value=$bundleArgs" >> $env:GITHUB_OUTPUT
+
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Contents of ~/.tauri/kotilo-deck.key. The key has an empty password; leave the
+          # password secret unset (GitHub cannot store an empty secret) and it resolves to "".
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ env.TAG }}
+          args: ${{ steps.args.outputs.value }}
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          uploadUpdaterSignatures: true
+          retryAttempts: 1
+
+  # Both matrix jobs merge their platform into latest.json on the draft. They can race, so
+  # check the result: the updater needs windows-x86_64 (NSIS) and linux-x86_64 (AppImage).
+  verify-release:
+    needs: [verify-version, create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: latest.json lists both platforms with signatures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify-version.outputs.version }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir .
+          cat latest.json
+          jq -e --arg v "$VERSION" '
+            .version == $v
+            and (.platforms["windows-x86_64"].url | test("-setup\\.exe$"))
+            and (.platforms["windows-x86_64"].signature | length > 0)
+            and (.platforms["linux-x86_64"].url | test("\\.AppImage$"))
+            and (.platforms["linux-x86_64"].signature | length > 0)
+          ' latest.json
+      - name: Summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### Draft release $TAG"
+            echo
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | "- " + .name'
+            echo
+            echo "Check the draft, then publish it: \`gh release edit $TAG --draft=false\`."
+          } >> "$GITHUB_STEP_SUMMARY"

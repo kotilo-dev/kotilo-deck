@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Install help
+    url: https://github.com/kotilo-dev/kotilo-deck/blob/main/docs/install.md
+    about: Installers, SmartScreen, Linux audio/media dependencies, where data lives.
+  - name: Widget plugin API
+    url: https://github.com/kotilo-dev/kotilo-deck/blob/main/docs/plugin-api.md
+    about: How to build your own widget folder.

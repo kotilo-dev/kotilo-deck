@@ -36,7 +36,15 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "msi", "appimage", "deb", "rpm"],
+    "publisher": "Kotilo",
+    "homepage": "https://github.com/kotilo-dev/kotilo-deck",
+    "copyright": "Copyright (c) 2026 Kotilo",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "category": "DeveloperTool",
+    "shortDescription": "Full-screen developer dashboard for a secondary display",
+    "longDescription": "Kotilo Deck turns a secondary display, a small USB screen or an old tablet into a glanceable dashboard: clock, weather, calendar, system load, volume and media controls, pomodoro, todos and your AI agents, in every popular developer colour theme. Widgets snap to a cell grid, workspaces switch by hotkey or schedule, and everything stays on your machine.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -44,7 +52,42 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "Turkish"],
+        "displayLanguageSelector": false,
+        "startMenuFolder": "Kotilo",
+        "compression": "lzma"
+      },
+      "wix": {
+        "language": ["en-US", "tr-TR"]
+      }
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      },
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1 | libappindicator3-1"
+        ],
+        "recommends": ["pulseaudio-utils | wireplumber"],
+        "section": "utils"
+      },
+      "rpm": {
+        "depends": ["webkit2gtk4.1", "gtk3", "libappindicator-gtk3"],
+        "recommends": ["pulseaudio-utils"]
+      }
+    }
   },
   "plugins": {
     "updater": {
