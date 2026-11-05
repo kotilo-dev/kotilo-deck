@@ -86,8 +86,13 @@ jobs:
           else
             gh release create "$TAG" --draft --verify-tag --title "Kotilo Deck $TAG" --notes-file notes.md
           fi
-          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
-            --jq ".[] | select(.tag_name == \"$TAG\") | .id" | head -n1)
+          # The releases list can lag behind a just-created draft; ask for the tag directly, with retries.
+          id=""
+          for i in 1 2 3 4 5 6; do
+            id=$(gh release view "$TAG" --json databaseId --jq .databaseId 2>/dev/null || true)
+            [ -n "$id" ] && break
+            sleep 5
+          done
           test -n "$id"
           echo "release_id=$id" >> "$GITHUB_OUTPUT"
 
