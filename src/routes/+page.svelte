@@ -340,16 +340,17 @@
 			return;
 		}
 		if (typing) return;
-		if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'z' || e.key === 'Z') && ui.runAction()) {
-			e.preventDefault();
-			return;
-		}
 		if ((e.ctrlKey || e.metaKey) && e.key === ',') {
 			e.preventDefault();
 			openSettings();
 			return;
 		}
+		// Everything below acts on the deck: never behind a modal (onboarding, sheets) or popover.
 		if (overlayOpen()) return;
+		if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'z' || e.key === 'Z') && ui.runAction()) {
+			e.preventDefault();
+			return;
+		}
 		// Inside Tauri the global shortcut emits workspace://cycle; handling it here too would double-step.
 		if (!isTauri() && e.ctrlKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
 			e.preventDefault();
