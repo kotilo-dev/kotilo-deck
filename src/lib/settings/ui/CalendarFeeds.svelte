@@ -190,7 +190,7 @@
 				{@const st = statusText(f)}
 				<li class="s-card item" class:off={!f.enabled}>
 					<span class="bar" style:background={feedColorVar(f.color)} aria-hidden="true"></span>
-					<div class="s-label grow">
+					<div class="s-label main">
 						<span class="s-title name">{f.name}</span>
 						<span class="s-path masked">{maskFeedUrl(f.url)}</span>
 						<span class="s-help" class:error={st.tone === 'error'} aria-live="polite">{st.text}</span>
@@ -302,7 +302,7 @@
 		padding: 8px 8px 8px 0;
 		overflow: hidden;
 	}
-	.item.off .grow {
+	.item.off .main {
 		opacity: 0.55;
 	}
 	.bar {
@@ -311,7 +311,7 @@
 		width: 4px;
 		border-radius: 0 4px 4px 0;
 	}
-	.grow {
+	.main {
 		flex: 1;
 	}
 	.name {

@@ -52,7 +52,7 @@
 					<span class="companion-label">{text.label}</span>
 				</button>
 			{:else}
-				<span class="companion static" title={text.title}>
+				<span class="companion passive" title={text.title}>
 					<span class="dot" class:on={view === 'connected'} aria-hidden="true"></span>
 					<span class="companion-label">{text.label}</span>
 				</span>
@@ -157,10 +157,10 @@
 	.companion:hover {
 		color: var(--k-text);
 	}
-	.companion.static {
+	.companion.passive {
 		cursor: default;
 	}
-	.companion.static:hover {
+	.companion.passive:hover {
 		color: var(--k-text-muted);
 	}
 	.dot {

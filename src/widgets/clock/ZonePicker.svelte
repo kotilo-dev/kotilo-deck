@@ -32,7 +32,7 @@
 
 <div class="picker">
 	<div class="row">
-		<label class="sr-only" for={id}>{t('widgets.clock.settings.search')}</label>
+		<label class="k-sr-only" for={id}>{t('widgets.clock.settings.search')}</label>
 		<input
 			{id}
 			class="field"
@@ -134,13 +134,5 @@
 		margin: 0;
 		font-size: 12px;
 		color: var(--k-text-muted);
-	}
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
 	}
 </style>

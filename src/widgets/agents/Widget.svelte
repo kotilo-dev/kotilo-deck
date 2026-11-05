@@ -315,7 +315,7 @@
 	{:else if size === '2x2'}
 		{@render header()}
 		{#if queue.length}
-			<div class="queue-wrap fixed">{@render approvalQueue()}</div>
+			<div class="queue-wrap pinned">{@render approvalQueue()}</div>
 		{/if}
 		<div class="list-wrap">{@render agentList()}</div>
 	{:else}
@@ -512,7 +512,7 @@
 		gap: 4px;
 		overflow: hidden;
 	}
-	.queue-wrap.fixed {
+	.queue-wrap.pinned {
 		flex: none;
 	}
 	.agents ul {
