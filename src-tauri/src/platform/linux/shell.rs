@@ -1,8 +1,10 @@
 //! Custom URL schemes (`kotilo://`): `xdg-mime` lookup, then a detached `xdg-open`; also
 //! folders (`open_path`).
 //!
-//! The lookup comes first so a missing handler is an error rather than a desktop "choose an
-//! application" dialog.
+//! For custom schemes the lookup comes first so a missing handler is an error rather than a
+//! desktop "choose an application" dialog. `http`/`https` skip it: every desktop has a
+//! browser, and inside Flatpak (flatpak-xdg-utils ships `xdg-open` via the portal but no
+//! `xdg-mime`) or on minimal desktops the lookup fails even though `xdg-open` works.
 
 use std::path::Path;
 use std::process::Stdio;
@@ -25,8 +27,18 @@ fn handler(xdg_mime: &Path, scheme: &str) -> Option<String> {
     handler_from(&out).map(str::to_string)
 }
 
+/// Whether `scheme` needs a registered handler before `xdg-open` (custom schemes do; web
+/// links go straight to `xdg-open`).
+pub fn needs_handler_check(scheme: &str) -> bool {
+    !(scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https"))
+}
+
 pub fn open_url_scheme(url: &str) -> Result<()> {
     let scheme = scheme_of(url).ok_or_else(|| PlatformError::Os("not a URL".into()))?;
+    if !needs_handler_check(scheme) {
+        // The URL starts with a letter (`scheme_of`), so it can never be parsed as an option.
+        return xdg_open(std::ffi::OsStr::new(url));
+    }
     let not_registered =
         || PlatformError::Os(format!("no app is registered for {scheme}:// links"));
     let xdg_mime = cmd::which("xdg-mime").ok_or_else(not_registered)?;
@@ -84,6 +96,16 @@ mod tests {
         assert_eq!(handler_from(""), None, "no handler → never open a picker");
         assert_eq!(handler_from("\n"), None);
         assert_eq!(handler_from("xdg-mime: unknown mode"), None);
+    }
+
+    #[test]
+    fn web_links_skip_the_handler_check() {
+        assert!(!needs_handler_check("http"));
+        assert!(!needs_handler_check("https"));
+        assert!(!needs_handler_check("HTTPS"));
+        assert!(needs_handler_check("kotilo"));
+        assert!(needs_handler_check("httpx"));
+        assert!(needs_handler_check("mailto"));
     }
 
     #[test]
