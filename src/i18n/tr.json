@@ -885,9 +885,13 @@
 			"logs": "Günlükler",
 			"privacy": "Hesap yok, bulut yok, telemetri yok. Her şey bu bilgisayarda kalır.",
 			"support": "Destek",
+			"reportIssue": "Sorun bildir",
+			"reportIssueHelp": "Önceden doldurulmuş bir GitHub sorunu açar. Günlükler asla otomatik eklenmez.",
+			"openLogs": "Günlük klasörünü aç",
 			"setupAgain": "Kurulumu yeniden çalıştır",
 			"setupAgainHelp": "İlk kurulumu deck’te gösterir: ekran, tema ve çalışma alanı.",
-			"setupAgainDone": "Kurulum deck’te açıldı."
+			"setupAgainDone": "Kurulum deck’te açıldı.",
+			"actionFailed": "Yapılamadı: {message}"
 		}
 	},
 	"onboarding": {
@@ -939,5 +943,12 @@
 			"tipSettings": "Ayarlar tepsi simgesinin menüsünde; deck’te Ctrl+, de açar.",
 			"open": "Deck’i aç"
 		}
+	},
+	"crash": {
+		"title": "Kotilo Deck geçen sefer beklenmedik şekilde kapandı.",
+		"report": "Sorun bildir",
+		"logs": "Günlükleri aç",
+		"dismiss": "Kapat",
+		"failed": "Yapılamadı: {message}"
 	}
 }

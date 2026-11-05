@@ -7,7 +7,8 @@
 	import './settings.css';
 	import { onMount } from 'svelte';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
-	import { isTauri, on, type DeckSettings } from '#lib/ipc/index.ts';
+	import { isTauri, logFrontendError, on, type DeckSettings } from '#lib/ipc/index.ts';
+	import { installErrorHooks } from '#lib/crash/index.ts';
 	import { listen } from '#lib/ipc/transport.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { applyTheme, effectiveThemeId, getTheme, pairFor, themes } from '#lib/theme/index.ts';
@@ -81,6 +82,8 @@
 		else if (isSection(fromHash)) section = fromHash;
 		const stopAmbient = ambient.start();
 		const stopCompanion = ui.companion.start();
+		// Uncaught errors → backend log (host window only; the settings route never mounts this remotely).
+		const stopErrorHooks = isTauri() ? installErrorHooks(window, logFrontendError) : () => {};
 		// Deep links from the deck (top-bar companion status): an open window gets an event, a browser tab a hash change.
 		const onHash = () => {
 			const id = location.hash.slice(1);
@@ -114,6 +117,7 @@
 		const onPageHide = () => void store.flush();
 		window.addEventListener('pagehide', onPageHide);
 		return () => {
+			stopErrorHooks();
 			stopAmbient();
 			stopCompanion();
 			window.removeEventListener('hashchange', onHash);

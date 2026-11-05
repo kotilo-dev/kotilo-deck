@@ -8,12 +8,15 @@
 	import { fly } from 'svelte/transition';
 	import {
 		calendarUpcoming,
+		crashLast,
 		hasBackend,
 		isRemote,
 		isTauri,
+		logFrontendError,
 		on,
 		pomodoroState,
 		wallpaperList,
+		type CrashReport,
 		type Wallpaper
 	} from '#lib/ipc/index.ts';
 	import { wallpaperSrc } from '#lib/ipc/transport.ts';
@@ -37,8 +40,10 @@
 	import Toast from '#lib/ui/Toast.svelte';
 	import TopBar from '#lib/ui/TopBar.svelte';
 	import WidgetDrawer from '#lib/ui/WidgetDrawer.svelte';
+	import CrashBanner from '#lib/ui/CrashBanner.svelte';
 	import Onboarding from '#lib/onboarding/Onboarding.svelte';
 	import { shouldShowOnboarding } from '#lib/onboarding/index.ts';
+	import { installErrorHooks } from '#lib/crash/index.ts';
 
 	const backend = defaultBackend();
 	const ui = new DeckUi();
@@ -141,6 +146,9 @@
 		if (isTauri()) saved.then(() => (onboardingDismissed = false), () => {});
 	}
 
+	// Last run crashed (Phase 5): non-blocking banner, held back while onboarding is up.
+	let crash = $state<CrashReport | null>(null);
+
 	// Effective theme = workspace override → global setting → default, then the light/dark pair when the
 	// auto switch asks for the other variant. Only CSS custom properties change, so switching is instant.
 	const theme = $derived.by(() => {
@@ -222,6 +230,14 @@
 		const stopCompanion = ui.companion.start();
 		if (hasBackend()) void pomodoroState().then((s) => switcher.seedPomodoro(s), () => switcher.seedPomodoro(null));
 
+		// Host only: uncaught errors → backend log; previous crash → banner.
+		const stopErrorHooks = isTauri() ? installErrorHooks(window, logFrontendError) : () => {};
+		if (isTauri()) {
+			crashLast()
+				.then((c) => (crash = c))
+				.catch(() => {});
+		}
+
 		void store.init();
 		void loadUserThemes();
 		void loadWallpapers();
@@ -284,6 +300,7 @@
 
 		return () => {
 			motion.removeEventListener('change', onMotion);
+			stopErrorHooks();
 			stopAmbient();
 			stopCompanion();
 			unwatch();
@@ -374,6 +391,9 @@
 			{/if}
 			<SettingsSheet />
 			<Toast />
+			{#if crash && !showOnboarding}
+				<CrashBanner {crash} onclose={() => (crash = null)} />
+			{/if}
 			{#if showOnboarding}
 				<Onboarding ondone={onboardingDone} />
 			{/if}

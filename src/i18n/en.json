@@ -885,9 +885,13 @@
 			"logs": "Logs",
 			"privacy": "No account, no cloud, no telemetry. Everything stays on this computer.",
 			"support": "Support",
+			"reportIssue": "Report an issue",
+			"reportIssueHelp": "Opens a prefilled GitHub issue. Logs are never attached for you.",
+			"openLogs": "Open logs folder",
 			"setupAgain": "Run setup again",
 			"setupAgainHelp": "Shows the first-run setup on the deck: screen, theme and workspace.",
-			"setupAgainDone": "Setup is open on the deck."
+			"setupAgainDone": "Setup is open on the deck.",
+			"actionFailed": "Couldn't do that: {message}"
 		}
 	},
 	"onboarding": {
@@ -939,5 +943,12 @@
 			"tipSettings": "Settings live in the tray icon menu, or press Ctrl+, on the deck.",
 			"open": "Open deck"
 		}
+	},
+	"crash": {
+		"title": "Kotilo Deck closed unexpectedly last time.",
+		"report": "Report issue",
+		"logs": "Open logs",
+		"dismiss": "Dismiss",
+		"failed": "Couldn't do that: {message}"
 	}
 }

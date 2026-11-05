@@ -5,7 +5,7 @@
 	 */
 	import { onMount } from 'svelte';
 	import { locale, t, tCode } from '#lib/i18n/index.ts';
-	import { on, updateCheck, updateInstall, updateStatus, type UpdateStatus } from '#lib/ipc/index.ts';
+	import { on, openLogsFolder, openReportIssue, updateCheck, updateInstall, updateStatus, type UpdateStatus } from '#lib/ipc/index.ts';
 	import { resetPatch } from '#lib/onboarding/index.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { errText, getSettingsContext } from './context.svelte';
@@ -78,6 +78,22 @@
 			requesting = false;
 		}
 	}
+	async function reportIssue() {
+		try {
+			await openReportIssue(null);
+		} catch (e) {
+			ui.say(t('settings.about.actionFailed', { message: errText(e) }), 'warning', 6000);
+		}
+	}
+
+	async function openLogs() {
+		try {
+			await openLogsFolder();
+		} catch (e) {
+			ui.say(t('settings.about.actionFailed', { message: errText(e) }), 'warning', 6000);
+		}
+	}
+
 	async function runSetupAgain() {
 		// The deck reacts to settings://changed and opens onboarding right away.
 		if (await save(resetPatch(store.settings.onboarding ?? { completed: true, version: 0 }))) {
@@ -165,6 +181,20 @@
 	</div>
 	<div class="s-group">
 		<h2 class="s-eyebrow">{t('settings.about.support')}</h2>
+		<div class="s-card s-row" class:s-disabled={!env.tauri}>
+			<div class="s-label">
+				<span class="s-title">{t('settings.about.reportIssue')}</span>
+				<span class="s-help">{env.tauri ? t('settings.about.reportIssueHelp') : t('settings.common.desktopOnly')}</span>
+			</div>
+			<div class="s-inline actions">
+				<button type="button" class="k-btn s-btn-sm" disabled={!env.tauri} onclick={openLogs}>
+					<Icon name="folder" size={16} />{t('settings.about.openLogs')}
+				</button>
+				<button type="button" class="k-btn s-btn-sm" disabled={!env.tauri} onclick={reportIssue}>
+					<Icon name="bug" size={16} />{t('settings.about.reportIssue')}
+				</button>
+			</div>
+		</div>
 		<div class="s-card s-row" class:s-disabled={!env.tauri}>
 			<div class="s-label">
 				<span class="s-title">{t('settings.about.setupAgain')}</span>
