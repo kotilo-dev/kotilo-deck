@@ -190,11 +190,30 @@ jobs:
     needs: [verify-version, create-release, build]
     runs-on: ubuntu-latest
     steps:
+      # On a draft, tauri-action writes API asset URLs (api.github.com/.../releases/assets/<id>),
+      # which need an octet-stream Accept header. Point every entry at the public download URL
+      # (valid once the release is published) instead.
+      - name: Point latest.json at download URLs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir .
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" --paginate \
+            --jq 'map({key: (.id | tostring), value: .name}) | from_entries' | jq -s 'add' > assets.json
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/"
+          jq --slurpfile a assets.json --arg base "$base" '
+            .platforms |= with_entries(
+              .value.url |= (if startswith($base) then . else $base + $a[0][(split("/") | last)] end))
+          ' latest.json > fixed.json
+          mkdir -p out && mv fixed.json out/latest.json
+          gh release upload "$TAG" out/latest.json --clobber --repo "$GITHUB_REPOSITORY"
       - name: latest.json lists both platforms with signatures
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.verify-version.outputs.version }}
         run: |
+          rm -f latest.json
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir .
           cat latest.json
           jq -e --arg v "$VERSION" --arg dl "/download/$TAG/" '
