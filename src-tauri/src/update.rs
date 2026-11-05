@@ -6,6 +6,9 @@
 //! The state machine ([`Engine`]) is independent of the network: it talks to a
 //! [`Backend`], which is `tauri-plugin-updater` in the app and a fake in the tests.
 //!
+//! On Linux only AppImages can replace themselves: Flatpak and package-managed (deb/rpm)
+//! installs report `unsupported` with a hint in `error` ([`install_blocker`]).
+//!
 //! Owner: rust-platform (plugins + updater worktree).
 
 use std::future::Future;
@@ -39,7 +42,8 @@ pub enum UpdateState {
     /// Installed; relaunch pending (Windows installers quit the app themselves).
     Ready,
     Error,
-    /// Dev build or no updater configured.
+    /// Dev build, no updater configured, or an install the updater cannot replace
+    /// (Linux Flatpak / deb / rpm; `error` then says how to update instead).
     Unsupported,
 }
 
@@ -78,6 +82,9 @@ pub mod code {
     /// The minisign signature or the signed version did not verify.
     pub const SIGNATURE: &str = "signature";
     pub const INSTALL_FAILED: &str = "install-failed";
+    /// State `unsupported`: Flatpak, deb, rpm or another package-managed Linux install;
+    /// updates come from the package manager / software center.
+    pub const PACKAGE_MANAGED: &str = "package-managed";
     pub const OTHER: &str = "other";
 }
 
@@ -161,6 +168,18 @@ impl<B: Backend> Engine<B> {
             backend,
             emit,
         }
+    }
+
+    /// Pins the state to `unsupported` with an English hint (`error`) and `code`, so the UI
+    /// can say how to update instead.
+    pub fn blocked(self, code: &'static str, hint: &str) -> Self {
+        {
+            let mut s = self.lock();
+            s.state = UpdateState::Unsupported;
+            s.error = Some(hint.to_string());
+            s.error_code = Some(code);
+        }
+        self
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, UpdateStatus> {
@@ -255,7 +274,10 @@ impl<B: Backend> Engine<B> {
             let mut s = self.lock();
             match s.state {
                 UpdateState::Unsupported => {
-                    return Err("updates are not available in this build".into())
+                    return Err(s
+                        .error
+                        .clone()
+                        .unwrap_or_else(|| "updates are not available in this build".into()))
                 }
                 UpdateState::Checking | UpdateState::Downloading => {
                     return Err("an update is already in progress".into())
@@ -460,11 +482,37 @@ fn reschedule(app: &AppHandle, updates: &UpdateSettings, startup: bool) {
     }));
 }
 
+/// Why this install cannot update itself (English hint), or `None`. Takes the env values
+/// so it is testable: `flatpak_id` = `$FLATPAK_ID`, `appimage` = `$APPIMAGE` (empty =
+/// unset). On Linux only an AppImage can be replaced by the updater; Flatpak and
+/// deb/rpm/other package-managed installs update through their package manager.
+pub fn install_blocker(
+    linux: bool,
+    flatpak_id: Option<&str>,
+    appimage: Option<&str>,
+) -> Option<&'static str> {
+    let set = |v: Option<&str>| v.is_some_and(|v| !v.trim().is_empty());
+    if !linux {
+        None
+    } else if set(flatpak_id) {
+        Some("Installed from Flatpak: update Kotilo Deck with your software center or `flatpak update`.")
+    } else if !set(appimage) {
+        Some("Installed by your package manager: update Kotilo Deck with it (or your software center).")
+    } else {
+        None
+    }
+}
+
 /// Startup: schedules the periodic check when `updates.autoCheck`.
 pub fn start(app: &AppHandle, updates: &UpdateSettings) {
-    let supported = !cfg!(debug_assertions);
+    let blocker = install_blocker(
+        cfg!(target_os = "linux"),
+        std::env::var("FLATPAK_ID").ok().as_deref(),
+        std::env::var("APPIMAGE").ok().as_deref(),
+    );
+    let supported = !cfg!(debug_assertions) && blocker.is_none();
     let emitter = app.clone();
-    let engine = Engine::new(
+    let mut engine = Engine::new(
         TauriBackend {
             app: app.clone(),
             pending: Mutex::new(None),
@@ -475,11 +523,15 @@ pub fn start(app: &AppHandle, updates: &UpdateSettings) {
             let _ = emitter.emit(EVENT_UPDATE_STATUS, s);
         }),
     );
+    if let Some(hint) = blocker {
+        tracing::info!("auto-update disabled: {hint}");
+        engine = engine.blocked(code::PACKAGE_MANAGED, hint);
+    }
     app.manage(UpdateHub {
         engine,
         schedule: Mutex::new(None),
     });
-    if !supported {
+    if cfg!(debug_assertions) {
         tracing::info!("auto-update disabled in debug builds");
     }
     reschedule(app, updates, true);
@@ -783,6 +835,41 @@ mod tests {
         assert_eq!(e.status().state, UpdateState::Unsupported);
         assert_eq!(e.check().await.state, UpdateState::Unsupported);
         assert!(e.install().await.is_err());
+        assert_eq!(e.backend.calls.load(Ordering::SeqCst), 0);
+        assert!(log.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn linux_installs_the_updater_cannot_replace() {
+        // Windows (and other non-Linux) is never blocked, whatever the env says.
+        assert_eq!(install_blocker(false, Some("org.kotilo.Deck"), None), None);
+        assert_eq!(install_blocker(false, None, None), None);
+        // AppImage: the updater replaces the file.
+        assert_eq!(
+            install_blocker(true, None, Some("/home/u/Kotilo.AppImage")),
+            None
+        );
+        // Flatpak wins even if APPIMAGE leaked into the env.
+        let flatpak = install_blocker(true, Some("org.kotilo.Deck"), Some("/x.AppImage"));
+        assert!(flatpak.unwrap().contains("Flatpak"));
+        // deb / rpm / anything without APPIMAGE (empty counts as unset).
+        for appimage in [None, Some(""), Some("  ")] {
+            let hint = install_blocker(true, Some(""), appimage).unwrap();
+            assert!(hint.contains("package manager"), "{appimage:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn blocked_install_is_unsupported_with_a_hint() {
+        let (e, log) = engine(Fake::default(), true);
+        let e = e.blocked(code::PACKAGE_MANAGED, "use flatpak update");
+        let s = e.status();
+        assert_eq!(s.state, UpdateState::Unsupported);
+        assert_eq!(s.error.as_deref(), Some("use flatpak update"));
+        assert_eq!(s.error_code, Some(code::PACKAGE_MANAGED));
+        // Checks keep the hint and never reach the backend.
+        assert_eq!(e.check().await, s);
+        assert_eq!(e.install().await.unwrap_err(), "use flatpak update");
         assert_eq!(e.backend.calls.load(Ordering::SeqCst), 0);
         assert!(log.lock().unwrap().is_empty());
     }
