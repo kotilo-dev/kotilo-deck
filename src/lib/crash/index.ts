@@ -16,24 +16,46 @@ export interface HookOptions {
 
 const MAX_MESSAGE = 500;
 const MAX_STACK = 4000;
+/** Thrown/rejected strings are free text from anywhere: keep a short prefix only. */
+const MAX_STRING = 200;
 
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n) : s);
 
-/** Message + stack from whatever was thrown or rejected (Error, string, object, undefined). */
+/**
+ * `object (Response)`, `number`, `function`…: what a non-Error value was, never what it contained
+ * (objects can carry tokens, settings, response bodies into the log).
+ */
+export function typeDescription(value: unknown): string {
+	const type = typeof value;
+	if (type !== 'object') return type;
+	let name = '';
+	try {
+		const ctor = (Object.getPrototypeOf(value) as { constructor?: unknown } | null)?.constructor;
+		if (typeof ctor === 'function' && typeof ctor.name === 'string') name = ctor.name;
+	} catch {
+		// Proxies / exotic objects: the type alone is enough.
+	}
+	return /^[\w$]{1,60}$/.test(name) ? `object (${name})` : 'object';
+}
+
+/**
+ * Message + stack from whatever was thrown or rejected. Errors keep name, message and stack; strings are
+ * clipped to 200 chars; anything else is logged as `<fallback>: <type description>` without its contents.
+ */
 export function describeError(value: unknown, fallback = 'Unknown error'): { message: string; stack: string | null } {
-	if (value instanceof Error) {
+	let isError = false;
+	try {
+		isError = value instanceof Error;
+	} catch {
+		// A Proxy's getPrototypeOf trap may throw; treat it as a plain object.
+	}
+	if (isError && value instanceof Error) {
 		const message = value.message ? `${value.name}: ${value.message}` : value.name || fallback;
 		return { message: clip(message, MAX_MESSAGE), stack: value.stack ? clip(value.stack, MAX_STACK) : null };
 	}
-	if (typeof value === 'string') return { message: clip(value || fallback, MAX_MESSAGE), stack: null };
+	if (typeof value === 'string') return { message: value ? clip(value, MAX_STRING) : fallback, stack: null };
 	if (value === undefined || value === null) return { message: fallback, stack: null };
-	let text: string;
-	try {
-		text = JSON.stringify(value) ?? String(value);
-	} catch {
-		text = String(value);
-	}
-	return { message: clip(text, MAX_MESSAGE), stack: null };
+	return { message: clip(`${fallback}: ${typeDescription(value)}`, MAX_MESSAGE), stack: null };
 }
 
 /** Normalises a window `error` / `unhandledrejection` event; null for events we ignore (resource loads). */

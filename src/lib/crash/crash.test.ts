@@ -20,14 +20,40 @@ describe('describeError', () => {
 		expect(d.stack).toContain('x is undefined');
 	});
 
-	it('handles strings, objects and nothing', () => {
+	it('handles strings and nothing', () => {
 		expect(describeError('boom')).toEqual({ message: 'boom', stack: null });
-		expect(describeError({ code: 1 })).toEqual({ message: '{"code":1}', stack: null });
+		expect(describeError('', 'fallback')).toEqual({ message: 'fallback', stack: null });
 		expect(describeError(undefined, 'fallback')).toEqual({ message: 'fallback', stack: null });
+		expect(describeError(null, 'fallback')).toEqual({ message: 'fallback', stack: null });
 	});
 
-	it('clips long messages to 500 chars', () => {
-		expect(describeError('a'.repeat(900)).message).toHaveLength(500);
+	it('logs only the type of non-Error values, never their contents', () => {
+		const secret = { token: 'hunter2', nested: { password: 'pw' } };
+		const d = describeError(secret, 'Unhandled promise rejection');
+		expect(d).toEqual({ message: 'Unhandled promise rejection: object (Object)', stack: null });
+		expect(d.message).not.toContain('hunter2');
+
+		class Response {
+			body = 'private body';
+		}
+		expect(describeError(new Response(), 'Unhandled promise rejection').message).toBe('Unhandled promise rejection: object (Response)');
+		expect(describeError(Object.create(null), 'x').message).toBe('x: object');
+		expect(describeError(42, 'x').message).toBe('x: number');
+		expect(describeError(() => 1, 'x').message).toBe('x: function');
+		const hostile = new Proxy(
+			{},
+			{
+				getPrototypeOf() {
+					throw new Error('trap');
+				}
+			}
+		);
+		expect(describeError(hostile, 'x').message).toBe('x: object');
+	});
+
+	it('clips strings to 200 chars and Error messages to 500', () => {
+		expect(describeError('a'.repeat(900)).message).toHaveLength(200);
+		expect(describeError(new Error('a'.repeat(900))).message).toHaveLength(500);
 	});
 });
 
@@ -44,6 +70,7 @@ describe('fromEvent', () => {
 
 	it('rejections use the reason', () => {
 		expect(fromEvent(rejection(new Error('nope')))?.message).toBe('Error: nope');
+		expect(fromEvent(rejection({ apiKey: 'k' }))?.message).toBe('Unhandled promise rejection: object (Object)');
 	});
 });
 
