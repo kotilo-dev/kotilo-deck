@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const read = (p) => readFileSync(join(root, p), 'utf8');
+const read = (/** @type {string} */ p) => readFileSync(join(root, p), 'utf8');
 
 const cargoPackage = read('src-tauri/Cargo.toml').split(/^\[/m).find((s) => s.startsWith('package]'));
 const versions = {
