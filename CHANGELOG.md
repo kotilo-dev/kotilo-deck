@@ -12,6 +12,8 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Release workflow: pushing a `v*` tag builds every installer, its updater signature and `latest.json` into a draft GitHub Release with the changelog as notes; optional Windows code signing from repository secrets.
 - winget manifest (`Kotilo.KotiloDeck`) and Flatpak manifest (`dev.kotilo.deck`) with AppStream metadata.
 - Bug report issue template; `docs/install.md` and `docs/releasing.md`.
+- Demo mode: open the deck in a browser with `?demo` (optionally `&theme=<id>&workspace=<id>`) to try it with sample data; nothing is saved.
+- `pnpm screenshots` regenerates the README screenshots (every preset and widget in four themes, 7" and portrait layouts) and the GIF; CI uploads them as an artifact.
 - Linux platform layer: volume, devices and per-app mixer via `pactl` (PulseAudio / PipeWire) with a `wpctl` fallback; media via MPRIS (D-Bus); AMD GPU load from sysfs; `kotilo://` links and folders via `xdg-open`. Not yet run on a real Linux machine.
 - Tablet/browser mode: serve the deck on the LAN (off by default, token-protected, QR code in Settings ▸ Tablet & browser); remote browsers get the deck with per-device theme and workspace. Rotating a tablet reflows the layout on that device only and never rewrites the host's workspaces.
 - External widget plugins: drop a folder into `~/.kotilo/deck/widgets/` and it appears in the drawer without a rebuild; sandboxed iframe, no network, theme tokens and system/media/pomodoro data via `docs/plugin-api.md`; example in `examples/widgets/hello/`; Settings ▸ Widgets page.
