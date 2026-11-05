@@ -17,4 +17,4 @@ assignees: ''
 <!-- Settings ▸ About shows the version. Windows 10/11 or Linux distro + desktop (GNOME, KDE…). -->
 
 **Log**
-<!-- Settings ▸ About ▸ Open logs folder, then drag today's deck.log.<date> file here. Logs contain no personal data. -->
+<!-- Settings ▸ About ▸ Open logs folder, then drag today's deck.log.<date> file here. Logs hold no passwords or tokens, but may contain monitor, workspace and app names; skim the file before attaching it. -->

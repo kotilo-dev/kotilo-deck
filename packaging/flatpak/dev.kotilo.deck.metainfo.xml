@@ -67,7 +67,7 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
-    <release version="1.0.0" date="2026-11-30">
+    <release version="1.0.0" date="2026-11-20">
       <url type="details">https://github.com/kotilo-dev/kotilo-deck/releases/tag/v1.0.0</url>
       <description>
         <p>First stable release.</p>

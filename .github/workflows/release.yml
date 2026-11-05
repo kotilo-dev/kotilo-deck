@@ -7,7 +7,9 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    # Plain X.Y.Z only: WiX rejects pre-release versions, and a published pre-release would
+    # become releases/latest for the updater.
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
     inputs:
       tag:
@@ -63,6 +65,10 @@ jobs:
           # Evaluates to 'true' / 'false'; the secret itself never reaches the shell.
           HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
         run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$TAG is not vX.Y.Z; pre-releases are not supported (WiX, updater 'latest')."
+            exit 1
+          fi
           node scripts/changelog-section.mjs "$TAG" > notes.md
           if [ "$HAS_WINDOWS_CERT" != "true" ]; then
             cat >> notes.md <<'EOF'
@@ -89,6 +95,9 @@ jobs:
     needs: create-release
     strategy:
       fail-fast: false
+      # One at a time: each job merges its platform into the draft's latest.json, and two
+      # jobs finishing together would overwrite each other's entry.
+      max-parallel: 1
       matrix:
         include:
           - platform: windows-latest
@@ -132,6 +141,10 @@ jobs:
         run: |
           $bundleArgs = "--bundles $env:BUNDLES"
           if ($IsWindows -and $env:WINDOWS_CERTIFICATE) {
+            if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) {
+              Write-Host '::error::WINDOWS_CERTIFICATE is set but WINDOWS_CERTIFICATE_PASSWORD is not.'
+              exit 1
+            }
             $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
             [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
             $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
@@ -166,8 +179,8 @@ jobs:
           uploadUpdaterSignatures: true
           retryAttempts: 1
 
-  # Both matrix jobs merge their platform into latest.json on the draft. They can race, so
-  # check the result: the updater needs windows-x86_64 (NSIS) and linux-x86_64 (AppImage).
+  # Both matrix jobs merge their platform into latest.json on the draft (one after the
+  # other); check the result: the updater needs windows-x86_64 (NSIS) and linux-x86_64 (AppImage).
   verify-release:
     needs: [verify-version, create-release, build]
     runs-on: ubuntu-latest
@@ -179,8 +192,10 @@ jobs:
         run: |
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir .
           cat latest.json
-          jq -e --arg v "$VERSION" '
+          jq -e --arg v "$VERSION" --arg dl "/download/$TAG/" '
             .version == $v
+            and (.platforms["windows-x86_64"].url | contains($dl))
+            and (.platforms["linux-x86_64"].url | contains($dl))
             and (.platforms["windows-x86_64"].url | test("-setup\\.exe$"))
             and (.platforms["windows-x86_64"].signature | length > 0)
             and (.platforms["linux-x86_64"].url | test("\\.AppImage$"))

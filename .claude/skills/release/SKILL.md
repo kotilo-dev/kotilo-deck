@@ -20,7 +20,7 @@ Full maintainer guide: `docs/releasing.md`. Versions follow SemVer; the same ver
 - `verify-version`: the tag must equal the three versions, and CHANGELOG must have the section.
 - `create-release`: creates a **draft** release `vx.y.z` whose body is the changelog section. It adds an "unsigned" note when the `WINDOWS_CERTIFICATE` secret is missing.
 - `build`: `tauri-action` (pinned to v1.0.0 by SHA) on windows-latest (`nsis,msi`) and ubuntu-22.04 (`appimage,deb,rpm`). It uploads the installers and `.sig` files and merges `latest.json`: `windows-x86_64` points at the NSIS `-setup.exe` and `linux-x86_64` at the AppImage. Needs the `TAURI_SIGNING_PRIVATE_KEY` secret (contents of `~/.tauri/kotilo-deck.key`); leave `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` unset (empty password).
-- `verify-release`: fails unless `latest.json` has both platforms with signatures. If the two matrix jobs raced, re-run the failed job.
+- `verify-release`: fails unless `latest.json` has both platforms with signatures. The build jobs run one at a time so `latest.json` isn't overwritten; if the check still fails, delete `latest.json` from the draft and re-run the whole workflow. Only plain `vX.Y.Z` tags trigger a release (no pre-releases).
 - To rebuild an existing tag: Actions ▸ Release ▸ Run workflow with `tag: vx.y.z` (reuses the draft; refuses a published release).
 
 ## Verify and publish
