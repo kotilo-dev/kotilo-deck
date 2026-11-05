@@ -194,6 +194,10 @@ pub async fn settings_import_all(
     tracing::info!(backup = %file_label(&backup_dir), workspaces = workspaces.len(), "importing settings");
     // Missing keys in the export take defaults, so import = full replace.
     let mut full = settings::to_map(&DeckSettings::default());
+    // Except onboarding: an export from before Phase 5 must not restart it.
+    if !settings_patch.contains_key("onboarding") {
+        full.remove("onboarding");
+    }
     full.extend(settings_patch);
     settings::apply_patch(&app, &full)?;
     let result = replace_workspaces(&store, &dir, &workspaces);

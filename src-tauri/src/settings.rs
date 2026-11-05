@@ -32,6 +32,7 @@ const NESTED_KEYS: &[&str] = &[
     "pomodoro",
     "lan",
     "updates",
+    "onboarding",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -208,6 +209,28 @@ impl Default for UpdateSettings {
     }
 }
 
+/// Phase 5 first-run onboarding. A fresh install (no settings file) starts at
+/// [`Default`] (`completed: false`); a settings file written before this key existed loads
+/// as [`OnboardingSettings::UPGRADED`] so upgrading users never see onboarding.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnboardingSettings {
+    pub completed: bool,
+    /// Onboarding flow version the user finished (0 = none).
+    pub version: u32,
+}
+
+/// Upper bound for `onboarding.version` (sanity check, flows are numbered 1, 2, ...).
+pub const MAX_ONBOARDING_VERSION: u32 = 1000;
+
+impl OnboardingSettings {
+    /// Settings files from before Phase 5: treated as done, without claiming a flow version.
+    pub const UPGRADED: Self = Self {
+        completed: true,
+        version: 0,
+    };
+}
+
 /// Lengths in minutes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -321,6 +344,8 @@ pub struct DeckSettings {
     // Phase 4 (additive, still schemaVersion 1).
     pub lan: LanSettings,
     pub updates: UpdateSettings,
+    // Phase 5 (additive, still schemaVersion 1).
+    pub onboarding: OnboardingSettings,
 }
 
 impl Default for DeckSettings {
@@ -345,6 +370,7 @@ impl Default for DeckSettings {
             auto_switch: Vec::new(),
             lan: LanSettings::default(),
             updates: UpdateSettings::default(),
+            onboarding: OnboardingSettings::default(),
         }
     }
 }
@@ -462,6 +488,11 @@ fn validate_phase4(s: &DeckSettings) -> Result<(), String> {
             crate::companion::PORT
         ));
     }
+    if s.onboarding.version > MAX_ONBOARDING_VERSION {
+        return Err(format!(
+            "onboarding.version must be between 0 and {MAX_ONBOARDING_VERSION}"
+        ));
+    }
     Ok(())
 }
 
@@ -558,9 +589,18 @@ fn set_path(map: &mut Map<String, Value>, path: &[String], value: Value) {
 /// Builds settings from raw store entries. Each stored key (each leaf, for the nested
 /// objects) is applied on top of the defaults only if it still deserialises and validates,
 /// so one corrupt value never resets the rest.
+///
+/// An empty store is a fresh install. A non-empty store without `onboarding` (or with a
+/// corrupt one) was written by an earlier version, so onboarding starts as completed.
 pub fn from_stored(entries: Map<String, Value>) -> DeckSettings {
+    let existing = !entries.is_empty();
     let entries = migrations::migrate_settings(entries);
-    let defaults = to_map(&DeckSettings::default());
+    let mut defaults = to_map(&DeckSettings::default());
+    if existing {
+        if let Ok(v) = serde_json::to_value(OnboardingSettings::UPGRADED) {
+            defaults.insert("onboarding".into(), v);
+        }
+    }
     let mut merged = defaults.clone();
     for (key, value) in entries {
         if key == "schemaVersion" || !merged.contains_key(&key) {
@@ -794,10 +834,66 @@ mod tests {
                 "calendarFeeds": [],
                 "autoSwitch": [],
                 "lan": {"enabled": false, "port": 47832},
-                "updates": {"autoCheck": true}
+                "updates": {"autoCheck": true},
+                "onboarding": {"completed": false, "version": 0}
             })
         );
         assert!(validate(&DeckSettings::default()).is_ok());
+    }
+
+    #[test]
+    fn fresh_install_starts_onboarding() {
+        let s = from_stored(Map::new());
+        assert_eq!(s.onboarding, OnboardingSettings::default());
+        assert!(!s.onboarding.completed);
+        assert_eq!(s.onboarding.version, 0);
+    }
+
+    #[test]
+    fn pre_phase5_store_skips_onboarding() {
+        let s = from_stored(obj(json!({"schemaVersion": 1, "theme": "nord"})));
+        assert_eq!(s.onboarding, OnboardingSettings::UPGRADED);
+        assert_eq!(s.theme.as_deref(), Some("nord"));
+        // A corrupt value in an existing store also counts as completed.
+        for bad in [json!("garbage"), json!({"completed": "no", "version": -1})] {
+            let s = from_stored(obj(json!({"theme": "nord", "onboarding": bad.clone()})));
+            assert!(s.onboarding.completed, "{bad}");
+        }
+    }
+
+    #[test]
+    fn onboarding_round_trips_and_validates() {
+        // Fresh install, user finishes onboarding, the store is written and read back.
+        let fresh = from_stored(Map::new());
+        let done = merge(
+            &fresh,
+            &obj(json!({"onboarding": {"completed": true, "version": 1}})),
+        )
+        .unwrap();
+        assert_eq!(
+            done.onboarding,
+            OnboardingSettings {
+                completed: true,
+                version: 1
+            }
+        );
+        assert_eq!(from_stored(to_map(&done)).onboarding, done.onboarding);
+        // A store written while onboarding was still pending keeps it pending.
+        let pending = from_stored(to_map(&fresh));
+        assert!(!pending.onboarding.completed);
+        // Partial patch merges into the nested object.
+        let partial = merge(&fresh, &obj(json!({"onboarding": {"completed": true}}))).unwrap();
+        assert!(partial.onboarding.completed);
+        assert_eq!(partial.onboarding.version, 0);
+        for bad in [
+            json!({"onboarding": {"completed": "yes"}}),
+            json!({"onboarding": {"version": -1}}),
+            json!({"onboarding": {"version": 1.5}}),
+            json!({"onboarding": {"version": 1001}}),
+            json!({"onboarding": true}),
+        ] {
+            assert!(merge(&fresh, &obj(bad.clone())).is_err(), "{bad}");
+        }
     }
 
     #[test]
