@@ -10,7 +10,7 @@
 //! remote side of the ref-counted subscriptions, and every `DeckEvents` event (Rust-side
 //! `listen_any`, which `app.emit` reaches) fanned out to the open sockets.
 
-mod allowlist;
+pub(crate) mod allowlist;
 mod assets;
 mod auth;
 mod dispatch;
