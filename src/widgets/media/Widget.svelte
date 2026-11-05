@@ -321,10 +321,14 @@
 		padding: 14px 18px;
 		font-family: var(--k-font-ui);
 	}
+	/* 4×2: artwork and the text/controls column form one block, top edges aligned, centred in the card.
+	   Artwork is 120 px (DESIGN §5.7) up to 1280×720 and grows on taller cards (1920×1080) instead of
+	   leaving the column to spread over the whole height. */
 	.media[data-size='4x2'] {
+		--art: clamp(min(120px, 100cqh), calc(100cqh - 150px), 320px);
 		padding: 18px 22px;
 		gap: 20px;
-		align-items: stretch;
+		align-items: center;
 	}
 	.mono {
 		font-family: var(--k-font-mono);
@@ -348,9 +352,8 @@
 		border-radius: 12px;
 	}
 	.art-l {
-		align-self: center;
-		width: min(120px, 100cqh);
-		height: min(120px, 100cqh);
+		width: var(--art);
+		height: var(--art);
 		border-radius: 14px;
 	}
 	.art img {
@@ -374,6 +377,8 @@
 	.col {
 		flex: 1;
 		min-width: 0;
+		min-height: var(--art);
+		max-height: 100%;
 		display: flex;
 		flex-direction: column;
 		justify-content: space-between;

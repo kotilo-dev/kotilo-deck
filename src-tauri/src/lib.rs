@@ -1,6 +1,7 @@
 pub mod platform;
 
 mod companion;
+mod crash;
 mod files;
 mod hotkeys;
 mod lan;
@@ -31,6 +32,8 @@ fn platform_capabilities() -> Vec<Capability> {
 
 pub fn run() {
     logging::init();
+    // Phase 5: crash logs; installed before anything else can panic.
+    crash::install();
     let builder = tauri::Builder::default()
         // Must be first: a second launch focuses the running deck and exits.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -128,6 +131,13 @@ pub fn run() {
             update::update_status,
             update::update_check,
             update::update_install,
+            // Phase 5: crash log + report issue (never on the LAN allowlist)
+            crash::crash_last,
+            crash::crash_dismiss,
+            crash::log_frontend_error,
+            crash::report_issue_url,
+            crash::open_report_issue,
+            crash::open_logs_folder,
         ])
         .build(tauri::generate_context!());
     match app {

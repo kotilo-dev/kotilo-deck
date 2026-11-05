@@ -12,3 +12,8 @@ node_modules/
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Flatpak builds (packaging/flatpak)
+/packaging/flatpak/shared-modules/
+/packaging/flatpak/build-dir/
+/packaging/flatpak/.flatpak-builder/

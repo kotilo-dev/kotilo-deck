@@ -5,6 +5,9 @@
  * - **remote**: a tablet/browser served by the deck's LAN server → `POST /api/invoke/<cmd>` and one shared
  *   WebSocket on `/api/events` pushing `{ event, payload }`.
  * - **local**: plain `pnpm dev` (no backend; `/api/hello` 404s) → callers use their localStorage fallbacks.
+ * - **demo**: a browser page opened with `?demo` (never inside Tauri) → an in-memory fake backend
+ *   (`./demo.ts`, loaded with a dynamic import so normal builds only carry a lazy chunk) with
+ *   deterministic data. Used for README screenshots (`pnpm screenshots`) and showing the deck off.
  *
  * `init()` decides once (cached) and must have resolved before the app mounts (`routes/+layout.ts`).
  * Before that `isRemote()` / `hasBackend()` report false outside Tauri.
@@ -19,7 +22,7 @@ export interface TransportEvent<T> {
 	payload: T;
 }
 export type EventHandler<T> = (event: TransportEvent<T>) => void;
-export type TransportMode = 'tauri' | 'remote' | 'local';
+export type TransportMode = 'tauri' | 'remote' | 'local' | 'demo';
 
 /** `GET /api/hello` body (ARCHITECTURE LAN mode). */
 export interface Hello {
@@ -37,6 +40,15 @@ export interface SocketLike {
 	close(): void;
 }
 
+/** In-memory backend behind `?demo` (`./demo.ts`). */
+export interface DemoBackend {
+	invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T>;
+	listen<T>(event: string, handler: EventHandler<T>): Promise<UnlistenFn>;
+}
+
+/** True when the page URL asks for the demo backend (`?demo`, any value). */
+export const wantsDemo = (search: string): boolean => new URLSearchParams(search).has('demo');
+
 export interface TransportEnv {
 	/** True inside the Tauri webview. */
 	tauri: () => boolean;
@@ -51,6 +63,10 @@ export interface TransportEnv {
 	clearTimeout: (id: unknown) => void;
 	/** How long `/api/hello` may take before we assume there is no server. */
 	helloTimeoutMs?: number;
+	/** `location.search` of the page; `?demo` selects the demo backend (outside Tauri only). */
+	search?: () => string;
+	/** Loads the demo backend (browser: dynamic `import('./demo')`). */
+	loadDemo?: (params: URLSearchParams) => Promise<DemoBackend>;
 }
 
 /** Reconnect backoff of the events socket: 1 s, doubling, capped at 30 s; reset after a successful open. */
@@ -72,6 +88,7 @@ export function createTransport(env: TransportEnv) {
 	let mode: TransportMode | null = null;
 	let hello: Hello | null = null;
 	let pending: Promise<TransportMode> | null = null;
+	let demo: DemoBackend | null = null;
 
 	// ── remote events socket ──
 	const handlers = new Map<string, Set<EventHandler<unknown>>>();
@@ -89,10 +106,20 @@ export function createTransport(env: TransportEnv) {
 
 	const isTauri = (): boolean => env.tauri();
 	const isRemote = (): boolean => !isTauri() && mode === 'remote';
-	const hasBackend = (): boolean => isTauri() || mode === 'remote';
+	const isDemo = (): boolean => !isTauri() && mode === 'demo' && demo !== null;
+	const hasBackend = (): boolean => isTauri() || mode === 'remote' || isDemo();
 
 	async function probe(): Promise<TransportMode> {
 		if (isTauri()) return 'tauri';
+		const search = env.search?.() ?? '';
+		if (env.loadDemo && wantsDemo(search)) {
+			try {
+				demo = await env.loadDemo(new URLSearchParams(search));
+				return 'demo';
+			} catch (e) {
+				console.error('kotilo-deck: demo backend failed to load', e);
+			}
+		}
 		if (!env.location()) return 'local';
 		let timer: unknown = null;
 		try {
@@ -278,7 +305,9 @@ export function createTransport(env: TransportEnv) {
 
 	async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
 		if (isTauri()) return env.tauriInvoke<T>(cmd, args);
-		if ((await init()) !== 'remote') throw 'Kotilo backend not available';
+		const m = await init();
+		if (m === 'demo' && demo) return demo.invoke<T>(cmd, args);
+		if (m !== 'remote') throw 'Kotilo backend not available';
 		const sub = SUBSCRIBE.exec(cmd);
 		const unsub = sub ? null : UNSUBSCRIBE.exec(cmd);
 		if (sub) await socketReady();
@@ -296,7 +325,9 @@ export function createTransport(env: TransportEnv) {
 
 	async function listen<T>(event: string, handler: EventHandler<T>): Promise<UnlistenFn> {
 		if (isTauri()) return env.tauriListen<T>(event, handler);
-		if ((await init()) !== 'remote') return () => {};
+		const m = await init();
+		if (m === 'demo' && demo) return demo.listen<T>(event, handler);
+		if (m !== 'remote') return () => {};
 		let set = handlers.get(event);
 		if (!set) handlers.set(event, (set = new Set()));
 		const h = handler as EventHandler<unknown>;
@@ -326,6 +357,7 @@ export function createTransport(env: TransportEnv) {
 		listen,
 		isTauri,
 		isRemote,
+		isDemo,
 		hasBackend,
 		/** Server hello (version) in remote mode, else null. */
 		hello: () => hello,
@@ -345,7 +377,9 @@ const browserEnv: TransportEnv = {
 	tauriInvoke: (cmd, args) => tauriInvoke(cmd, args),
 	tauriListen: (event, handler) => tauriListen(event, handler),
 	setTimeout: (fn, ms) => setTimeout(fn, ms),
-	clearTimeout: (id) => clearTimeout(id as ReturnType<typeof setTimeout>)
+	clearTimeout: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
+	search: () => (typeof location === 'undefined' ? '' : location.search),
+	loadDemo: (params) => import('./demo').then((m) => m.createDemoBackend({ params }))
 };
 
 const transport = createTransport(browserEnv);
@@ -360,6 +394,8 @@ export const isTauri = transport.isTauri;
 export const isRemote = transport.isRemote;
 /** Is there a backend at all (Tauri or remote)? False in plain `pnpm dev`. */
 export const hasBackend = transport.hasBackend;
+/** The in-memory demo backend (`?demo`): behaves like Tauri for data, but no window/OS APIs. */
+export const isDemo = transport.isDemo;
 export const remoteHello = transport.hello;
 
 /** `<img>/<video>` src for a wallpaper: the asset protocol in Tauri, the LAN server's `/wallpapers/<file>` remotely. */

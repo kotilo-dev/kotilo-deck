@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- First-run setup on the deck: pick the monitor, theme and starting workspace (Focus / Ops / Agents / Full) with live preview; skippable any time (Skip setup / Esc); Settings ▸ About ▸ "Run setup again". Users upgrading from an earlier version skip it.
+- Crash logs: a crash writes `~/.kotilo/deck/logs/crash-<UTC>.log` (version, OS, backtrace; home folder redacted) and the next start shows "Kotilo Deck closed unexpectedly last time." with Report issue, Open logs and Dismiss.
+- "Report an issue" opens a prefilled GitHub issue (version, OS, arch, WebView, crash summary; no logs or paths are sent), and "Open logs folder" in Settings ▸ About. Uncaught errors in the deck and settings windows are written to the app log (rate-limited).
+- Installers: per-user NSIS setup (English/Turkish, no admin rights, installs WebView2 if missing), MSI (en-US, tr-TR), AppImage, .deb and .rpm.
+- Release workflow: pushing a `v*` tag builds every installer, its updater signature and `latest.json` into a draft GitHub Release with the changelog as notes; optional Windows code signing from repository secrets.
+- winget manifest (`Kotilo.KotiloDeck`) and Flatpak manifest (`dev.kotilo.deck`) with AppStream metadata.
+- Bug report issue template; `docs/install.md` and `docs/releasing.md`.
+- Demo mode: open the deck in a browser with `?demo` (optionally `&theme=<id>&workspace=<id>`) to try it with sample data; nothing is saved.
+- `pnpm screenshots` regenerates the README screenshots (every preset and widget in four themes, 7" and portrait layouts) and the GIF; CI uploads them as an artifact.
 - Linux platform layer: volume, devices and per-app mixer via `pactl` (PulseAudio / PipeWire) with a `wpctl` fallback; media via MPRIS (D-Bus); AMD GPU load from sysfs; `kotilo://` links and folders via `xdg-open`. Not yet run on a real Linux machine.
 - Tablet/browser mode: serve the deck on the LAN (off by default, token-protected, QR code in Settings ▸ Tablet & browser); remote browsers get the deck with per-device theme and workspace. Rotating a tablet reflows the layout on that device only and never rewrites the host's workspaces.
 - External widget plugins: drop a folder into `~/.kotilo/deck/widgets/` and it appears in the drawer without a rebuild; sandboxed iframe, no network, theme tokens and system/media/pomodoro data via `docs/plugin-api.md`; example in `examples/widgets/hello/`; Settings ▸ Widgets page.
@@ -40,7 +49,18 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Settings: Companion page, ICS feed manager, Pomodoro page, workspace auto-switch rules (time, pomodoro start/end, calendar event start).
 - Top bar companion status; presets updated with the Phase 3 widgets.
 
+### Fixed
+- Pomodoro: removed the square outline around the timer ring (2×2, 4×2); a CSS class clashed with Tailwind's `ring` utility.
+- Agents: the 2×2 approval queue is no longer forced to `position: fixed` by a Tailwind class clash. Every custom CSS class that matched a Tailwind utility was renamed, and a test fails if a new one appears.
+- Agents: the 2×1 card lists agent rows when it has room instead of a blank area above the approval row.
+- Media: the 4×2 card keeps artwork, title and controls together on tall screens; the artwork grows instead of leaving a gap.
+- Edit mode: the per-card settings gear no longer covers header info ("2 / 4", "6 min ago", "4 left").
+- Ctrl+Z no longer undoes a deck action behind an open dialog.
+- Linux: the in-app updater no longer offers updates it cannot install; Flatpak and deb/rpm installs say to update through the software center or package manager (only AppImages update themselves).
+- Linux: "Report issue" and other web links open with `xdg-open` even without `xdg-mime` (Flatpak, minimal desktops).
+
 ### Changed
+- README rewritten for v1.0 with GIF, screenshot gallery, install summary, hardware ideas, shortcuts and privacy notes.
 - GPU is sampled every 3 s; deck widgets and timers pause while the deck is hidden; logs keep 14 days.
 - System 4×2: the CPU sparkline fills the tile and the per-core strip grows on large displays.
 - Settings dialogs are centred (Tailwind preflight zeroed dialog margins).

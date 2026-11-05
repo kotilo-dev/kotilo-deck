@@ -129,7 +129,7 @@
 				{@const hidden = layout(ws.widgets, ws.grid).unplaced.length}
 				<li class="s-card item">
 					<div class="row">
-					<div class="s-label grow">
+					<div class="s-label main">
 						<span class="s-title name">{ws.name}</span>
 						<span class="s-help">
 							<span class="k-mono">{ws.id}</span> · {t('settings.workspaces.widgets', { count: ws.widgets.length })}{#if hidden}
@@ -278,7 +278,7 @@
 		gap: 12px;
 		padding: 8px 8px 8px 14px;
 	}
-	.grow {
+	.main {
 		flex: 1;
 	}
 	.name {

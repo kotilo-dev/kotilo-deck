@@ -55,7 +55,7 @@
 		{#each zones as z, i (z.timeZone)}
 			<div class="zone-row">
 				<label class="label-field">
-					<span class="sr-only">{t('widgets.clock.settings.label', { zone: z.timeZone })}</span>
+					<span class="k-sr-only">{t('widgets.clock.settings.label', { zone: z.timeZone })}</span>
 					<input
 						class="field"
 						type="text"
@@ -196,13 +196,5 @@
 		background: transparent;
 		color: var(--k-text-muted);
 		cursor: pointer;
-	}
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
-		white-space: nowrap;
 	}
 </style>

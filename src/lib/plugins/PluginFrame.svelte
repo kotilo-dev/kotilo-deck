@@ -142,7 +142,7 @@
 		{#if status === 'loading'}
 			<div class="skeleton" aria-hidden="true">
 				<span class="bar" style:width="40%" style:height="12px"></span>
-				<span class="bar grow"></span>
+				<span class="bar fill"></span>
 			</div>
 		{/if}
 		{#key `${attempt}|${pluginKey}`}
@@ -200,7 +200,7 @@
 		border-radius: 8px;
 		background: var(--k-bg-alt);
 	}
-	.bar.grow {
+	.bar.fill {
 		flex: 1;
 		min-height: 0;
 	}

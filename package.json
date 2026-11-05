@@ -13,6 +13,7 @@
     "lint": "pnpm lint:hex && pnpm check",
     "lint:hex": "node scripts/lint-hex.mjs",
     "test": "vitest run",
+    "screenshots": "node scripts/screenshots.mjs",
     "tauri": "tauri"
   },
   "devDependencies": {
@@ -22,6 +23,9 @@
     "@tailwindcss/vite": "^4.3.4",
     "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^26.6.6",
+    "gifenc": "^1.0.3",
+    "playwright": "^1.64.1",
+    "pngjs": "^7.0.0",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.8",
     "tailwindcss": "^4.3.4",

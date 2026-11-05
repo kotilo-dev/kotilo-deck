@@ -1,0 +1,63 @@
+# Flatpak manifest for Kotilo Deck, following Tauri 2's Flatpak guide: repackage the .deb
+# that the release workflow builds instead of compiling inside the Flatpak SDK.
+#
+# Build locally (see docs/releasing.md ▸ Flatpak):
+#   flatpak install -y flathub org.gnome.Platform//46 org.gnome.Sdk//46
+#   flatpak-builder --user --install --force-clean build-dir dev.kotilo.deck.yml
+#   flatpak run dev.kotilo.deck
+#
+# Before each release: point the .deb source at the new version and update its sha256
+# (sha256sum "Kotilo.Deck_<v>_amd64.deb"), and add a <release> to the metainfo file.
+id: dev.kotilo.deck
+runtime: org.gnome.Platform
+# GNOME 46 ships WebKitGTK 4.1 (libwebkit2gtk-4.1), which Tauri 2 links against.
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: kotilo-deck
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Weather, calendar feeds, update checks, companion (127.0.0.1) and LAN mode.
+  - --share=network
+  # Volume widget (pactl / PulseAudio protocol, also served by pipewire-pulse).
+  - --socket=pulseaudio
+  # Media widget: MPRIS players on the session bus.
+  - --talk-name=org.mpris.MediaPlayer2.*
+  # Todo reminders and pomodoro notifications.
+  - --talk-name=org.freedesktop.Notifications
+  # Tray icon (StatusNotifierItem); tray-icon writes its PNGs under $XDG_RUNTIME_DIR/tray-icon.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --filesystem=xdg-run/tray-icon:create
+  # Workspaces, settings, logs, wallpapers, plugins and user themes live in ~/.kotilo
+  # (shared with the Kotilo desktop app), not in the per-app sandbox directory.
+  - --filesystem=~/.kotilo:create
+
+modules:
+  # Tauri's tray loads libayatana-appindicator3 at runtime; the GNOME runtime does not ship
+  # it. Needs the flathub/shared-modules git submodule next to this manifest.
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
+  - name: kotilo-deck
+    buildsystem: simple
+    sources:
+      - type: file
+        dest-filename: kotilo-deck.deb
+        url: https://github.com/kotilo-dev/kotilo-deck/releases/download/v1.0.0/Kotilo.Deck_1.0.0_amd64.deb
+        sha256: 0000000000000000000000000000000000000000000000000000000000000000 # TODO: real hash at release
+        only-arches: [x86_64]
+      - type: file
+        path: dev.kotilo.deck.metainfo.xml
+      - type: file
+        path: dev.kotilo.deck.desktop
+    build-commands:
+      - ar -x kotilo-deck.deb
+      - tar -xf data.tar.gz
+      - install -Dm755 usr/bin/kotilo-deck /app/bin/kotilo-deck
+      - install -Dm644 usr/share/icons/hicolor/32x32/apps/kotilo-deck.png /app/share/icons/hicolor/32x32/apps/dev.kotilo.deck.png
+      - install -Dm644 usr/share/icons/hicolor/128x128/apps/kotilo-deck.png /app/share/icons/hicolor/128x128/apps/dev.kotilo.deck.png
+      - install -Dm644 usr/share/icons/hicolor/256x256@2/apps/kotilo-deck.png /app/share/icons/hicolor/256x256/apps/dev.kotilo.deck.png
+      - install -Dm644 dev.kotilo.deck.desktop /app/share/applications/dev.kotilo.deck.desktop
+      - install -Dm644 dev.kotilo.deck.metainfo.xml /app/share/metainfo/dev.kotilo.deck.metainfo.xml

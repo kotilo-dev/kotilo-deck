@@ -90,7 +90,7 @@
 	<div class="s-group">
 		<h2 class="s-eyebrow" id="k-theme-grid">{t('settings.themes.global', { count: list.length })}</h2>
 		<p class="s-note small">{t('settings.themes.scopeNote')}</p>
-		<div class="grid" role="radiogroup" aria-labelledby="k-theme-grid" bind:this={grid}>
+		<div class="theme-grid" role="radiogroup" aria-labelledby="k-theme-grid" bind:this={grid}>
 			{#each list as theme, i (theme.id)}
 				{@const pair = theme.pair ? themes.get(theme.pair) : undefined}
 				{@const on = theme.id === selectedId}
@@ -158,7 +158,7 @@
 	.times {
 		gap: 20px;
 	}
-	.grid {
+	.theme-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 		gap: 12px;

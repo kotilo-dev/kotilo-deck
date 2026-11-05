@@ -7,6 +7,7 @@
 import { emitTo } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
+	isDemo,
 	isRemote,
 	isTauri,
 	monitorList,
@@ -49,7 +50,9 @@ export const DEFAULT_SETTINGS: DeckSettings = {
 	calendarFeeds: [],
 	autoSwitch: [],
 	lan: { enabled: false, port: 47832 },
-	updates: { autoCheck: true }
+	updates: { autoCheck: true },
+	// Fresh install (no stored settings) → onboarding shows; see normalizeSettings for older files.
+	onboarding: { completed: false, version: 0 }
 };
 
 const obj = (v: unknown): Record<string, unknown> =>
@@ -78,8 +81,22 @@ export function normalizeSettings(input: unknown): DeckSettings {
 		companion: { ...d.companion, ...obj(s.companion) },
 		pomodoro: { ...d.pomodoro, ...obj(s.pomodoro) },
 		calendarFeeds: Array.isArray(s.calendarFeeds) ? s.calendarFeeds : [],
-		autoSwitch: Array.isArray(s.autoSwitch) ? s.autoSwitch : []
+		autoSwitch: Array.isArray(s.autoSwitch) ? s.autoSwitch : [],
+		onboarding: normalizeOnboarding(s)
 	} as DeckSettings;
+}
+
+/**
+ * Same rule as the backend (DeckSettings.onboarding): no stored settings at all = fresh install = not
+ * completed; stored settings from an earlier version without the key = completed (upgrades skip it).
+ */
+function normalizeOnboarding(s: Record<string, unknown>): DeckSettings['onboarding'] {
+	const o = obj(s.onboarding);
+	const fresh = Object.keys(s).length === 0;
+	return {
+		completed: typeof o.completed === 'boolean' ? o.completed : !fresh,
+		version: typeof o.version === 'number' && Number.isFinite(o.version) ? o.version : DEFAULT_SETTINGS.onboarding.version
+	};
 }
 
 /** Monitor key used for `settings.activeWorkspace` outside Tauri. */
@@ -350,5 +367,6 @@ export function remoteBackend(storage: Pick<Storage, 'getItem' | 'setItem'>): De
 const browserStorage = (): Pick<Storage, 'getItem' | 'setItem'> =>
 	typeof localStorage !== 'undefined' ? localStorage : memoryStorage();
 
+/** The `?demo` backend answers the same commands as Tauri (in memory), so it uses the Tauri seam. */
 export const defaultBackend = (): DeckBackend =>
-	isTauri() ? tauriBackend : isRemote() ? remoteBackend(browserStorage()) : storageBackend(browserStorage());
+	isTauri() || isDemo() ? tauriBackend : isRemote() ? remoteBackend(browserStorage()) : storageBackend(browserStorage());

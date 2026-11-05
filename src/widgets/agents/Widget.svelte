@@ -103,7 +103,7 @@
 
 	// "12 min" in the rows: minute tick while the list is on screen.
 	$effect(() => {
-		if (!connected || !visible || size === '2x1') return;
+		if (!connected || !visible) return;
 		now = Date.now();
 		return subscribeTick((d) => (now = d.getTime()));
 	});
@@ -229,17 +229,21 @@
 	</header>
 {/snippet}
 
+{#snippet agentRow(agent: Agent)}
+	<li class="agent">
+		<span class="dot" style:background="var(--k-{statusTone(agent.status)})" aria-hidden="true"></span>
+		<span class="a-text">
+			<span class="a-name">{agentLabel(agent)}</span>
+			<span class="a-status" class:warn-text={agent.status === 'waiting'}>{statusLine(agent)}</span>
+		</span>
+		<span class="a-time mono">{minutesText(agent)}</span>
+	</li>
+{/snippet}
+
 {#snippet agentList()}
 	<ul class="alist" bind:clientHeight={listH} aria-label={t('widgets.agents.list')}>
 		{#each agentRows as agent (agent.id)}
-			<li class="agent">
-				<span class="dot" style:background="var(--k-{statusTone(agent.status)})" aria-hidden="true"></span>
-				<span class="a-text">
-					<span class="a-name">{agentLabel(agent)}</span>
-					<span class="a-status" class:warn-text={agent.status === 'waiting'}>{statusLine(agent)}</span>
-				</span>
-				<span class="a-time mono">{minutesText(agent)}</span>
-			</li>
+			{@render agentRow(agent)}
 		{/each}
 		{#if shownAgents.length === 0}
 			<li class="agent empty">{t('widgets.agents.noAgents')}</li>
@@ -294,28 +298,37 @@
 		</div>
 	{:else if size === '2x1'}
 		{@render header()}
-		<div class="compact">
-			{#if top}
-				<span class="c-text">
-					<span class="c-name">{topAgent ? agentLabel(topAgent) : top.summary}</span>
-					<span class="c-status warn-text" title={top.detail ?? top.summary}>
-						{t('widgets.agents.waitingTask', { task: top.summary })}{#if approvals.length > 1}<span class="mono"> +{approvals.length - 1}</span>{/if}
+		<!-- Tall 2×1 cells (1920×1080, portrait) list as many agents as fit between the header and the
+		     approval row; at 1024×600 the list fits none and the card is header + one row (DESIGN §5.10). -->
+		<ul class="alist" bind:clientHeight={listH} aria-label={t('widgets.agents.list')}>
+			{#each agentRows as agent (agent.id)}
+				{@render agentRow(agent)}
+			{/each}
+		</ul>
+		{#if top || agentRows.length === 0}
+			<div class="compact">
+				{#if top}
+					<span class="c-text">
+						<span class="c-name">{topAgent ? agentLabel(topAgent) : top.summary}</span>
+						<span class="c-status warn-text" title={top.detail ?? top.summary}>
+							{t('widgets.agents.waitingTask', { task: top.summary })}{#if approvals.length > 1}<span class="mono"> +{approvals.length - 1}</span>{/if}
+						</span>
 					</span>
-				</span>
-				{@render actions(top, false)}
-			{:else if topAgent}
-				<span class="c-text">
-					<span class="c-name">{agentLabel(topAgent)}</span>
-					<span class="c-status">{statusLine(topAgent)}</span>
-				</span>
-			{:else}
-				<span class="c-status">{t('widgets.agents.noAgents')}</span>
-			{/if}
-		</div>
+					{@render actions(top, false)}
+				{:else if topAgent}
+					<span class="c-text">
+						<span class="c-name">{agentLabel(topAgent)}</span>
+						<span class="c-status">{statusLine(topAgent)}</span>
+					</span>
+				{:else}
+					<span class="c-status">{t('widgets.agents.noAgents')}</span>
+				{/if}
+			</div>
+		{/if}
 	{:else if size === '2x2'}
 		{@render header()}
 		{#if queue.length}
-			<div class="queue-wrap fixed">{@render approvalQueue()}</div>
+			<div class="queue-wrap pinned">{@render approvalQueue()}</div>
 		{/if}
 		<div class="list-wrap">{@render agentList()}</div>
 	{:else}
@@ -512,7 +525,7 @@
 		gap: 4px;
 		overflow: hidden;
 	}
-	.queue-wrap.fixed {
+	.queue-wrap.pinned {
 		flex: none;
 	}
 	.agents ul {

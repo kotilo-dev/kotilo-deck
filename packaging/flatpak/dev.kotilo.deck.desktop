@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Kotilo Deck
+GenericName=Developer dashboard
+GenericName[tr]=Geliştirici panosu
+Comment=Full-screen developer dashboard for a secondary display
+Comment[tr]=İkinci ekran için tam ekran geliştirici panosu
+Exec=kotilo-deck
+Icon=dev.kotilo.deck
+Terminal=false
+Categories=Development;Utility;
+Keywords=dashboard;widgets;pomodoro;clock;weather;calendar;second screen;
+StartupWMClass=kotilo-deck
+SingleMainWindow=true

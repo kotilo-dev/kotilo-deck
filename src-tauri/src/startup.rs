@@ -101,6 +101,7 @@ pub fn on_exit(app: &AppHandle) {
     app.state::<window::DisplayState>().flush();
     companion::shutdown(app);
     crate::lan::shutdown(app);
+    crate::crash::mark_clean_exit();
     tracing::info!("Kotilo Deck exiting");
     crate::logging::flush();
 }

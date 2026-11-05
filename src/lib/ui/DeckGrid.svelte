@@ -290,7 +290,7 @@
 
 <section
 	bind:this={gridEl}
-	class="grid"
+	class="deck-grid"
 	class:k-dots={ui.editing}
 	class:editing={ui.editing}
 	class:dragging={drag !== null}
@@ -355,7 +355,7 @@
 <p id="k-edit-keys" class="k-sr-only">{t('shell.edit.hintKeys')}</p>
 
 <style>
-	.grid {
+	.deck-grid {
 		position: relative;
 		flex: 1;
 		min-height: 0;
@@ -368,7 +368,7 @@
 		-webkit-user-select: none;
 	}
 	/* Edit mode: every surface at 100 % so cell edges are visible (SPEC §5.3). */
-	.grid.editing {
+	.deck-grid.editing {
 		--k-surface-a: var(--k-surface);
 	}
 	.dragging {
