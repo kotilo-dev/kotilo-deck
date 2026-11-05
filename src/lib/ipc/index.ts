@@ -69,6 +69,14 @@ export interface DeckSettings {
 	lan: { enabled: boolean; port: number };
 	/** Auto-update. Default autoCheck true (startup + every 24 h; never installs without a click). */
 	updates: { autoCheck: boolean };
+
+	// ── Phase 5 (additive; defaults in doc comments) ──
+	/**
+	 * First-run onboarding. `completed` defaults to false only when no settings file exists (fresh install);
+	 * a settings file written by an earlier version without this key loads as completed: true, so upgrading
+	 * users never see onboarding. `version` = onboarding flow version the user finished (1).
+	 */
+	onboarding: { completed: boolean; version: number };
 }
 
 export interface PomodoroSettings {
@@ -625,6 +633,42 @@ export const updateStatus = () => invoke<UpdateStatus>('update_status');
 export const updateCheck = () => invoke<UpdateStatus>('update_check');
 /** Downloads + installs the available update, then relaunches; in state "ready" it only relaunches. */
 export const updateInstall = () => invoke<void>('update_install');
+
+// ── Phase 5: crash log + report issue ───────────────────────────────────────
+
+export interface CrashReport {
+	/** File name only (e.g. "crash-2026-11-05T10-12-03Z.log") inside ~/.kotilo/deck/logs/. */
+	file: string;
+	/** Unix ms when the crash was written. */
+	at: number;
+	/** First line of the panic message, ≤ 200 chars, paths under $HOME replaced with "~". */
+	summary: string;
+}
+
+/**
+ * The newest crash log written by a previous run that the user hasn't dismissed yet, or null.
+ * A Rust panic writes `crash-<UTC>.log` (version, OS, arch, thread, message, backtrace; no PII).
+ */
+export const crashLast = () => invoke<CrashReport | null>('crash_last');
+/** Marks every crash up to now as seen; crashLast returns null until the next crash. */
+export const crashDismiss = () => invoke<void>('crash_dismiss');
+/**
+ * Records an uncaught frontend error (window "error"/"unhandledrejection") in the tracing log.
+ * Backend truncates message to 500 / stack to 4000 chars and drops more than 20 calls per minute.
+ * Not available remotely (LAN).
+ */
+export const logFrontendError = (message: string, stack: string | null) =>
+	invoke<void>('log_frontend_error', { message, stack });
+/**
+ * A https://github.com/kotilo-dev/kotilo-deck/issues/new URL prefilled with app version, OS name/version,
+ * arch, WebView version and crash summary when `crash` is given. Never includes logs, paths or settings;
+ * the body asks the user to attach the log file themselves.
+ */
+export const reportIssueUrl = (crash: string | null) => invoke<string>('report_issue_url', { crash });
+/** Opens the URL from reportIssueUrl in the default browser (only that GitHub prefix is accepted). */
+export const openReportIssue = (crash: string | null) => invoke<void>('open_report_issue', { crash });
+/** Opens ~/.kotilo/deck/logs/ in the file manager (Platform::open_path). */
+export const openLogsFolder = () => invoke<void>('open_logs_folder');
 
 // ── Events (backend → UI) ───────────────────────────────────────────────────
 
