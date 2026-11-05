@@ -50,6 +50,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Top bar companion status; presets updated with the Phase 3 widgets.
 
 ### Changed
+- README rewritten for v1.0 with GIF, screenshot gallery, install summary, hardware ideas, shortcuts and privacy notes.
 - GPU is sampled every 3 s; deck widgets and timers pause while the deck is hidden; logs keep 14 days.
 - System 4×2: the CPU sparkline fills the tile and the per-core strip grows on large displays.
 - Settings dialogs are centred (Tailwind preflight zeroed dialog margins).
