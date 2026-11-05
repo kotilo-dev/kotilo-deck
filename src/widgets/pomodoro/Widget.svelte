@@ -246,7 +246,7 @@
 {/snippet}
 
 {#snippet bigRing()}
-	<div class="ring" role="timer" aria-label={timerLabel}>
+	<div class="dial" role="timer" aria-label={timerLabel}>
 		<svg viewBox="0 0 136 136" aria-hidden="true">
 			<circle class="track" cx="68" cy="68" r={R} stroke-width="10" />
 			{#key ringKey}
@@ -284,7 +284,7 @@
 	{:else if !timer}
 		<div class="skeleton" aria-busy="true" aria-label={t('widgets.common.loading')}>
 			<span class="bar" style="width: 40%"></span>
-			<span class="bar grow"></span>
+			<span class="bar disc"></span>
 			<span class="bar" style="width: 50%"></span>
 		</div>
 	{:else if size === '2x1'}
@@ -415,8 +415,8 @@
 		color: var(--warn-text);
 	}
 
-	/* Ring (DESIGN §5.8): 136 px, 10 px track/progress, starts at 12 o'clock, 1 s linear. */
-	.ring {
+	/* Ring (DESIGN §5.8; class is .dial — Tailwind owns .ring): 136 px, 10 px track/progress, starts at 12 o'clock, 1 s linear. */
+	.dial {
 		/* Header 16 + 2 gaps 10 + controls 44 = 80; the banner takes 36 + 10 more. 136 px up to 1280×720,
 		   larger only on tall cards (1920×1080) so the ring doesn't sit tiny in a huge card. */
 		--ring: clamp(84px, calc(100cqh - 80px - var(--banner-h, 0px)), max(136px, calc(100cqh - 200px)));
@@ -429,7 +429,7 @@
 	.has-banner {
 		--banner-h: 46px;
 	}
-	.ring svg,
+	.dial svg,
 	.mini svg,
 	.day-ring svg {
 		position: absolute;
@@ -677,7 +677,7 @@
 		border-radius: 8px;
 		background: var(--k-bg-alt);
 	}
-	.bar.grow {
+	.bar.disc {
 		flex: 1;
 		width: auto;
 		aspect-ratio: 1;
