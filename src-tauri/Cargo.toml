@@ -1,6 +1,6 @@
 [package]
 name = "kotilo-deck"
-version = "0.0.1"
+version = "1.0.0"
 description = "Full-screen developer dashboard for a secondary display"
 authors = ["Kotilo"]
 license = "MIT"

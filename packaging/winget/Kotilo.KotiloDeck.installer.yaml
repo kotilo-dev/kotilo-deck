@@ -15,7 +15,7 @@ InstallModes:
 UpgradeBehavior: install
 # Tauri's NSIS installer registers HKCU\...\Uninstall\<productName>.
 ProductCode: Kotilo Deck
-ReleaseDate: 2026-11-20
+ReleaseDate: 2026-11-05
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/kotilo-dev/kotilo-deck/releases/download/v1.0.0/Kotilo.Deck_1.0.0_x64-setup.exe

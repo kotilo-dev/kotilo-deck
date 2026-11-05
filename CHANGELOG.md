@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-05
+
 ### Added
 - First-run setup on the deck: pick the monitor, theme and starting workspace (Focus / Ops / Agents / Full) with live preview; skippable any time (Skip setup / Esc); Settings ▸ About ▸ "Run setup again". Users upgrading from an earlier version skip it.
 - Crash logs: a crash writes `~/.kotilo/deck/logs/crash-<UTC>.log` (version, OS, backtrace; home folder redacted) and the next start shows "Kotilo Deck closed unexpectedly last time." with Report issue, Open logs and Dismiss.
@@ -65,3 +67,6 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - System 4×2: the CPU sparkline fills the tile and the per-core strip grows on large displays.
 - Settings dialogs are centred (Tailwind preflight zeroed dialog margins).
 - Tablet/browser mode: plugin widgets load their scripts, styles and images; large video wallpapers stream instead of loading whole; `lan://status` (token URLs, QR) stays on the host. Install in the "ready" state relaunches the app. LAN, update and plugin errors carry an `errorCode` for translation.
+
+[Unreleased]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/kotilo-dev/kotilo-deck/releases/tag/v1.0.0
