@@ -6,6 +6,7 @@
 	import { onMount } from 'svelte';
 	import { locale, t, tCode } from '#lib/i18n/index.ts';
 	import { on, updateCheck, updateInstall, updateStatus, type UpdateStatus } from '#lib/ipc/index.ts';
+	import { resetPatch } from '#lib/onboarding/index.ts';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { errText, getSettingsContext } from './context.svelte';
 	import Head from './Head.svelte';
@@ -77,6 +78,13 @@
 			requesting = false;
 		}
 	}
+	async function runSetupAgain() {
+		// The deck reacts to settings://changed and opens onboarding right away.
+		if (await save(resetPatch(store.settings.onboarding ?? { completed: true, version: 0 }))) {
+			ui.say(t('settings.about.setupAgainDone'));
+		}
+	}
+
 	const rows = $derived([
 		{ label: t('settings.about.settings'), path: env.settingsPath },
 		{ label: t('settings.about.workspaces'), path: env.workspacesPath },
@@ -153,6 +161,18 @@
 				disabled={!env.tauri || unsupported}
 				onchange={(v) => void save({ updates: { ...updates, autoCheck: v } })}
 			/>
+		</div>
+	</div>
+	<div class="s-group">
+		<h2 class="s-eyebrow">{t('settings.about.support')}</h2>
+		<div class="s-card s-row" class:s-disabled={!env.tauri}>
+			<div class="s-label">
+				<span class="s-title">{t('settings.about.setupAgain')}</span>
+				<span class="s-help">{t('settings.about.setupAgainHelp')}</span>
+			</div>
+			<button type="button" class="k-btn s-btn-sm" disabled={!env.tauri} onclick={runSetupAgain}>
+				<Icon name="refresh" size={16} />{t('settings.about.setupAgain')}
+			</button>
 		</div>
 	</div>
 	<div class="s-group">

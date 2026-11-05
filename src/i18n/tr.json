@@ -883,7 +883,61 @@
 			"wallpapers": "Duvar kâğıtları",
 			"themes": "Kullanıcı temaları",
 			"logs": "Günlükler",
-			"privacy": "Hesap yok, bulut yok, telemetri yok. Her şey bu bilgisayarda kalır."
+			"privacy": "Hesap yok, bulut yok, telemetri yok. Her şey bu bilgisayarda kalır.",
+			"support": "Destek",
+			"setupAgain": "Kurulumu yeniden çalıştır",
+			"setupAgainHelp": "İlk kurulumu deck’te gösterir: ekran, tema ve çalışma alanı.",
+			"setupAgainDone": "Kurulum deck’te açıldı."
+		}
+	},
+	"onboarding": {
+		"title": "Kotilo Deck kurulumu",
+		"skip": "Kurulumu atla",
+		"back": "Geri",
+		"next": "İleri",
+		"progress": "Adım {n} / {total}",
+		"steps": {
+			"welcome": "Hoş geldiniz",
+			"monitor": "Ekran",
+			"theme": "Tema",
+			"workspace": "Çalışma alanı",
+			"done": "Bitti"
+		},
+		"welcome": {
+			"title": "Kotilo Deck’e hoş geldiniz",
+			"text": "Saatiniz, odağınız ve ajanlarınız için sakin bir ikinci ekran. Üç hızlı seçim ve hazırsınız.",
+			"start": "Başlayalım"
+		},
+		"monitor": {
+			"title": "Bir ekran seçin",
+			"text": "Deck hemen oraya taşınır. Daha sonra Ayarlar’dan değiştirebilirsiniz.",
+			"current": "Geçerli",
+			"primary": "birincil",
+			"failed": "Deck taşınamadı: {message}"
+		},
+		"theme": {
+			"title": "Bir tema seçin",
+			"text": "Hemen uygulanır. Üst çubuktaki tema etiketinden istediğiniz zaman değiştirin.",
+			"filter": "Temaları göster",
+			"all": "Tümü",
+			"dark": "Koyu",
+			"light": "Açık"
+		},
+		"workspace": {
+			"title": "Başlangıç çalışma alanını seçin",
+			"text": "Diğerleri üst çubukta bir kaydırma uzağınızda kalır.",
+			"focus": "Saat, odak zamanlayıcı ve yapılacaklar",
+			"ops": "Sistem, takvim ve medya",
+			"agents": "Ajan durumu, zamanlayıcı ve yapılacaklar",
+			"full": "Her widget bir kez"
+		},
+		"done": {
+			"title": "Her şey hazır",
+			"text": "Bilmeye değer birkaç şey:",
+			"tipEdit": "Düzeni değiştirmek için E tuşuna basın ya da bir karta uzun basın.",
+			"tipHotkey": "{hotkey} deck’i her yerden gösterir ya da gizler.",
+			"tipSettings": "Ayarlar tepsi simgesinin menüsünde; deck’te Ctrl+, de açar.",
+			"open": "Deck’i aç"
 		}
 	}
 }

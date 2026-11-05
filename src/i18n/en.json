@@ -883,7 +883,61 @@
 			"wallpapers": "Wallpapers",
 			"themes": "User themes",
 			"logs": "Logs",
-			"privacy": "No account, no cloud, no telemetry. Everything stays on this computer."
+			"privacy": "No account, no cloud, no telemetry. Everything stays on this computer.",
+			"support": "Support",
+			"setupAgain": "Run setup again",
+			"setupAgainHelp": "Shows the first-run setup on the deck: screen, theme and workspace.",
+			"setupAgainDone": "Setup is open on the deck."
+		}
+	},
+	"onboarding": {
+		"title": "Set up Kotilo Deck",
+		"skip": "Skip setup",
+		"back": "Back",
+		"next": "Next",
+		"progress": "Step {n} of {total}",
+		"steps": {
+			"welcome": "Welcome",
+			"monitor": "Screen",
+			"theme": "Theme",
+			"workspace": "Workspace",
+			"done": "Done"
+		},
+		"welcome": {
+			"title": "Welcome to Kotilo Deck",
+			"text": "A calm second screen for your time, focus and agents. Three quick choices and you are set.",
+			"start": "Get started"
+		},
+		"monitor": {
+			"title": "Pick a screen",
+			"text": "The deck moves there right away. You can change it later in Settings.",
+			"current": "Current",
+			"primary": "primary",
+			"failed": "Couldn't move the deck: {message}"
+		},
+		"theme": {
+			"title": "Choose a theme",
+			"text": "Applies instantly. Change it any time from the theme chip in the top bar.",
+			"filter": "Show themes",
+			"all": "All",
+			"dark": "Dark",
+			"light": "Light"
+		},
+		"workspace": {
+			"title": "Pick a starting workspace",
+			"text": "The others stay one swipe away in the top bar.",
+			"focus": "Clock, focus timer and todos",
+			"ops": "System, calendar and media",
+			"agents": "Agent status, timer and todos",
+			"full": "Every widget once"
+		},
+		"done": {
+			"title": "You're all set",
+			"text": "A few things worth knowing:",
+			"tipEdit": "Press E or long-press any card to edit the layout.",
+			"tipHotkey": "{hotkey} shows or hides the deck from anywhere.",
+			"tipSettings": "Settings live in the tray icon menu, or press Ctrl+, on the deck.",
+			"open": "Open deck"
 		}
 	}
 }

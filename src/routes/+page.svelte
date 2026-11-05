@@ -6,7 +6,16 @@
 	 */
 	import { onMount, untrack } from 'svelte';
 	import { fly } from 'svelte/transition';
-	import { calendarUpcoming, hasBackend, isRemote, isTauri, on, pomodoroState, wallpaperList, type Wallpaper } from '#lib/ipc/index.ts';
+	import {
+		calendarUpcoming,
+		hasBackend,
+		isRemote,
+		isTauri,
+		on,
+		pomodoroState,
+		wallpaperList,
+		type Wallpaper
+	} from '#lib/ipc/index.ts';
 	import { wallpaperSrc } from '#lib/ipc/transport.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { applyTheme, effectiveThemeId, getTheme, pairFor, themes } from '#lib/theme/index.ts';
@@ -28,6 +37,8 @@
 	import Toast from '#lib/ui/Toast.svelte';
 	import TopBar from '#lib/ui/TopBar.svelte';
 	import WidgetDrawer from '#lib/ui/WidgetDrawer.svelte';
+	import Onboarding from '#lib/onboarding/Onboarding.svelte';
+	import { shouldShowOnboarding } from '#lib/onboarding/index.ts';
 
 	const backend = defaultBackend();
 	const ui = new DeckUi();
@@ -105,6 +116,30 @@
 	});
 
 	let wallpapers = $state<Wallpaper[]>([]);
+
+	// First-run onboarding (Phase 5): host only, when settings say not completed (also after Settings ▸
+	// About ▸ "Run setup again", which arrives as settings://changed). `?onboarding` forces it in a browser.
+	let onboardingDismissed = $state(false);
+	const onboardingCompleted = $derived(store.settings.onboarding?.completed ?? true);
+	const showOnboarding = $derived(
+		store.ready &&
+			shouldShowOnboarding({
+				remote: isRemote(),
+				tauri: isTauri(),
+				search: location.search,
+				completed: onboardingCompleted,
+				dismissed: onboardingDismissed
+			})
+	);
+	/**
+	 * Closed by the user: stays closed for this session if the write fails. Once completed:true is saved
+	 * on the host the flag is cleared, so a later "Run setup again" shows it (the forced browser demo
+	 * stays closed until reload).
+	 */
+	function onboardingDone(saved: Promise<void>) {
+		onboardingDismissed = true;
+		if (isTauri()) saved.then(() => (onboardingDismissed = false), () => {});
+	}
 
 	// Effective theme = workspace override → global setting → default, then the light/dark pair when the
 	// auto switch asks for the other variant. Only CSS custom properties change, so switching is instant.
@@ -339,6 +374,9 @@
 			{/if}
 			<SettingsSheet />
 			<Toast />
+			{#if showOnboarding}
+				<Onboarding ondone={onboardingDone} />
+			{/if}
 		{/if}
 
 		{#if ambient.clockFace}
