@@ -73,6 +73,7 @@
 <div
 	class="frame"
 	class:lifted
+	class:editing={ui.editing}
 	class:flash={ui.highlight === inst.instance}
 	class:k-shake={shaking}
 	data-instance={inst.instance}
@@ -145,6 +146,13 @@
 	}
 	.content > :global(*) {
 		height: 100%;
+	}
+	/* Edit mode: the 36 px gear (top 10, right 10) sits over the right end of the card header (DESIGN §6).
+	   Every card header is a <header> child of .k-card; reserve the gear's width so the meta
+	   ("2 / 4", "6 min ago", "4 left") ellipsizes before it instead of running underneath. */
+	.editing .content :global(.k-card > header) {
+		box-sizing: border-box;
+		padding-right: 32px;
 	}
 	.flash {
 		outline: 2px solid var(--k-accent);
