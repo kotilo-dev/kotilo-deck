@@ -51,7 +51,8 @@
 			case 'error':
 				return t('update.state.error', { message: tCode('update.errors', update?.errorCode, update?.error ?? '') });
 			case 'unsupported':
-				return t('update.state.unsupported');
+				// Linux Flatpak / deb / rpm: the package manager owns updates (update.rs install_blocker).
+				return update?.errorCode === 'package-managed' ? t('update.state.packageManaged') : t('update.state.unsupported');
 			default:
 				return update?.lastChecked ? t('update.state.upToDate') : t('update.state.never');
 		}

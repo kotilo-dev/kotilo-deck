@@ -621,7 +621,9 @@ export interface UpdateStatus {
 	error: string | null;
 	/**
 	 * Machine-readable `error`: "no-release" (nothing published, or not for this platform) |
-	 * "network" | "signature" (signature / signed version invalid) | "install-failed" | "other".
+	 * "network" | "signature" (signature / signed version invalid) | "install-failed" | "other";
+	 * with state "unsupported": "package-managed" (Linux Flatpak / deb / rpm install, update via the
+	 * package manager), otherwise a development build.
 	 */
 	errorCode?: string | null;
 	/** Unix ms of the last finished check. */

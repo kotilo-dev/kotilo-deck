@@ -102,6 +102,7 @@
 			"ready": "Update ready. Restart to finish.",
 			"error": "Update failed: {message}",
 			"unsupported": "Updates are disabled in development builds",
+			"packageManaged": "Installed by Flatpak or your package manager — update Kotilo Deck there.",
 			"upToDate": "Kotilo Deck is up to date",
 			"never": "Not checked yet"
 		},
