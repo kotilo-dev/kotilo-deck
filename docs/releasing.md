@@ -54,7 +54,7 @@ To rebuild an existing tag, run the workflow manually (Actions ▸ Release ▸ R
 - Assets: the six installers listed above, their `.sig` files and `latest.json`.
 - `latest.json`: `version` has no `v`, the URLs point at `releases/download/vX.Y.Z/…`, and the signatures are file contents, not paths.
 - **Windows**, on a fresh VM (SPEC Phase 5 acceptance: a working deck in under 2 minutes without docs): download the setup.exe, install, run onboarding. Without a certificate, expect SmartScreen's "Windows protected your PC" dialog.
-- **Linux smoke test**: the Linux platform layer had never run on real Linux before 1.0 (DECISIONS 59). On Ubuntu 24.04 (GNOME, PipeWire) and one more distro (Fedora KDE or similar), check that the AppImage and the .deb start, the volume widget lists devices (`pactl`), the media widget follows Spotify/Firefox (MPRIS), the tray works, and logs appear in `~/.kotilo/deck/logs/`.
+- **Linux smoke test**: the Linux platform layer had never run on real Linux before 1.0 (DECISIONS 59). On Ubuntu 24.04 (GNOME, PipeWire) and one more distro (Fedora KDE or similar), check that the AppImage and the .deb start, the volume widget lists devices (`pactl`), the media widget follows Spotify/Firefox (MPRIS), the tray works, and logs appear in `~/.kotilo/deck/logs/`. The full checklist is [linux-test-plan.md](linux-test-plan.md).
 - **Updater**: with an older release build installed, Settings ▸ About ▸ Check now only finds the update after publishing. To test before publishing, upload the draft's `latest.json` to a scratch pre-release in a fork, or test right after publishing and be ready to pull the release.
 
 Publish with `gh release edit vX.Y.Z --draft=false` (or the web UI). Then do winget and Flatpak below.

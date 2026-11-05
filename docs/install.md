@@ -95,4 +95,4 @@ Uninstalling leaves these folders in place, so a reinstall picks up where you le
 
 ## Reporting a problem
 
-Settings ▸ About ▸ Open logs folder shows the log files (`deck.log.<date>`). They contain no personal data. Attach today's file to a [bug report](https://github.com/kotilo-dev/kotilo-deck/issues/new?template=bug_report.md).
+Settings ▸ About ▸ Open logs folder shows the log files (`deck.log.<date>`). They hold no passwords or tokens, but may contain monitor, workspace and app names; skim them before attaching. Attach today's file to a [bug report](https://github.com/kotilo-dev/kotilo-deck/issues/new?template=bug_report.md).
