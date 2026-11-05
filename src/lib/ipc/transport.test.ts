@@ -3,6 +3,8 @@ import {
 	BACKOFF_MAX_MS,
 	BACKOFF_MIN_MS,
 	createTransport,
+	wantsDemo,
+	type DemoBackend,
 	type SocketLike,
 	type TransportEnv
 } from './transport';
@@ -349,5 +351,73 @@ describe('remote events', () => {
 		FakeSocket.all[0].open();
 		await expect(tr.invoke('audio_subscribe')).rejects.toBe('no audio');
 		expect(tr.subscriptions().size).toBe(0);
+	});
+});
+
+describe('demo mode (?demo)', () => {
+	function fakeDemo() {
+		const demo: DemoBackend = {
+			invoke: vi.fn(async (cmd: string) => `demo:${cmd}`) as DemoBackend['invoke'],
+			listen: vi.fn(async () => () => {}) as DemoBackend['listen']
+		};
+		const loadDemo = vi.fn(async () => demo);
+		return { demo, loadDemo };
+	}
+
+	it('parses the query string', () => {
+		expect(wantsDemo('?demo')).toBe(true);
+		expect(wantsDemo('?theme=nord&demo=1')).toBe(true);
+		expect(wantsDemo('')).toBe(false);
+		expect(wantsDemo('?token=abc')).toBe(false);
+		expect(wantsDemo('?demonstration')).toBe(false);
+	});
+
+	it('uses the in-memory backend and never probes the LAN server', async () => {
+		const { demo, loadDemo } = fakeDemo();
+		const { env, calls } = makeEnv({ search: () => '?demo&theme=nord', loadDemo });
+		const tr = createTransport(env);
+		expect(await tr.init()).toBe('demo');
+		expect(loadDemo).toHaveBeenCalledTimes(1);
+		expect((loadDemo.mock.calls[0] as unknown as [URLSearchParams])[0].get('theme')).toBe('nord');
+		expect(tr.isDemo()).toBe(true);
+		expect(tr.hasBackend()).toBe(true);
+		expect(tr.isRemote()).toBe(false);
+		expect(tr.isTauri()).toBe(false);
+		expect(await tr.invoke('settings_get')).toBe('demo:settings_get');
+		await tr.listen('system://sample', () => {});
+		expect(demo.listen).toHaveBeenCalled();
+		expect(calls).toEqual([]);
+		expect(FakeSocket.all).toHaveLength(0);
+	});
+
+	it('is never active inside Tauri', async () => {
+		const { loadDemo } = fakeDemo();
+		const { env } = makeEnv({ tauri: () => true, search: () => '?demo', loadDemo });
+		const tr = createTransport(env);
+		expect(await tr.init()).toBe('tauri');
+		expect(tr.isDemo()).toBe(false);
+		expect(loadDemo).not.toHaveBeenCalled();
+		expect(await tr.invoke('settings_get')).toBe('tauri');
+	});
+
+	it('leaves remote mode alone without ?demo', async () => {
+		const { loadDemo } = fakeDemo();
+		const { env } = makeEnv({ search: () => '?token=secret', loadDemo });
+		const tr = createTransport(env);
+		expect(await tr.init()).toBe('remote');
+		expect(tr.isDemo()).toBe(false);
+		expect(tr.isRemote()).toBe(true);
+		expect(loadDemo).not.toHaveBeenCalled();
+	});
+
+	it('falls back to the normal probe when the demo module fails to load', async () => {
+		const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { env, routes } = makeEnv({ search: () => '?demo', loadDemo: () => Promise.reject(new Error('chunk')) });
+		routes.delete('/api/hello');
+		const tr = createTransport(env);
+		expect(await tr.init()).toBe('local');
+		expect(tr.isDemo()).toBe(false);
+		expect(tr.hasBackend()).toBe(false);
+		err.mockRestore();
 	});
 });

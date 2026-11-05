@@ -6,9 +6,9 @@
  * (`isRemote()`), nothing in plain `pnpm dev` (`hasBackend()` false → callers fall back to
  * localStorage / "not available" states instead of throwing).
  */
-import { hasBackend, invoke, isRemote, isTauri, listen, type UnlistenFn } from './transport';
+import { hasBackend, invoke, isDemo, isRemote, isTauri, listen, type UnlistenFn } from './transport';
 
-export { hasBackend, isRemote, isTauri, type UnlistenFn };
+export { hasBackend, isDemo, isRemote, isTauri, type UnlistenFn };
 
 // ── Platform ────────────────────────────────────────────────────────────────
 

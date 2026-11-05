@@ -7,6 +7,7 @@
 import { emitTo } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
+	isDemo,
 	isRemote,
 	isTauri,
 	monitorList,
@@ -366,5 +367,6 @@ export function remoteBackend(storage: Pick<Storage, 'getItem' | 'setItem'>): De
 const browserStorage = (): Pick<Storage, 'getItem' | 'setItem'> =>
 	typeof localStorage !== 'undefined' ? localStorage : memoryStorage();
 
+/** The `?demo` backend answers the same commands as Tauri (in memory), so it uses the Tauri seam. */
 export const defaultBackend = (): DeckBackend =>
-	isTauri() ? tauriBackend : isRemote() ? remoteBackend(browserStorage()) : storageBackend(browserStorage());
+	isTauri() || isDemo() ? tauriBackend : isRemote() ? remoteBackend(browserStorage()) : storageBackend(browserStorage());
