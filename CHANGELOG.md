@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- First-run setup on the deck: pick the monitor, theme and starting workspace (Focus / Ops / Agents / Full) with live preview; skippable any time (Skip setup / Esc); Settings ▸ About ▸ "Run setup again". Users upgrading from an earlier version skip it.
+- Crash logs: a crash writes `~/.kotilo/deck/logs/crash-<UTC>.log` (version, OS, backtrace; home folder redacted) and the next start shows "Kotilo Deck closed unexpectedly last time." with Report issue, Open logs and Dismiss.
+- "Report an issue" opens a prefilled GitHub issue (version, OS, arch, WebView, crash summary; no logs or paths are sent), and "Open logs folder" in Settings ▸ About. Uncaught errors in the deck and settings windows are written to the app log (rate-limited).
+- Installers: per-user NSIS setup (English/Turkish, no admin rights, installs WebView2 if missing), MSI (en-US, tr-TR), AppImage, .deb and .rpm.
+- Release workflow: pushing a `v*` tag builds every installer, its updater signature and `latest.json` into a draft GitHub Release with the changelog as notes; optional Windows code signing from repository secrets.
+- winget manifest (`Kotilo.KotiloDeck`) and Flatpak manifest (`dev.kotilo.deck`) with AppStream metadata.
+- Bug report issue template; `docs/install.md` and `docs/releasing.md`.
 - Linux platform layer: volume, devices and per-app mixer via `pactl` (PulseAudio / PipeWire) with a `wpctl` fallback; media via MPRIS (D-Bus); AMD GPU load from sysfs; `kotilo://` links and folders via `xdg-open`. Not yet run on a real Linux machine.
 - Tablet/browser mode: serve the deck on the LAN (off by default, token-protected, QR code in Settings ▸ Tablet & browser); remote browsers get the deck with per-device theme and workspace. Rotating a tablet reflows the layout on that device only and never rewrites the host's workspaces.
 - External widget plugins: drop a folder into `~/.kotilo/deck/widgets/` and it appears in the drawer without a rebuild; sandboxed iframe, no network, theme tokens and system/media/pomodoro data via `docs/plugin-api.md`; example in `examples/widgets/hello/`; Settings ▸ Widgets page.
