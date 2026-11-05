@@ -13,6 +13,7 @@
     "lint": "pnpm lint:hex && pnpm check",
     "lint:hex": "node scripts/lint-hex.mjs",
     "test": "vitest run",
+    "screenshots": "node scripts/screenshots.mjs",
     "tauri": "tauri"
   },
   "devDependencies": {
