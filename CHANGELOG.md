@@ -49,6 +49,16 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Settings: Companion page, ICS feed manager, Pomodoro page, workspace auto-switch rules (time, pomodoro start/end, calendar event start).
 - Top bar companion status; presets updated with the Phase 3 widgets.
 
+### Fixed
+- Pomodoro: removed the square outline around the timer ring (2×2, 4×2); a CSS class clashed with Tailwind's `ring` utility.
+- Agents: the 2×2 approval queue is no longer forced to `position: fixed` by a Tailwind class clash. Every custom CSS class that matched a Tailwind utility was renamed, and a test fails if a new one appears.
+- Agents: the 2×1 card lists agent rows when it has room instead of a blank area above the approval row.
+- Media: the 4×2 card keeps artwork, title and controls together on tall screens; the artwork grows instead of leaving a gap.
+- Edit mode: the per-card settings gear no longer covers header info ("2 / 4", "6 min ago", "4 left").
+- Ctrl+Z no longer undoes a deck action behind an open dialog.
+- Linux: the in-app updater no longer offers updates it cannot install; Flatpak and deb/rpm installs say to update through the software center or package manager (only AppImages update themselves).
+- Linux: "Report issue" and other web links open with `xdg-open` even without `xdg-mime` (Flatpak, minimal desktops).
+
 ### Changed
 - README rewritten for v1.0 with GIF, screenshot gallery, install summary, hardware ideas, shortcuts and privacy notes.
 - GPU is sampled every 3 s; deck widgets and timers pause while the deck is hidden; logs keep 14 days.
