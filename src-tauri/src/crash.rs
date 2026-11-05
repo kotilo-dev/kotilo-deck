@@ -6,6 +6,9 @@
 //!   then runs the previous hook (stderr) and logs through `tracing`.
 //! - `crash_last` returns the newest crash log from an earlier run newer than the
 //!   "dismissed up to" marker `logs/.crash-seen` (unix ms; kept out of `settings.json`).
+//!   A clean exit advances the marker too ([`mark_clean_exit`]), so panics that tokio
+//!   caught inside a command or task (the app kept running) are not reported as a crash on
+//!   the next start; only runs that did not exit cleanly leave a crash to show.
 //! - `report_issue_url` prefills a GitHub issue with version/OS/arch/WebView and an optional
 //!   crash summary only: never logs, paths, settings or user names.
 //!
@@ -309,14 +312,35 @@ fn read_summary(path: &Path) -> String {
 }
 
 /// Newest crash log in `dir` with `seen < at < before`.
+///
+/// File names only carry whole seconds, so `before` (the run start, in ms) is truncated to
+/// its second first: a panic in the first second of this run (stamped `…:SS.000`) must not
+/// count as an earlier run's crash.
 pub fn last_in(dir: &Path, before: i64) -> Option<CrashReport> {
     let seen = read_seen(dir);
+    let before = before.div_euclid(1000).saturating_mul(1000);
     let (file, at) = crash_files(dir)
         .into_iter()
         .filter(|(_, at)| *at > seen && *at < before)
         .max_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)))?;
     let summary = read_summary(&dir.join(&file));
     Some(CrashReport { file, at, summary })
+}
+
+/// Clean exit: advances the marker to `now` (never backwards), so this run's crash files
+/// (panics caught while the app kept running) are not shown on the next start.
+pub fn clean_exit_in(dir: &Path, now: i64) -> Result<(), String> {
+    if read_seen(dir) >= now {
+        return Ok(());
+    }
+    dismiss_in(dir, now)
+}
+
+/// Called from `RunEvent::Exit` (tray Quit and every other orderly exit).
+pub fn mark_clean_exit() {
+    if let Err(e) = clean_exit_in(&paths::logs_dir(), now_ms()) {
+        tracing::warn!("cannot record the clean exit: {e}");
+    }
 }
 
 pub fn dismiss_in(dir: &Path, now: i64) -> Result<(), String> {
@@ -663,6 +687,62 @@ mod tests {
         let mut left: Vec<_> = crash_files(d).into_iter().map(|f| f.1).collect();
         left.sort();
         assert_eq!(left, vec![t(5).timestamp_millis(), t(6).timestamp_millis()]);
+    }
+
+    #[test]
+    fn panic_in_the_first_second_of_a_run_is_not_last() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        let t = |s: u32| chrono::Utc.with_ymd_and_hms(2026, 11, 5, 10, 0, s).unwrap();
+        // Run started at 10:00:05.700; a panic at 10:00:05.900 is stamped 10:00:05.
+        let started = t(5).timestamp_millis() + 700;
+        write_crash_file(
+            d,
+            &crash_file_name(t(5)),
+            "summary: this run
+",
+        )
+        .unwrap();
+        assert_eq!(last_in(d, started), None);
+        // An earlier second is still an earlier run.
+        write_crash_file(
+            d,
+            &crash_file_name(t(4)),
+            "summary: last run
+",
+        )
+        .unwrap();
+        assert_eq!(last_in(d, started).unwrap().summary, "last run");
+    }
+
+    #[test]
+    fn clean_exit_hides_this_runs_crashes() {
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        let t = |s: u32| chrono::Utc.with_ymd_and_hms(2026, 11, 5, 10, 0, s).unwrap();
+        // A panic caught by tokio at :02; the app kept running and quit cleanly at :09.
+        write_crash_file(
+            d,
+            &crash_file_name(t(2)),
+            "summary: caught
+",
+        )
+        .unwrap();
+        clean_exit_in(d, t(9).timestamp_millis()).unwrap();
+        assert_eq!(last_in(d, i64::MAX), None);
+        // The next run crashes hard (no clean exit): shown on the run after.
+        write_crash_file(
+            d,
+            &crash_file_name(t(20)),
+            "summary: hard
+",
+        )
+        .unwrap();
+        assert_eq!(last_in(d, i64::MAX).unwrap().summary, "hard");
+        // The marker never moves backwards.
+        dismiss_in(d, t(30).timestamp_millis()).unwrap();
+        clean_exit_in(d, t(25).timestamp_millis()).unwrap();
+        assert_eq!(read_seen(d), t(30).timestamp_millis());
     }
 
     #[test]
