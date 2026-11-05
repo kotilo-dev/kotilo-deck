@@ -113,6 +113,16 @@
 
 	const themeId = $derived(getTheme(store.settings.theme ?? DEFAULT_THEME_ID).id);
 	let filter = $state<'all' | 'dark' | 'light'>(getTheme(store.settings.theme ?? DEFAULT_THEME_ID).variant);
+	const FILTERS = ['all', 'dark', 'light'] as const;
+	let filterGroup = $state<HTMLElement>();
+	/** Radio group keyboard model (same as settings' Segmented): one Tab stop, arrows move the selection. */
+	function onFilterKey(e: KeyboardEvent) {
+		const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+		if (!dir) return;
+		e.preventDefault();
+		filter = FILTERS[(FILTERS.indexOf(filter) + dir + FILTERS.length) % FILTERS.length];
+		requestAnimationFrame(() => filterGroup?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus());
+	}
 	const themeList = $derived([...themes.values()].filter((th) => filter === 'all' || th.variant === filter));
 
 	function pickTheme(id: string) {
@@ -172,9 +182,18 @@
 							<h1 id="k-ob-title" tabindex="-1" bind:this={heading}>{t('onboarding.theme.title')}</h1>
 							<p class="lead">{t('onboarding.theme.text')}</p>
 						</div>
-						<div class="seg" role="radiogroup" aria-label={t('onboarding.theme.filter')}>
-							{#each ['all', 'dark', 'light'] as const as f (f)}
-								<button type="button" role="radio" aria-checked={filter === f} onclick={() => (filter = f)}>{t(`onboarding.theme.${f}`)}</button>
+						<div class="seg" role="radiogroup" aria-label={t('onboarding.theme.filter')} bind:this={filterGroup}>
+							{#each FILTERS as f (f)}
+								<button
+									type="button"
+									role="radio"
+									aria-checked={filter === f}
+									tabindex={filter === f ? 0 : -1}
+									onkeydown={onFilterKey}
+									onclick={() => (filter = f)}
+								>
+									{t(`onboarding.theme.${f}`)}
+								</button>
 							{/each}
 						</div>
 					</div>
@@ -454,8 +473,9 @@
 		border: 1px solid var(--k-border);
 		background: var(--k-bg-alt);
 	}
+	/* 44 px hit targets (DESIGN §1.3). */
 	.seg button {
-		min-height: 36px;
+		min-height: 44px;
 		padding: 0 14px;
 		border: 0;
 		border-radius: 999px;
