@@ -41,6 +41,37 @@ pub fn read(path: &Path) -> io::Result<Option<String>> {
     }
 }
 
+/// 32 random bytes as 64 lowercase hex chars (tokens and handshake nonces).
+pub fn random_hex() -> io::Result<String> {
+    generate()
+}
+
+/// Which side a handshake proof comes from; part of the HMAC message (protocol.md §2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Role {
+    Server,
+    Client,
+}
+
+/// `hex(HMAC-SHA256(key = token as ASCII, msg = "kotilo-companion-v1|<role>|" + own + "|" + other))`.
+/// The server signs `Nc|Ns`, the client signs `Ns|Nc` (each side's message starts with the
+/// nonce it received first), so one proof can never be replayed as the other.
+pub fn proof(token: &str, role: Role, first: &str, second: &str) -> String {
+    use hmac::{Hmac, Mac};
+    let mut mac = Hmac::<sha2::Sha256>::new_from_slice(token.as_bytes())
+        .expect("HMAC takes keys of any length");
+    let role = match role {
+        Role::Server => "server",
+        Role::Client => "client",
+    };
+    mac.update(format!("kotilo-companion-v1|{role}|{first}|{second}").as_bytes());
+    mac.finalize()
+        .into_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
 fn generate() -> io::Result<String> {
     let mut bytes = [0u8; 32];
     getrandom::fill(&mut bytes).map_err(|e| io::Error::other(e.to_string()))?;
@@ -119,6 +150,22 @@ fn publish(tmp: &Path, path: &Path, token: &str) -> io::Result<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn proof_matches_the_protocol_test_vector() {
+        use super::{proof, Role};
+        let t = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+        let nc = "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf";
+        let ns = "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf";
+        assert_eq!(
+            proof(t, Role::Server, nc, ns),
+            "7a405ce29b239672c5c818ed4755c62166745da6b19cc1a48bd9c14d501079e2"
+        );
+        assert_eq!(
+            proof(t, Role::Client, ns, nc),
+            "19dadb8ff84d74d2037f8d5e7860840d4719899023fc7f1e097c76a9984676cd"
+        );
+    }
+
     use super::*;
 
     const VALID: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";

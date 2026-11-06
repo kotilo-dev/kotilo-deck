@@ -225,7 +225,8 @@ async fn handshake_good_token_gets_hello_ok_then_pomodoro_state() {
     assert_eq!(
         ok,
         json!({"v": 1, "type": "hello.ok", "payload": {
-            "server": "kotilo-deck", "serverVersion": env!("CARGO_PKG_VERSION"), "protocol": 1}})
+            "server": "kotilo-deck", "serverVersion": env!("CARGO_PKG_VERSION"), "protocol": 1,
+            "auth": "token"}})
     );
     let p = c.recv().await;
     assert_eq!(p["type"], "pomodoro.state");
@@ -272,6 +273,87 @@ async fn handshake_rejections_use_protocol_close_codes() {
     c.send(json!({"v": 1, "type": "hello", "payload": {}}))
         .await;
     assert_eq!(c.close_code().await, Some(4401), "hello without token");
+
+    assert!(!rig.server.status().connected);
+}
+
+/// Desktop side of the mutual handshake; returns the server's `hello.challenge` payload.
+async fn mutual_hello(c: &mut Client, nc: &str) -> Value {
+    c.send(json!({"v": 1, "type": "hello", "payload": {
+        "nonce": nc, "client": "kotilo-desktop", "clientVersion": "2.0.0"}}))
+        .await;
+    let ch = c.recv().await;
+    assert_eq!(ch["type"], "hello.challenge");
+    ch["payload"].clone()
+}
+
+#[tokio::test]
+async fn mutual_handshake_proves_the_token_both_ways() {
+    let mut rig = Rig::start().await;
+    let nc = token::random_hex().unwrap();
+    let mut c = rig.connect().await;
+    let ch = mutual_hello(&mut c, &nc).await;
+    let ns = ch["nonce"].as_str().unwrap().to_string();
+    assert!(token::is_valid(&ns) && ns != nc);
+    // The server's proof is checkable without the token ever crossing the socket.
+    assert_eq!(
+        ch["proof"],
+        token::proof(&rig.token, token::Role::Server, &nc, &ns)
+    );
+    // Uppercase hex is accepted (receivers lowercase before comparing).
+    let pc = token::proof(&rig.token, token::Role::Client, &ns, &nc).to_ascii_uppercase();
+    c.send(json!({"v": 1, "type": "hello.auth", "payload": {"proof": pc}}))
+        .await;
+    let ok = c.recv().await;
+    assert_eq!(ok["type"], "hello.ok");
+    assert_eq!(ok["payload"]["auth"], "mutual");
+    assert_eq!(c.recv().await["type"], "pomodoro.state");
+    let st = rig.status(|s| s.connected).await;
+    assert_eq!(st.client.as_deref(), Some("2.0.0"));
+
+    // A fresh nonce per connection gets a fresh server nonce.
+    let mut c2 = rig.connect().await;
+    let ch2 = mutual_hello(&mut c2, &nc).await;
+    assert_ne!(ch2["nonce"], ch["nonce"]);
+}
+
+#[tokio::test]
+async fn mutual_handshake_rejections() {
+    let rig = Rig::start().await;
+    let nc = token::random_hex().unwrap();
+
+    // Wrong client proof: 4401. Replaying the server's own proof is wrong too.
+    let mut c = rig.connect().await;
+    let ch = mutual_hello(&mut c, &nc).await;
+    c.send(json!({"v": 1, "type": "hello.auth", "payload": {"proof": ch["proof"]}}))
+        .await;
+    assert_eq!(c.close_code().await, Some(4401), "server proof replayed");
+
+    let mut c = rig.connect().await;
+    mutual_hello(&mut c, &nc).await;
+    c.send(json!({"v": 1, "type": "hello.auth", "payload": {"proof": "0".repeat(64)}}))
+        .await;
+    assert_eq!(c.close_code().await, Some(4401), "wrong proof");
+
+    let mut c = rig.connect().await;
+    mutual_hello(&mut c, &nc).await;
+    c.send(json!({"v": 1, "type": "hello.auth", "payload": {"proof": "xyz"}}))
+        .await;
+    assert_eq!(c.close_code().await, Some(4400), "malformed proof");
+
+    let mut c = rig.connect().await;
+    mutual_hello(&mut c, &nc).await;
+    c.send(agents_state()).await;
+    assert_eq!(c.close_code().await, Some(4401), "no hello.auth");
+
+    let mut c = rig.connect().await;
+    mutual_hello(&mut c, &nc).await;
+    assert_eq!(c.close_code().await, Some(4401), "hello.auth too late");
+
+    let mut c = rig.connect().await;
+    c.send(json!({"v": 1, "type": "hello", "payload": {"nonce": "abc"}}))
+        .await;
+    assert_eq!(c.close_code().await, Some(4400), "malformed nonce");
 
     assert!(!rig.server.status().connected);
 }
@@ -335,6 +417,12 @@ async fn snapshot_and_approvals_flow() {
     let s = rig.snapshot(|s| s.approvals.len() == 1).await;
     assert_eq!(s.approvals[0].id, "ap-18");
     assert_eq!(rig.server.snapshot().approvals.len(), 1);
+
+    // "unknown" (answered in the agent's terminal) resolves it too.
+    c.send(json!({"v": 1, "type": "agent.approval.resolved", "payload":
+        {"id": "ap-18", "decision": "unknown", "by": "agent"}}))
+        .await;
+    rig.snapshot(|s| s.approvals.is_empty()).await;
 
     // Disconnect clears the snapshot.
     drop(c);

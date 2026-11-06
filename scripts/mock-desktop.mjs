@@ -10,12 +10,14 @@
 //   --port <n>                    default 47831
 //   --token-file <path>           default ~/.kotilo/companion.token
 //   --once                        exit when the connection closes (no reconnect)
+//   --legacy-hello                use the deprecated one-step hello { token } instead of the
+//                                 mutual HMAC handshake (protocol.md §2)
 //
 // While connected, type a line + Enter to request another approval with that summary.
 // Manual Phase 3 acceptance test: tap Approve/Deny on the Deck and watch for
 // "approval.respond reached the desktop" here.
 
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -29,7 +31,7 @@ if (typeof WebSocket === 'undefined') {
 // ── Arguments ───────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-const opts = { port: 47831, tokenFile: join(homedir(), '.kotilo', 'companion.token'), once: false };
+const opts = { port: 47831, tokenFile: join(homedir(), '.kotilo', 'companion.token'), once: false, legacyHello: false };
 for (let i = 0; i < args.length; i++) {
 	const a = args[i];
 	const value = () => {
@@ -45,6 +47,7 @@ for (let i = 0; i < args.length; i++) {
 	else if (a === '--switch') opts.switchTo = value();
 	else if (a === '--port') opts.port = Number(value());
 	else if (a === '--token-file') opts.tokenFile = value();
+	else if (a === '--legacy-hello') opts.legacyHello = true;
 	else if (a === '--once') opts.once = true;
 	else if (a === '--help' || a === '-h') {
 		console.log(readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(1, 16).join('\n'));
@@ -100,7 +103,9 @@ function describe(msg) {
 	const p = msg.payload ?? {};
 	switch (msg.type) {
 		case 'hello.ok':
-			return `${p.server} ${p.serverVersion}, protocol ${p.protocol}`;
+			return `${p.server} ${p.serverVersion}, protocol ${p.protocol}, auth ${p.auth ?? 'token'}`;
+		case 'hello.challenge':
+			return 'server proof received';
 		case 'pomodoro.state': {
 			const left = p.running && p.endsAt ? Math.max(0, Math.round((p.endsAt - Date.now()) / 1000)) : p.remaining;
 			const mmss = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
@@ -158,9 +163,26 @@ function requestApproval(summary) {
 	sendAgents();
 }
 
+// protocol.md §2: hex(HMAC-SHA256(key = token as ASCII, msg = "kotilo-companion-v1|<role>|a|b")).
+const proof = (token, role, a, b) =>
+	createHmac('sha256', Buffer.from(token, 'ascii')).update(`kotilo-companion-v1|${role}|${a}|${b}`, 'ascii').digest('hex');
+
+let handshake = null; // { token, nc } while the mutual handshake is in flight
+
 function onMessage(msg) {
 	log('<-', msg.type, describe(msg));
-	if (msg.type === 'hello.ok') {
+	if (msg.type === 'hello.challenge') {
+		const { nonce: ns, proof: ps } = msg.payload ?? {};
+		if (!handshake || typeof ns !== 'string' || typeof ps !== 'string') return ws.close(1000);
+		const want = Buffer.from(proof(handshake.token, 'server', handshake.nc, ns), 'ascii');
+		const got = Buffer.from(ps.toLowerCase(), 'ascii');
+		if (got.length !== want.length || !timingSafeEqual(got, want)) {
+			log('server proof is wrong: not the Deck (or a different token); closing');
+			return ws.close(1000);
+		}
+		send('hello.auth', { proof: proof(handshake.token, 'client', ns, handshake.nc) });
+		handshake = null;
+	} else if (msg.type === 'hello.ok') {
 		backoff = 1000;
 		sendAgents();
 		send('usage.today', { tokens: 1_840_000, costUsd: 4.12, budgetUsd: 10 });
@@ -187,7 +209,12 @@ function connect() {
 	log('connecting to', url);
 	ws = new WebSocket(url);
 	ws.addEventListener('open', () => {
-		ws.send(envelope('hello', { token, client: 'kotilo-desktop', clientVersion: 'mock-1.0.0' }));
+		if (opts.legacyHello) {
+			ws.send(envelope('hello', { token, client: 'kotilo-desktop', clientVersion: 'mock-1.0.0' }));
+		} else {
+			handshake = { token, nc: randomBytes(32).toString('hex') };
+			ws.send(envelope('hello', { nonce: handshake.nc, client: 'kotilo-desktop', clientVersion: 'mock-1.0.0' }));
+		}
 	});
 	ws.addEventListener('message', (e) => {
 		try {
@@ -198,7 +225,7 @@ function connect() {
 	});
 	ws.addEventListener('error', () => {}); // close follows with the details
 	ws.addEventListener('close', (e) => {
-		const why = { 1001: 'deck shutting down', 4400: 'malformed', 4401: 'bad token / no hello', 4409: 'replaced by another client', 4426: 'unsupported version' }[e.code] ?? '';
+		const why = { 1001: 'deck shutting down', 4400: 'malformed', 4401: 'bad token / no hello (or a Deck older than 1.0.1)', 4409: 'replaced by another client', 4426: 'unsupported version' }[e.code] ?? '';
 		log(`closed ${e.code}${why ? ` (${why})` : ''}`);
 		ws = null;
 		if (opts.once) process.exit(e.code === 1000 ? 0 : 1);
