@@ -1,0 +1,37 @@
+# Builds packaging/flatpak/dev.kotilo.deck.yml in Flathub's own build image, so the manifest
+# is checked on real Linux before it goes to Flathub (docs/releasing.md ▸ Flatpak).
+name: Flatpak
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/flatpak/**'
+      - '.github/workflows/flatpak.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-46
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      # The manifest expects flathub/shared-modules next to it (a git submodule on Flathub).
+      - name: Fetch shared-modules
+        run: git clone --depth 1 https://github.com/flathub/shared-modules packaging/flatpak/shared-modules
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: kotilo-deck.flatpak
+          manifest-path: packaging/flatpak/dev.kotilo.deck.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Lint the manifest and metainfo (Flathub linter)
+        run: |
+          flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --noninteractive flathub org.flatpak.Builder
+          flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest packaging/flatpak/dev.kotilo.deck.yml || true
+          flatpak run --command=flatpak-builder-lint org.flatpak.Builder appstream packaging/flatpak/dev.kotilo.deck.metainfo.xml || true
