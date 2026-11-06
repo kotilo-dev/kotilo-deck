@@ -17,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-46
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
       options: --privileged
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +29,12 @@ jobs:
           bundle: kotilo-deck.flatpak
           manifest-path: packaging/flatpak/dev.kotilo.deck.yml
           cache-key: flatpak-builder-${{ github.sha }}
+      # No display in CI, so check that every shared library the binary needs resolves in the runtime.
+      - name: Check runtime libraries
+        run: |
+          flatpak install -y --noninteractive kotilo-deck.flatpak
+          flatpak run --command=sh dev.kotilo.deck -c 'ldd /app/bin/kotilo-deck' | tee ldd.txt
+          if grep -q "not found" ldd.txt; then echo "::error::missing libraries"; exit 1; fi
       - name: Lint the manifest and metainfo (Flathub linter)
         run: |
           flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo

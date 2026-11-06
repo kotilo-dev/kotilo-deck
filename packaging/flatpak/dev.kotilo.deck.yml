@@ -2,7 +2,7 @@
 # that the release workflow builds instead of compiling inside the Flatpak SDK.
 #
 # Build locally (see docs/releasing.md ▸ Flatpak):
-#   flatpak install -y flathub org.gnome.Platform//46 org.gnome.Sdk//46
+#   flatpak install -y flathub org.gnome.Platform//51 org.gnome.Sdk//51
 #   flatpak-builder --user --install --force-clean build-dir dev.kotilo.deck.yml
 #   flatpak run dev.kotilo.deck
 #
@@ -10,8 +10,8 @@
 # (sha256sum "Kotilo.Deck_<v>_amd64.deb"), and add a <release> to the metainfo file.
 id: dev.kotilo.deck
 runtime: org.gnome.Platform
-# GNOME 46 ships WebKitGTK 4.1 (libwebkit2gtk-4.1), which Tauri 2 links against.
-runtime-version: '46'
+# Tauri 2 links against WebKitGTK 4.1 (libwebkit2gtk-4.1); CI checks it resolves in this runtime.
+runtime-version: '51'
 sdk: org.gnome.Sdk
 command: kotilo-deck
 

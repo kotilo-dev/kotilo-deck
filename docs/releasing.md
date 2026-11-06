@@ -108,7 +108,7 @@ An installer URL can never be replaced once winget has its hash. If an asset is 
 
 ## Flatpak
 
-`packaging/flatpak/` holds `dev.kotilo.deck.yml` (GNOME 46 runtime, repackages the release `.deb`, following Tauri 2's Flatpak guide), the AppStream `dev.kotilo.deck.metainfo.xml` and `dev.kotilo.deck.desktop`.
+`packaging/flatpak/` holds `dev.kotilo.deck.yml` (GNOME 51 runtime, repackages the release `.deb`, following Tauri 2's Flatpak guide), the AppStream `dev.kotilo.deck.metainfo.xml` and `dev.kotilo.deck.desktop`.
 
 Per release: update the `.deb` URL and `sha256` (`sha256sum Kotilo.Deck_X.Y.Z_amd64.deb`) in the manifest, and the `<release>` entry in the metainfo.
 
@@ -117,7 +117,7 @@ Build and test locally on Linux:
 ```sh
 cd packaging/flatpak
 git clone --depth 1 https://github.com/flathub/shared-modules   # tray: libayatana-appindicator
-flatpak install -y flathub org.gnome.Platform//46 org.gnome.Sdk//46
+flatpak install -y flathub org.gnome.Platform//51 org.gnome.Sdk//51
 flatpak-builder --user --install --force-clean build-dir dev.kotilo.deck.yml
 flatpak run dev.kotilo.deck
 flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest dev.kotilo.deck.yml
