@@ -26,7 +26,8 @@ use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tokio_tungstenite::WebSocketStream;
 
 use super::codec::{
-    self, Agent, Approval, Decision, DecodeError, Decoded, HelloOk, Message, PomodoroState, Usage,
+    self, Agent, Approval, AuthMode, Decision, DecodeError, Decoded, HelloChallenge, HelloOk,
+    Message, PomodoroState, Usage,
 };
 use super::token;
 
@@ -436,32 +437,61 @@ fn check_path(req: &Request, resp: Response) -> Result<Response, ErrorResponse> 
 }
 
 enum Auth {
-    Ok { client_version: Option<String> },
+    Ok {
+        client_version: Option<String>,
+        mode: AuthMode,
+    },
     Reject(u16, &'static str),
     Gone,
 }
 
-async fn authenticate(shared: &Shared, ws: &mut Ws, deadline: Instant) -> Auth {
-    let first = loop {
+/// The next text frame before `deadline`, skipping pings/pongs.
+async fn next_text(ws: &mut Ws, deadline: Instant, late: &'static str) -> Result<String, Auth> {
+    loop {
         match timeout_at(deadline, ws.next()).await {
-            Err(_) => return Auth::Reject(close::UNAUTHORIZED, "no hello in time"),
-            Ok(None) | Ok(Some(Err(_))) | Ok(Some(Ok(WsMessage::Close(_)))) => return Auth::Gone,
-            Ok(Some(Ok(WsMessage::Text(t)))) => break t,
+            Err(_) => return Err(Auth::Reject(close::UNAUTHORIZED, late)),
+            Ok(None) | Ok(Some(Err(_))) | Ok(Some(Ok(WsMessage::Close(_)))) => {
+                return Err(Auth::Gone)
+            }
+            Ok(Some(Ok(WsMessage::Text(t)))) => return Ok(t.as_str().to_owned()),
             Ok(Some(Ok(WsMessage::Binary(_)))) => {
-                return Auth::Reject(close::MALFORMED, "text frames only")
+                return Err(Auth::Reject(close::MALFORMED, "text frames only"))
             }
             Ok(Some(Ok(_))) => continue,
         }
-    };
-    let hello = match codec::decode(first.as_str()) {
-        Ok(Decoded::Message(Message::Hello(h))) => h,
-        Err(DecodeError::Malformed) => return Auth::Reject(close::MALFORMED, "malformed frame"),
-        Err(DecodeError::Version(_)) => {
-            return Auth::Reject(close::UNSUPPORTED_VERSION, "unsupported protocol version")
+    }
+}
+
+fn decode_error(e: DecodeError) -> Auth {
+    match e {
+        DecodeError::Malformed => Auth::Reject(close::MALFORMED, "malformed frame"),
+        DecodeError::Version(_) => {
+            Auth::Reject(close::UNSUPPORTED_VERSION, "unsupported protocol version")
         }
-        // A hello without a usable token, or any other first message.
+        DecodeError::Invalid { .. } => Auth::Reject(close::MALFORMED, "invalid handshake frame"),
+    }
+}
+
+/// A nonce or proof: 64 hex chars, compared lowercase.
+fn hex64(s: &str) -> Option<String> {
+    let s = s.trim().to_ascii_lowercase();
+    token::is_valid(&s).then_some(s)
+}
+
+async fn authenticate(shared: &Shared, ws: &mut Ws, deadline: Instant) -> Auth {
+    let first = match next_text(ws, deadline, "no hello in time").await {
+        Ok(t) => t,
+        Err(a) => return a,
+    };
+    let hello = match codec::decode(&first) {
+        Ok(Decoded::Message(Message::Hello(h))) => h,
+        Err(e @ (DecodeError::Malformed | DecodeError::Version(_))) => return decode_error(e),
+        // An unusable hello, or any other first message.
         _ => return Auth::Reject(close::UNAUTHORIZED, "hello required"),
     };
+    if hello.nonce.is_none() && hello.token.is_none() {
+        return Auth::Reject(close::UNAUTHORIZED, "hello required");
+    }
     // Re-read per handshake so a token recreated by the desktop is picked up.
     let expected = match token::load_or_create(&shared.config.token_path) {
         Ok(t) => t,
@@ -470,11 +500,54 @@ async fn authenticate(shared: &Shared, ws: &mut Ws, deadline: Instant) -> Auth {
             return Auth::Reject(close::UNAUTHORIZED, "token unavailable");
         }
     };
-    if !token::matches(&expected, hello.token.trim()) {
-        return Auth::Reject(close::UNAUTHORIZED, "bad token");
+    let client_version = hello.client_version;
+
+    // Legacy one-step handshake (deprecated): only the client proves the token.
+    let Some(nonce) = hello.nonce else {
+        let given = hello.token.unwrap_or_default();
+        if !token::matches(&expected, given.trim()) {
+            return Auth::Reject(close::UNAUTHORIZED, "bad token");
+        }
+        return Auth::Ok {
+            client_version,
+            mode: AuthMode::Token,
+        };
+    };
+
+    // Mutual handshake (protocol.md §2): prove the token first, then demand the client's proof.
+    let Some(nc) = hex64(&nonce) else {
+        return Auth::Reject(close::MALFORMED, "bad nonce");
+    };
+    let ns = match token::random_hex() {
+        Ok(n) => n,
+        Err(_) => return Auth::Reject(close::UNAUTHORIZED, "no randomness"),
+    };
+    let challenge = Message::HelloChallenge(HelloChallenge {
+        nonce: ns.clone(),
+        proof: token::proof(&expected, token::Role::Server, &nc, &ns),
+    });
+    if ws.send(WsMessage::text(challenge.encode())).await.is_err() {
+        return Auth::Gone;
+    }
+    let second = match next_text(ws, deadline, "no hello.auth in time").await {
+        Ok(t) => t,
+        Err(a) => return a,
+    };
+    let given = match codec::decode(&second) {
+        Ok(Decoded::Message(Message::HelloAuth(a))) => a.proof,
+        Err(e) => return decode_error(e),
+        _ => return Auth::Reject(close::UNAUTHORIZED, "hello.auth required"),
+    };
+    let Some(given) = hex64(&given) else {
+        return Auth::Reject(close::MALFORMED, "bad proof");
+    };
+    let want = token::proof(&expected, token::Role::Client, &ns, &nc);
+    if !token::matches(&want, &given) {
+        return Auth::Reject(close::UNAUTHORIZED, "bad proof");
     }
     Auth::Ok {
-        client_version: hello.client_version,
+        client_version,
+        mode: AuthMode::Mutual,
     }
 }
 
@@ -507,8 +580,11 @@ async fn connection(
         }
         Err(_) => return,
     };
-    let client_version = match authenticate(&shared, &mut ws, deadline).await {
-        Auth::Ok { client_version } => client_version,
+    let (client_version, mode) = match authenticate(&shared, &mut ws, deadline).await {
+        Auth::Ok {
+            client_version,
+            mode,
+        } => (client_version, mode),
         Auth::Reject(code, reason) => {
             tracing::info!(code, reason, "companion client rejected");
             close_with(&mut ws, code, reason).await;
@@ -522,6 +598,7 @@ async fn connection(
         server: "kotilo-deck".into(),
         server_version: cfg.server_version.clone(),
         protocol: codec::PROTOCOL_VERSION,
+        auth: Some(mode),
     });
     if ws.send(WsMessage::text(ok.encode())).await.is_err() {
         return;
@@ -543,7 +620,7 @@ async fn connection(
         fx.status = Some(st.status.clone());
         conn
     };
-    tracing::info!(conn, version = ?client_version, "companion client connected");
+    tracing::info!(conn, version = ?client_version, auth = ?mode, "companion client connected");
     shared.fire(fx);
 
     let pomodoro = Message::PomodoroState(shared.host.pomodoro_state());
@@ -660,6 +737,8 @@ fn handle(shared: &Shared, conn: u64, text: &str) {
         | Message::ApprovalResolved(_)
         | Message::UsageToday(_) => update_snapshot(shared, conn, msg),
         Message::Hello(_)
+        | Message::HelloChallenge(_)
+        | Message::HelloAuth(_)
         | Message::HelloOk(_)
         | Message::ApprovalRespond(_)
         | Message::PomodoroState(_)

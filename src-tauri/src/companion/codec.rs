@@ -15,7 +15,12 @@ pub const PROTOCOL_VERSION: u64 = 1;
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Hello {
-    pub token: String,
+    /// Legacy one-step handshake (deprecated): the raw token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    /// Mutual handshake: the client's nonce (64 lowercase hex). Takes precedence over `token`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub client: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -26,6 +31,7 @@ pub struct Hello {
 impl std::fmt::Debug for Hello {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Hello")
+            .field("nonce", &self.nonce)
             .field("client", &self.client)
             .field("client_version", &self.client_version)
             .finish_non_exhaustive()
@@ -38,6 +44,33 @@ pub struct HelloOk {
     pub server: String,
     pub server_version: String,
     pub protocol: u64,
+    /// How the client was authenticated. Absent from decks before 1.0.1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<AuthMode>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthMode {
+    /// Two-step HMAC handshake: both sides proved the token.
+    Mutual,
+    /// Legacy `hello { token }`: only the client proved it.
+    Token,
+}
+
+/// Server's half of the mutual handshake: its nonce and its proof of the token.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HelloChallenge {
+    pub nonce: String,
+    pub proof: String,
+}
+
+/// Client's proof of the token, answering `hello.challenge`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HelloAuth {
+    pub proof: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -93,12 +126,26 @@ pub struct AgentsState {
     pub approvals: Vec<Approval>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Resolution {
     Approve,
     Deny,
     Expired,
+    /// No longer pending, outcome not known (e.g. answered in the agent's terminal).
+    Unknown,
+}
+
+/// Unrecognised values count as `unknown`: the approval is resolved either way.
+impl<'de> Deserialize<'de> for Resolution {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(match String::deserialize(d)?.as_str() {
+            "approve" => Resolution::Approve,
+            "deny" => Resolution::Deny,
+            "expired" => Resolution::Expired,
+            _ => Resolution::Unknown,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -171,6 +218,8 @@ pub struct TodoAdded {
 pub enum Message {
     // Handshake
     Hello(Hello),
+    HelloChallenge(HelloChallenge),
+    HelloAuth(HelloAuth),
     HelloOk(HelloOk),
     // Desktop → Deck
     AgentsState(AgentsState),
@@ -189,6 +238,8 @@ impl Message {
     pub fn type_name(&self) -> &'static str {
         match self {
             Message::Hello(_) => "hello",
+            Message::HelloChallenge(_) => "hello.challenge",
+            Message::HelloAuth(_) => "hello.auth",
             Message::HelloOk(_) => "hello.ok",
             Message::AgentsState(_) => "agents.state",
             Message::ApprovalRequested(_) => "agent.approval.requested",
@@ -205,6 +256,8 @@ impl Message {
     fn payload(&self) -> serde_json::Result<Value> {
         match self {
             Message::Hello(p) => serde_json::to_value(p),
+            Message::HelloChallenge(p) => serde_json::to_value(p),
+            Message::HelloAuth(p) => serde_json::to_value(p),
             Message::HelloOk(p) => serde_json::to_value(p),
             Message::AgentsState(p) => serde_json::to_value(p),
             Message::ApprovalRequested(p) => serde_json::to_value(p),
@@ -299,6 +352,8 @@ pub fn decode(text: &str) -> Result<Decoded, DecodeError> {
     let k = kind.as_str();
     let msg = match k {
         "hello" => Message::Hello(parse(k, payload)?),
+        "hello.challenge" => Message::HelloChallenge(parse(k, payload)?),
+        "hello.auth" => Message::HelloAuth(parse(k, payload)?),
         "hello.ok" => Message::HelloOk(parse(k, payload)?),
         "agents.state" => Message::AgentsState(parse(k, payload)?),
         "agent.approval.requested" => Message::ApprovalRequested(parse(k, payload)?),
@@ -354,7 +409,8 @@ mod tests {
     #[test]
     fn every_message_round_trips() {
         round_trip(Message::Hello(Hello {
-            token: "ab".repeat(32),
+            token: Some("ab".repeat(32)),
+            nonce: None,
             client: Some("kotilo-desktop".into()),
             client_version: Some("1.4.0".into()),
         }));
@@ -362,6 +418,20 @@ mod tests {
             server: "kotilo-deck".into(),
             server_version: "0.0.1".into(),
             protocol: 1,
+            auth: Some(AuthMode::Mutual),
+        }));
+        round_trip(Message::Hello(Hello {
+            token: None,
+            nonce: Some("a0".repeat(32)),
+            client: Some("kotilo-desktop".into()),
+            client_version: None,
+        }));
+        round_trip(Message::HelloChallenge(HelloChallenge {
+            nonce: "c0".repeat(32),
+            proof: "7a".repeat(32),
+        }));
+        round_trip(Message::HelloAuth(HelloAuth {
+            proof: "19".repeat(32),
         }));
         round_trip(Message::AgentsState(AgentsState {
             agents: vec![
@@ -512,11 +582,13 @@ mod tests {
             Err(DecodeError::Version(2))
         );
         for bad in [
-            r#"{"v":1,"type":"hello","payload":{}}"#,
+            r#"{"v":1,"type":"hello","payload":{"token":5}}"#,
+            r#"{"v":1,"type":"hello.challenge","payload":{"nonce":"x"}}"#,
+            r#"{"v":1,"type":"hello.auth","payload":{}}"#,
             r#"{"v":1,"type":"agents.state","payload":{"agents":"secret approval text"}}"#,
             r#"{"v":1,"type":"agents.state","payload":[]}"#,
             r#"{"v":1,"type":"agent.approval.requested","payload":{"id":"x"}}"#,
-            r#"{"v":1,"type":"agent.approval.resolved","payload":{"id":"x","decision":"maybe"}}"#,
+            r#"{"v":1,"type":"agent.approval.resolved","payload":{"id":"x","decision":7}}"#,
             r#"{"v":1,"type":"usage.today","payload":{"tokens":-1,"costUsd":1}}"#,
             r#"{"v":1,"type":"usage.today","payload":{"tokens":1,"costUsd":-1}}"#,
             r#"{"v":1,"type":"pomodoro.suggest","payload":{"minutes":0}}"#,
@@ -532,10 +604,33 @@ mod tests {
     #[test]
     fn hello_debug_hides_the_token() {
         let h = Hello {
-            token: "deadbeef".repeat(8),
+            token: Some("deadbeef".repeat(8)),
+            nonce: None,
             client: None,
             client_version: Some("1".into()),
         };
         assert!(!format!("{h:?}").contains("deadbeef"));
+    }
+
+    #[test]
+    fn unknown_and_unrecognised_decisions_resolve_as_unknown() {
+        for d in ["unknown", "timeout", "something-new"] {
+            let text = format!(
+                r#"{{"v":1,"type":"agent.approval.resolved","payload":{{"id":"claude-code:s1:1793733100000","decision":"{d}","by":"agent"}}}}"#
+            );
+            let Ok(Decoded::Message(Message::ApprovalResolved(r))) = decode(&text) else {
+                panic!("{d}");
+            };
+            assert_eq!(r.decision, Resolution::Unknown);
+        }
+    }
+
+    #[test]
+    fn hello_ok_without_auth_still_decodes() {
+        let text = r#"{"v":1,"type":"hello.ok","payload":{"server":"kotilo-deck","serverVersion":"1.0.0","protocol":1}}"#;
+        let Ok(Decoded::Message(Message::HelloOk(ok))) = decode(text) else {
+            panic!();
+        };
+        assert_eq!(ok.auth, None);
     }
 }

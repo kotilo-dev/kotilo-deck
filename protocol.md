@@ -19,20 +19,73 @@ side disagrees with it, the code is wrong.
   (readers trim whitespace). Created by **whichever side starts first** if missing (write to a temp file in
   the same folder, then rename; never overwrite an existing valid token). The file must be readable only by
   the current user (POSIX `0600`; on Windows the default ACL of the user profile is sufficient).
-- The client's **first frame** must be `hello` within 5 s, otherwise the server closes with `4401`.
+- The token never crosses the socket. Both sides prove they know it with HMAC-SHA256 over fresh nonces,
+  **server first**, so a process squatting the port while the Deck is down learns nothing and cannot approve
+  anything (since Deck 1.0.1).
+- The whole handshake must complete within 5 s of the socket opening, otherwise the server closes with `4401`.
 
-```json
-{ "v": 1, "type": "hello", "payload": { "token": "<64 hex>", "client": "kotilo-desktop", "clientVersion": "1.4.0" } }
+### 2.1 Mutual handshake
+
+1. Client → `hello` with a fresh random nonce `Nc` (32 random bytes as 64 lowercase hex chars, new for
+   every connection) and **no** `token` field:
+
+   ```json
+   { "v": 1, "type": "hello", "payload": { "nonce": "<Nc>", "client": "kotilo-desktop", "clientVersion": "1.4.0" } }
+   ```
+
+2. Server → `hello.challenge` with its own fresh nonce `Ns` and its proof `Ps`:
+
+   ```json
+   { "v": 1, "type": "hello.challenge", "payload": { "nonce": "<Ns>", "proof": "<Ps>" } }
+   ```
+
+3. The client checks `Ps` in constant time. If it is missing or wrong, the client closes with `1000`, backs
+   off as usual and **never** sends its own proof. Otherwise, client → `hello.auth`:
+
+   ```json
+   { "v": 1, "type": "hello.auth", "payload": { "proof": "<Pc>" } }
+   ```
+
+4. The server checks `Pc` in constant time and replies:
+
+   ```json
+   { "v": 1, "type": "hello.ok", "payload": { "server": "kotilo-deck", "serverVersion": "1.0.1", "protocol": 1, "auth": "mutual" } }
+   ```
+
+Proofs (all strings ASCII; `|` is a literal character; `hex` = lowercase hex of the 32-byte digest):
+
+```
+key = the 64-char token string, as ASCII bytes (not hex-decoded)
+Ps  = hex(HMAC-SHA256(key, "kotilo-companion-v1|server|" + Nc + "|" + Ns))
+Pc  = hex(HMAC-SHA256(key, "kotilo-companion-v1|client|" + Ns + "|" + Nc))
 ```
 
-Server replies:
+Nonces and proofs are exactly 64 hex chars. Receivers lowercase them before comparing; anything else is
+malformed (`4400`). A wrong `Pc`, or a frame other than `hello.auth` after the challenge, is `4401`.
 
-```json
-{ "v": 1, "type": "hello.ok", "payload": { "server": "kotilo-deck", "serverVersion": "0.0.1", "protocol": 1 } }
-```
+Test vector:
 
-Close codes: `4401` bad/missing token or no hello in time · `4400` malformed first frame · `4409` replaced by
-a newer client · `4426` unsupported `v` (the server speaks only `v: 1`) · `1001` Deck shutting down.
+| | |
+|---|---|
+| token | `000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f` |
+| Nc | `a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf` |
+| Ns | `c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf` |
+| Ps | `7a405ce29b239672c5c818ed4755c62166745da6b19cc1a48bd9c14d501079e2` |
+| Pc | `19dadb8ff84d74d2037f8d5e7860840d4719899023fc7f1e097c76a9984676cd` |
+
+### 2.2 Legacy one-step hello (deprecated)
+
+Decks still accept `hello { "token": "<64 hex>", ... }` (and Deck 1.0.0 accepts only this); `hello.ok` then
+carries `"auth": "token"` (1.0.0 omits `auth`). Only the client proves the token here, so the token is sent
+to whatever holds the port. **Clients must not fall back to it**: a squatter could close with `4401` just to
+downgrade the handshake and collect the token. A Deck older than 1.0.1 answers the nonce `hello` with `4401`;
+clients treat that like a bad token (re-read the token file, normal backoff) and may suggest updating the Deck.
+
+### 2.3 Close codes and reconnect
+
+Close codes: `4401` bad/missing token or proof, or handshake not finished in time · `4400` malformed first
+frame, nonce or proof · `4409` replaced by a newer client · `4426` unsupported `v` (the server speaks only
+`v: 1`) · `1001` Deck shutting down.
 
 Clients reconnect with exponential backoff 1 s, 2 s, 4 s, … capped at 30 s, reset after a successful `hello.ok`.
 On `4401` the client re-reads the token file before retrying.
@@ -75,6 +128,8 @@ Full snapshot of known agents and pending approvals.
 - `status`: `"idle" | "working" | "waiting"` (waiting = needs the user). Unknown values are shown as `idle`.
 - `task` (optional string), `since` (optional, when the status started).
 - `approvals[]` lists every approval still pending; anything absent is no longer pending.
+- Agent and approval `id`s are opaque strings of up to 256 chars (for example
+  `claude-code:<sessionId>:<sinceMs>`); never assume a prefix or format.
 
 ### `agent.approval.requested`
 A new approval, sent in addition to the next `agents.state` so the Deck can react immediately (attention
@@ -87,7 +142,10 @@ An approval was answered (on the desktop, on the Deck, or it expired).
 { "v": 1, "type": "agent.approval.resolved", "payload": { "id": "ap-17", "decision": "approve", "by": "deck" } }
 ```
 
-`decision`: `"approve" | "deny" | "expired"`; `by`: `"deck" | "desktop" | "agent"`.
+`decision`: `"approve" | "deny" | "expired" | "unknown"`; `by`: `"deck" | "desktop" | "agent"`.
+`"unknown"` means no longer pending, outcome not known (for example the user answered in the agent's own
+terminal). Decks from 1.0.1 treat any unrecognised `decision` as `"unknown"`; Deck 1.0.0 ignores the message,
+so always follow a resolve with a fresh `agents.state`, which removes the approval on every Deck.
 
 ### `usage.today`
 
@@ -165,6 +223,7 @@ Sent when the user adds a todo on the Deck (optional for the desktop to act on, 
 
 ## 8. Reference client
 
-`scripts/mock-desktop.mjs` (Node ≥ 22, no dependencies) connects, authenticates, sends sample agents/usage,
+`scripts/mock-desktop.mjs` (Node ≥ 22, no dependencies) connects, authenticates with the mutual handshake
+(`--legacy-hello` for the deprecated one), sends sample agents/usage,
 prints every Deck message and can request an approval from the command line. It doubles as the manual
 acceptance test for Phase 3.
