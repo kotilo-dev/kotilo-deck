@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-06
+
 ### Security
 - Companion handshake is now mutual: the Deck and Kotilo desktop prove the shared token to each other with HMAC-SHA256 over fresh nonces, and the token itself is never sent over the socket. A program squatting the companion port while the Deck is closed can no longer collect the token or approve agent commands. The old one-step handshake is still accepted for older clients.
 
