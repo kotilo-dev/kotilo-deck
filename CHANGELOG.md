@@ -22,6 +22,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Sliders have a new look: a thick rounded track with an accent fill and a large round thumb, easier to grab on a touch screen.
 - Top bar: workspace pills are 44 px tall (touch-target rule) and the theme chip shows four colour swatches of the current theme.
 
+### Fixed
+
+- A media or audio call could fail with "call aborted" right after another call crashed on the background worker (Windows and Linux). The worker now survives a failing job.
+
 ## [1.0.1] - 2026-11-06
 
 ### Security

@@ -58,6 +58,7 @@ impl Worker {
     fn spawn(&self) -> Result<Sender<Job>> {
         let (tx, rx) = mpsc::channel::<Job>();
         let (ready_tx, ready_rx) = mpsc::sync_channel::<Result<()>>(1);
+        let name = self.name;
         std::thread::Builder::new()
             .name(self.name.into())
             .spawn(move || {
@@ -69,8 +70,13 @@ impl Worker {
                     }
                 };
                 let _ = ready_tx.send(Ok(()));
+                // A panicking job must not kill the thread: jobs already queued behind it would be
+                // dropped with the receiver ("call aborted"), and the thread-local state would be lost.
+                // The panicking job's own caller still gets an error (its result sender is dropped).
                 for job in rx {
-                    job();
+                    if std::panic::catch_unwind(std::panic::AssertUnwindSafe(job)).is_err() {
+                        tracing::warn!(worker = name, "job panicked; worker keeps running");
+                    }
                 }
                 drop(com);
             })
@@ -148,5 +154,10 @@ mod tests {
         let b = TEST_WORKER.run(|| Ok(std::thread::current().id())).unwrap();
         assert_eq!(a, b, "jobs share one dedicated thread");
         assert_ne!(a, std::thread::current().id());
+        assert!(TEST_WORKER
+            .run(|| -> Result<()> { panic!("job panicked") })
+            .is_err());
+        let c = TEST_WORKER.run(|| Ok(std::thread::current().id())).unwrap();
+        assert_eq!(a, c, "a panicking job does not kill the worker");
     }
 }

@@ -2,6 +2,7 @@
 //! media backend keeps its D-Bus connection, HTTP runtime and caches in thread-locals there.
 //! Idle it blocks on its queue (no CPU).
 
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -29,11 +30,17 @@ impl Worker {
 
     fn spawn(&self) -> Result<Sender<Job>> {
         let (tx, rx) = mpsc::channel::<Job>();
+        let name = self.name;
         std::thread::Builder::new()
             .name(self.name.into())
             .spawn(move || {
+                // A panicking job must not kill the thread: jobs already queued behind it would be
+                // dropped with the receiver ("call aborted"), and the thread-local state would be lost.
+                // The panicking job's own caller still gets an error (its result sender is dropped).
                 for job in rx {
-                    job();
+                    if panic::catch_unwind(AssertUnwindSafe(job)).is_err() {
+                        tracing::warn!(worker = name, "job panicked; worker keeps running");
+                    }
                 }
             })
             .map_err(|e| PlatformError::Os(format!("cannot start {}: {e}", self.name)))?;
@@ -103,6 +110,23 @@ mod tests {
         assert!(TEST_WORKER
             .run(|| -> Result<()> { panic!("job panicked") })
             .is_err());
-        assert_eq!(TEST_WORKER.run(|| Ok(1)).unwrap(), 1, "respawned");
+        let c = TEST_WORKER.run(|| Ok(std::thread::current().id())).unwrap();
+        assert_eq!(a, c, "a panicking job does not kill the worker");
+    }
+
+    /// The old race: a job queued while a panicking job unwound the thread was dropped with the
+    /// receiver. Queue jobs from other threads right behind a panicking one; none may be lost.
+    #[test]
+    fn jobs_queued_behind_a_panic_are_not_lost() {
+        static RACE: Worker = Worker::new("linux-worker-race");
+        for _ in 0..50 {
+            let followers: Vec<_> = (0..4)
+                .map(|i| std::thread::spawn(move || RACE.run(move || Ok(i))))
+                .collect();
+            let _ = RACE.run(|| -> Result<()> { panic!("boom") });
+            for (i, h) in followers.into_iter().enumerate() {
+                assert_eq!(h.join().unwrap().unwrap(), i);
+            }
+        }
     }
 }
