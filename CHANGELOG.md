@@ -4,26 +4,27 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-12
+
 ### Added
-- Media 4×2 takes on the colour of the album artwork in the flat look, toned down per theme so text stays readable.
-- Calendar day timeline on large cards: today's events as blocks on an hour axis (09:00–18:00 by default, set per widget), all-day events in a top lane, overlapping events in two lanes with a "+N" block beyond that, and a line for now. The next-event card and rows get bigger on large screens, and in the glass look the countdown is a filled accent chip.
-- Widget settings can offer a time picker (`"format": "time"` in a manifest).
 - Glass card style (Settings ▸ Appearance ▸ Card style, also per workspace): frosted, saturated cards and top-bar pills over a wallpaper or transparent background, with a "Wallpaper dimming" slider. The default card opacity in Glass is worked out per theme so text stays readable even over a white or black wallpaper; picking Glass with blur off turns blur on at 32 px.
+- Calendar day timeline on large cards: today's events as blocks on an hour axis (09:00–18:00 by default, set per widget), all-day events in a top lane, overlapping events in two lanes with a "+N" block beyond that, and a line for now. The next-event card and rows get bigger on large screens, and in the glass look the countdown is a filled accent chip.
+- Media 4×2 takes on the colour of the album artwork in the flat look, toned down per theme so text stays readable.
+- Widget settings can offer a time picker (`"format": "time"` in a manifest).
 
 ### Changed
-- The Focus preset now fills the whole grid: Calendar takes the bottom-right block in place of the Date card (the big clock already shows the date). Existing workspaces are not changed; use "Reset to preset" to get it.
-- README screenshots and the animated preview are refreshed and show the glass look.
-- Volume 2×1: the percentage grows with the card, the slider uses the new rounded style, and the Output device and Mixer buttons are 44 px tall (short cards keep them slim but still 44 px to tap).
-- Weather 2×1: on larger cards a big temperature with the condition and today's high/low, a large filled icon and a one-line 3-day forecast. Large weather icons (56 px and up) are now filled. Small cards keep the compact layout.
-- Date 2×1: on larger cards a big day number beside the weekday and "November · Week 45", with a strip of this week's days below (today highlighted, past days dimmed, first day of the week from your locale). Small cards keep the compact layout.
-- Clock 2×1: on larger cards the time grows with the card, with the full date and the city with its UTC offset underneath. Small cards keep the single-row layout.
-- Media: artwork fills the card height on large screens, the title grows with the card, and the controls are round: a large filled play button, borderless previous/next, and shuffle/repeat that show a tinted circle when on. In the glass look the play button and progress use the text colour.
-- System widget (4×2): bigger numbers on large screens, a sparkline with a soft fill under it in every tile (CPU, memory, GPU), a "peak N% · 60 s" label for CPU, and a per-core strip coloured by load with the busiest core named.
 - Sliders have a new look: a thick rounded track with an accent fill and a large round thumb, easier to grab on a touch screen.
 - Top bar: workspace pills are 44 px tall (touch-target rule) and the theme chip shows four colour swatches of the current theme.
+- System widget (4×2): bigger numbers on large screens, a sparkline with a soft fill under it in every tile (CPU, memory, GPU), a "peak N% · 60 s" label for CPU, and a per-core strip coloured by load with the busiest core named.
+- Media: artwork fills the card height on large screens, the title grows with the card, and the controls are round: a large filled play button, borderless previous/next, and shuffle/repeat that show a tinted circle when on. In the glass look the play button and progress use the text colour.
+- Clock 2×1: on larger cards the time grows with the card, with the full date and the city with its UTC offset underneath. Small cards keep the single-row layout.
+- Date 2×1: on larger cards a big day number beside the weekday and "November · Week 45", with a strip of this week's days below (today highlighted, past days dimmed, first day of the week from your locale). Small cards keep the compact layout.
+- Weather 2×1: on larger cards a big temperature with the condition and today's high/low, a large filled icon and a one-line 3-day forecast. Large weather icons (56 px and up) are now filled. Small cards keep the compact layout.
+- Volume 2×1: the percentage grows with the card, the slider uses the new rounded style, and the Output device and Mixer buttons are 44 px tall (short cards keep them slim but still 44 px to tap).
+- The Focus preset now fills the whole grid: Calendar takes the bottom-right block in place of the Date card (the big clock already shows the date). Existing workspaces are not changed; use "Reset to preset" to get it.
+- README screenshots and the animated preview are refreshed and show the glass look.
 
 ### Fixed
-
 - A media or audio call could fail with "call aborted" right after another call crashed on the background worker (Windows and Linux). The worker now survives a failing job.
 
 ## [1.0.1] - 2026-11-06

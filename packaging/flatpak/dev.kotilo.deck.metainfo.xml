@@ -67,6 +67,12 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.1.0" date="2026-11-12">
+      <url type="details">https://github.com/kotilo-dev/kotilo-deck/releases/tag/v1.1.0</url>
+      <description>
+        <p>A refreshed look: an optional frosted glass card style over a wallpaper, a day timeline in Calendar, album-art colours in Media, larger and clearer System, Clock, Date, Weather and Volume widgets on big screens, and touch-friendly sliders.</p>
+      </description>
+    </release>
     <release version="1.0.1" date="2026-11-06">
       <url type="details">https://github.com/kotilo-dev/kotilo-deck/releases/tag/v1.0.1</url>
       <description>
