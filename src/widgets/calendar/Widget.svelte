@@ -503,7 +503,7 @@
 		display: block;
 		height: 22px;
 		border-radius: 8px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 	.bar.tall {
 		height: 60px;

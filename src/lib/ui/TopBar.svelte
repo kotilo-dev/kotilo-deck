@@ -39,26 +39,28 @@
 {#if !ui.editing}
 	<header class="bar" data-tauri-drag-region={drag}>
 		<div class="side start" data-tauri-drag-region={drag}>
-			<Mark />
-			<span class="brand" data-tauri-drag-region={drag}>{t('shell.appName')}</span>
+			<span class="brand-pill k-bar-pill" data-tauri-drag-region={drag}>
+				<Mark />
+				<span class="brand" data-tauri-drag-region={drag}>{t('shell.appName')}</span>
+			</span>
 		</div>
 		<div class="center" data-tauri-drag-region={drag}>
 			<WorkspaceSwitcher />
 		</div>
 		<div class="side end" data-tauri-drag-region={drag}>
 			{#if linkSettings}
-				<button type="button" class="companion" title={text.title} aria-label={t('shell.topbar.companionOpen', { status: text.title })} onclick={openCompanion}>
+				<button type="button" class="companion k-bar-pill" title={text.title} aria-label={t('shell.topbar.companionOpen', { status: text.title })} onclick={openCompanion}>
 					<span class="dot" class:on={view === 'connected'} aria-hidden="true"></span>
 					<span class="companion-label">{text.label}</span>
 				</button>
 			{:else}
-				<span class="companion passive" title={text.title}>
+				<span class="companion passive k-bar-pill" title={text.title}>
 					<span class="dot" class:on={view === 'connected'} aria-hidden="true"></span>
 					<span class="companion-label">{text.label}</span>
 				</span>
 			{/if}
 			<ThemePicker />
-			<button type="button" class="k-btn k-btn-icon" aria-label={t('shell.topbar.edit')} title={t('shell.topbar.edit')} onclick={() => ui.enterEdit()}>
+			<button type="button" class="k-btn k-btn-icon k-bar-pill" aria-label={t('shell.topbar.edit')} title={t('shell.topbar.edit')} onclick={() => ui.enterEdit()}>
 				<Icon name="edit" size={18} />
 			</button>
 		</div>
@@ -128,6 +130,23 @@
 		justify-content: center;
 		min-width: 0;
 		flex: 0 1 auto;
+	}
+	.brand-pill {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	/* Glass look (DESIGN §4.5): brand and companion status sit in glass pills, not on the bare wallpaper. */
+	:global(html[data-look='glass']) .brand-pill {
+		box-sizing: border-box;
+		min-height: 44px;
+		padding: 0 16px 0 12px;
+		border-radius: 14px;
+	}
+	:global(html[data-look='glass']) .companion {
+		margin: 0;
+		padding: 0 14px;
+		border-radius: 12px;
 	}
 	.brand {
 		font-size: 14px;

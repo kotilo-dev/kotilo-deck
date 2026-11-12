@@ -30,6 +30,8 @@
 		refreshUserThemes,
 		resolveBackground,
 		resolveBlur,
+		resolveLook,
+		resolveScrim,
 		resolveSurfaceOpacity
 	} from '#lib/settings/index.ts';
 	import { DeckUi, setDeck, sizesOf } from '#lib/ui/deck.svelte.ts';
@@ -165,12 +167,16 @@
 	$effect(() => {
 		if (!store.ready) return;
 		const ws = store.active;
-		const surface = resolveSurfaceOpacity(ws?.appearance, store.settings.appearance, theme);
-		const blur = resolveBlur(undefined, ws?.appearance, store.settings.appearance);
+		const global = store.settings.appearance;
+		// Glass look (DESIGN §4.5): only over a wallpaper or transparent background.
+		const look = resolveLook(ws?.appearance, global, background.mode);
+		const surface = resolveSurfaceOpacity(ws?.appearance, global, theme, look);
+		const blur = resolveBlur(undefined, ws?.appearance, global);
 		const root = document.documentElement;
-		applyTheme(theme, root, surface);
-		root.style.setProperty('--k-backdrop', backdropValue(blur));
-		ui.look = { surfaceOpacity: surface, blur };
+		applyTheme(theme, root, surface, { look, scrim: resolveScrim(global) });
+		root.style.setProperty('--k-backdrop', backdropValue(blur, look));
+		root.dataset.look = look;
+		ui.look = { surfaceOpacity: surface, blur, look };
 	});
 
 	$effect(() => {
@@ -375,6 +381,8 @@
 		{:else if wallpaper?.kind === 'video'}
 			<video bind:this={videoEl} src={wallpaper.src} muted loop playsinline disablepictureinpicture></video>
 		{/if}
+		<!-- Glass scrim: keeps text readable over bright wallpapers; transparent in the flat look. -->
+		<div class="scrim"></div>
 	</div>
 
 	<main class="deck" style:transform={ambient.shift.x || ambient.shift.y ? `translate(${ambient.shift.x}px, ${ambient.shift.y}px)` : undefined}>
@@ -437,6 +445,11 @@
 	}
 	.bg[data-mode='transparent'] {
 		background: transparent;
+	}
+	.scrim {
+		position: absolute;
+		inset: 0;
+		background: var(--k-scrim, transparent);
 	}
 	.bg img,
 	.bg video {

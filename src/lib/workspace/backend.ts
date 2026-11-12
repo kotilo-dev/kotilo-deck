@@ -36,7 +36,7 @@ export const DEFAULT_SETTINGS: DeckSettings = {
 	hotkey: 'Ctrl+Alt+K',
 	autostart: false,
 	displayMode: 'fullscreen',
-	appearance: { background: 'solid', wallpaper: null, surfaceOpacity: null, blur: 0, windowOpacity: 1 },
+	appearance: { background: 'solid', wallpaper: null, surfaceOpacity: null, blur: 0, windowOpacity: 1, style: 'flat', scrim: 0.34 },
 	burnIn: {
 		shiftMinutes: 10,
 		night: { enabled: false, from: '22:00', to: '07:00', dim: 0.5 },

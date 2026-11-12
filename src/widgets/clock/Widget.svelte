@@ -252,7 +252,7 @@
 		flex-shrink: 0;
 	}
 	.dial {
-		fill: var(--k-bg);
+		fill: var(--k-inset-deep);
 		stroke: var(--k-border);
 		stroke-width: 2;
 	}

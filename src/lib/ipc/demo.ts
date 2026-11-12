@@ -31,6 +31,7 @@ import type {
 	Todo,
 	TodoPatch,
 	UpdateStatus,
+	Wallpaper,
 	WeatherReport,
 	Workspace
 } from './index';
@@ -49,6 +50,7 @@ export interface DemoOptions {
 }
 
 export const DEMO_MONITOR = 'DEMO-1';
+const DEMO_WALLPAPER: Wallpaper = { name: 'ember.svg', kind: 'image', path: '' };
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const GIB = 1024 ** 3;
@@ -124,6 +126,9 @@ export function createDemoBackend(opts: DemoOptions = {}): DemoBackend & {
 
 	// ── settings + workspaces ──
 	const workspaceParam = params.get('workspace');
+	// `?look=glass`: the glass look over the bundled "Ember" gradient (static/wallpapers/ember.svg, made for
+	// this repo, safe to ship in screenshots).
+	const glass = params.get('look') === 'glass';
 	let settings: DeckSettings = {
 		...clone(DEFAULT_SETTINGS),
 		theme: params.get('theme') || null,
@@ -132,7 +137,10 @@ export function createDemoBackend(opts: DemoOptions = {}): DemoBackend & {
 		// Stills must not drift: no pixel shift.
 		burnIn: { ...clone(DEFAULT_SETTINGS.burnIn), shiftMinutes: 0 },
 		calendarFeeds: clone(FEEDS),
-		onboarding: { completed: true, version: 1 }
+		onboarding: { completed: true, version: 1 },
+		...(glass
+			? { appearance: { ...clone(DEFAULT_SETTINGS.appearance), background: 'wallpaper', wallpaper: DEMO_WALLPAPER.name, style: 'glass', blur: 32 } }
+			: {})
 	};
 	const workspaces = new Map<string, Workspace>();
 	for (const id of PRESET_IDS) {
@@ -420,7 +428,7 @@ export function createDemoBackend(opts: DemoOptions = {}): DemoBackend & {
 			{ name: 'Ankara', country: 'Türkiye', admin1: 'Ankara', latitude: 39.93, longitude: 32.86, timezone: 'Europe/Istanbul' }
 		],
 		weather_get: (a) => weather(a.unit === 'f' ? 'f' : 'c'),
-		wallpaper_list: () => [],
+		wallpaper_list: () => (glass ? [clone(DEMO_WALLPAPER)] : []),
 		wallpaper_import: () => null,
 		theme_user_list: () => [],
 		file_save_as: notInDemo('Saving files'),

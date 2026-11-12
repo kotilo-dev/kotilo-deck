@@ -481,7 +481,7 @@
 		min-width: 0;
 	}
 	.dev:has(input:checked) {
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 		font-weight: 600;
 	}
 	.dev input {
@@ -519,7 +519,7 @@
 		padding: 0 10px;
 	}
 	.foot-btn[aria-pressed='true'] {
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 
 	.menu {
@@ -577,7 +577,7 @@
 	.bar {
 		display: block;
 		border-radius: 8px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 
 	/* 1024×600: a 2×1 cell is ~112 px tall — tighten the stack, keep all three rows. */

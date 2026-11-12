@@ -610,7 +610,7 @@
 		gap: 2px;
 		padding: 8px 10px;
 		border-radius: 10px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 		border: 1px solid color-mix(in srgb, var(--k-warning) 55%, var(--k-border));
 		flex-shrink: 0;
 	}
@@ -671,7 +671,7 @@
 	.track {
 		height: 6px;
 		border-radius: 3px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 		overflow: hidden;
 	}
 	.fill {
@@ -748,7 +748,7 @@
 		display: block;
 		height: 14px;
 		border-radius: 8px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 
 	.cost-short {

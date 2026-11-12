@@ -1,10 +1,10 @@
 <script lang="ts">
 	/**
-	 * Per-workspace appearance override (SPEC §5.3): background, surface opacity, blur. Each one either
+	 * Per-workspace appearance override (SPEC §5.3): background, card style (DESIGN §4.5), surface opacity, blur. Each one either
 	 * inherits the global Appearance setting or sets its own value. Saved with the workspace file, so the
 	 * deck picks it up through `workspace://changed`.
 	 */
-	import type { Workspace } from '#lib/ipc/index.ts';
+	import type { LookStyle, Workspace } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { getTheme } from '#lib/theme/index.ts';
 	import { clamp } from '../look';
@@ -44,6 +44,18 @@
 			{#each wallpaperOptions as name (name)}
 				<option value="wallpaper:{name}">{t('settings.appearance.wallpaper')} · {name}</option>
 			{/each}
+		</select>
+	</label>
+
+	<label class="s-row">
+		<span class="s-label">
+			<span class="s-title">{t('settings.appearance.look')}</span>
+			<span class="s-help">{t('settings.workspaces.inheritHelp')}</span>
+		</span>
+		<select class="k-select s-select-sm bg" value={a.style ?? ''} onchange={(e) => set({ style: (e.currentTarget.value || undefined) as LookStyle | undefined })}>
+			<option value="">{t('settings.workspaces.inherit')}</option>
+			<option value="flat">{t('settings.appearance.flat')}</option>
+			<option value="glass">{t('settings.appearance.glass')}</option>
 		</select>
 	</label>
 

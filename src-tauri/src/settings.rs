@@ -52,6 +52,15 @@ pub enum Background {
     Transparent,
 }
 
+/// Card look (DESIGN §4.5). Older settings files without `style` load as `Flat`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LookStyle {
+    #[default]
+    Flat,
+    Glass,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeckAppearance {
@@ -60,6 +69,9 @@ pub struct DeckAppearance {
     pub surface_opacity: Option<f64>,
     pub blur: f64,
     pub window_opacity: f64,
+    pub style: LookStyle,
+    /// Glass wallpaper scrim, 0–0.6.
+    pub scrim: f64,
 }
 
 impl Default for DeckAppearance {
@@ -70,6 +82,8 @@ impl Default for DeckAppearance {
             surface_opacity: None,
             blur: 0.0,
             window_opacity: 1.0,
+            style: LookStyle::Flat,
+            scrim: 0.34,
         }
     }
 }
@@ -521,6 +535,7 @@ pub fn validate(s: &DeckSettings) -> Result<(), String> {
     }
     range("appearance.blur", a.blur, 0.0, 40.0)?;
     range("appearance.windowOpacity", a.window_opacity, 0.2, 1.0)?;
+    range("appearance.scrim", a.scrim, 0.0, 0.6)?;
     if let Some(w) = &a.wallpaper {
         if !valid_file_name(w) {
             return Err("appearance.wallpaper must be a file name".into());
@@ -840,7 +855,7 @@ mod tests {
                 "displayMode": "fullscreen",
                 "appearance": {
                     "background": "solid", "wallpaper": null, "surfaceOpacity": null,
-                    "blur": 0.0, "windowOpacity": 1.0
+                    "blur": 0.0, "windowOpacity": 1.0, "style": "flat", "scrim": 0.34
                 },
                 "burnIn": {
                     "shiftMinutes": 10,
@@ -1007,6 +1022,8 @@ mod tests {
             json!({"appearance": {"blur": 41}}),
             json!({"appearance": {"background": "video"}}),
             json!({"appearance": {"wallpaper": "../x.png"}}),
+            json!({"appearance": {"scrim": 0.7}}),
+            json!({"appearance": {"style": "frosted"}}),
             json!({"burnIn": {"night": {"dim": 0.2}}}),
             json!({"burnIn": {"idle": {"minutes": 0}}}),
             json!({"burnIn": {"shiftMinutes": -1}}),
@@ -1025,6 +1042,25 @@ mod tests {
         .unwrap();
         assert_eq!(ok.display_mode, DisplayMode::Overlay);
         assert_eq!(ok.appearance.surface_opacity, Some(0.0));
+    }
+
+    #[test]
+    fn stored_appearance_without_style_loads_flat() {
+        // Settings written before the glass look (1.0.x) have no `style` / `scrim`.
+        let s = from_stored(obj(json!({
+            "appearance": {"background": "wallpaper", "wallpaper": "a.jpg", "surfaceOpacity": 0.6, "blur": 12, "windowOpacity": 1}
+        })));
+        assert_eq!(s.appearance.style, LookStyle::Flat);
+        assert_eq!(s.appearance.scrim, 0.34);
+        assert_eq!(s.appearance.blur, 12.0);
+        let g = merge(
+            &s,
+            &obj(json!({"appearance": {"style": "glass", "scrim": 0.5}})),
+        )
+        .unwrap();
+        assert_eq!(g.appearance.style, LookStyle::Glass);
+        assert_eq!(g.appearance.scrim, 0.5);
+        assert_eq!(g.appearance.surface_opacity, Some(0.6));
     }
 
     #[test]

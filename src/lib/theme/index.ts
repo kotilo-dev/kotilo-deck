@@ -1,5 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
-import { parseTheme, themeToCssVars } from './loader';
+import { parseTheme, themeToCssVars, type Look } from './loader';
 import type { Theme } from './types';
 
 export * from './loader';
@@ -103,8 +103,13 @@ export function themeLabel(theme: Theme): string {
  * Writes the theme's `--k-*` variables onto `root`. Only CSS custom properties change, so a theme
  * switch is a single style recalculation (instant). `surfaceOpacity` = resolved appearance override.
  */
-export function applyTheme(theme: Theme, root: HTMLElement = document.documentElement, surfaceOpacity?: number): void {
-	for (const [name, value] of Object.entries(themeToCssVars(theme, surfaceOpacity ?? theme.opacity.surface))) {
+export function applyTheme(
+	theme: Theme,
+	root: HTMLElement = document.documentElement,
+	surfaceOpacity?: number,
+	opts: { look?: Look; scrim?: number } = {}
+): void {
+	for (const [name, value] of Object.entries(themeToCssVars(theme, surfaceOpacity ?? theme.opacity.surface, opts))) {
 		root.style.setProperty(name, value);
 	}
 	root.style.colorScheme = theme.variant;

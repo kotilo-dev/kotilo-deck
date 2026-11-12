@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS } from '#lib/workspace/index.ts';
-import { getTheme } from '#lib/theme/index.ts';
+import { getTheme, glassSurfaceOpacity } from '#lib/theme/index.ts';
 import {
 	backdropValue,
 	clockDrift,
@@ -8,6 +8,8 @@ import {
 	nightActive,
 	resolveBackground,
 	resolveBlur,
+	resolveLook,
+	resolveScrim,
 	resolveSurfaceOpacity,
 	SHIFT_PATTERN,
 	shiftAt
@@ -42,6 +44,33 @@ describe('appearance layers (SPEC §5.3)', () => {
 		expect(resolveBlur(undefined, undefined, { ...g, blur: 99 })).toBe(40);
 		expect(backdropValue(0)).toBe('none');
 		expect(backdropValue(8)).toBe('blur(8px)');
+	});
+
+	it('look: workspace style wins, glass only over a wallpaper or transparent background (DESIGN §4.5)', () => {
+		const glass = { ...g, style: 'glass' as const };
+		expect(g.style).toBe('flat');
+		expect(resolveLook(undefined, g, 'wallpaper')).toBe('flat');
+		expect(resolveLook(undefined, glass, 'wallpaper')).toBe('glass');
+		expect(resolveLook(undefined, glass, 'transparent')).toBe('glass');
+		expect(resolveLook(undefined, glass, 'solid')).toBe('flat');
+		expect(resolveLook({ style: 'flat' }, glass, 'wallpaper')).toBe('flat');
+		expect(resolveLook({ style: 'glass' }, g, 'wallpaper')).toBe('glass');
+		expect(resolveLook({ style: 'bogus' as never }, glass, 'wallpaper')).toBe('glass');
+	});
+
+	it('glass: saturated backdrop, still none when blur is off; scrim clamped', () => {
+		expect(backdropValue(32, 'glass')).toBe('blur(32px) saturate(150%)');
+		expect(backdropValue(0, 'glass')).toBe('none');
+		expect(resolveScrim(g)).toBe(0.34);
+		expect(resolveScrim({ ...g, scrim: 0.9 })).toBe(0.6);
+		expect(resolveScrim({ ...g, scrim: NaN })).toBe(0.34);
+	});
+
+	it('glass surface opacity: user values still win, otherwise the contrast-safe glass default', () => {
+		const theme = getTheme('catppuccin-mocha');
+		expect(resolveSurfaceOpacity(undefined, g, theme, 'glass')).toBe(glassSurfaceOpacity(theme, 0.34));
+		expect(resolveSurfaceOpacity(undefined, { ...g, surfaceOpacity: 0.4 }, theme, 'glass')).toBe(0.4);
+		expect(resolveSurfaceOpacity({ opacity: 0.3 }, g, theme, 'glass')).toBe(0.3);
 	});
 });
 

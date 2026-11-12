@@ -440,7 +440,7 @@
 	.track {
 		flex: 1;
 		min-width: 0;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 		overflow: hidden;
 	}
 	.track.s {
@@ -472,7 +472,7 @@
 	.seek::-webkit-slider-runnable-track {
 		height: 6px;
 		border-radius: 3px;
-		background: linear-gradient(to right, var(--k-accent-2) var(--p), var(--k-bg-alt) var(--p));
+		background: linear-gradient(to right, var(--k-accent-2) var(--p), var(--k-inset) var(--p));
 	}
 	.seek::-webkit-slider-thumb {
 		-webkit-appearance: none;
@@ -494,7 +494,7 @@
 	.seek::-moz-range-track {
 		height: 6px;
 		border-radius: 3px;
-		background: linear-gradient(to right, var(--k-accent-2) var(--p), var(--k-bg-alt) var(--p));
+		background: linear-gradient(to right, var(--k-accent-2) var(--p), var(--k-inset) var(--p));
 	}
 	.seek::-moz-range-thumb {
 		width: 12px;
@@ -583,7 +583,7 @@
 	.bar {
 		display: block;
 		border-radius: 8px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 
 	/* Narrow (portrait grids, 1024×600): drop the times on 4×1, then the artwork. */

@@ -45,16 +45,18 @@ Theme JSON (`themes/<id>.json`, schema from spec §5.1) maps 1:1 to CSS custom p
 | `radius` | `--k-radius` | card radius (default 16 px) |
 | `font.ui` / `font.mono` | `--k-font-ui` / `--k-font-mono` | |
 | *(runtime)* | `--k-dim` | 1.0 → 0.3 multiplier for night/idle dim (applied as `opacity` on the content layer) |
-| *(derived)* | `--k-inset` | background of tiles, chips and tracks that sit **inside** a card. Flat: `var(--k-bg)` for stat tiles, `var(--k-bg-alt)` for chips (today's look). Glass: `color-mix(in srgb, var(--k-bg-alt) 45%, transparent)` |
+| *(derived)* | `--k-inset` | chips, tracks, bars and fields **inside** a card. Flat: `bg-alt`. Glass: `color-mix(in srgb, bg-alt 45%, transparent)` |
+| *(derived)* | `--k-inset-deep` | stat tiles and dials inside a card. Flat: `bg`. Glass: same as `--k-inset` |
+| *(derived)* | `--k-inset-ring` | optional 1 px ring on insets, drawn as `box-shadow: inset 0 0 0 1px var(--k-inset-ring)` so it never changes layout. Flat: `transparent`. Glass: `color-mix(in srgb, text 8%, transparent)` |
 | *(derived)* | `--k-card-border` | card border. Flat: `var(--k-border)`. Glass: `color-mix(in srgb, var(--k-text) 18%, transparent)` |
-| *(derived)* | `--k-scrim` | wallpaper overlay, glass look only (§4.5) |
+| *(derived)* | `--k-scrim` | wallpaper overlay. Flat: `transparent`. Glass: `color-mix(in srgb, bg <scrim>%, transparent)` (§4.5) |
 
 Rules:
 - Widgets use **only** `var(--k-…)`. CI lint: regex `#[0-9a-fA-F]{3,8}` under `src/widgets/**` fails the build (allow-list: `transparent`, `currentColor`).
 - Text on an **accent-filled** button uses the theme's `bg-alt` (dark themes) or `#fff` (light themes). Expose this as `--k-on-accent`, computed by the theme loader: if `variant == "dark"` → `bg-alt`, else `#ffffff`.
 - Tinted states (warning card, selected calendar row) are `color-mix(in srgb, var(--k-warning) 18%, var(--k-surface))` — never a second hex.
-- Derived variables (`--k-surface-a`, `--k-on-accent`, `--k-inset`, `--k-card-border`, `--k-scrim`) are computed once in `src/lib/theme/loader.ts` (`themeToCssVars`) or `app.css`, never per widget.
-- Inner tiles, chips and tracks use `--k-inset`, not opaque `--k-bg` / `--k-bg-alt`: opaque boxes punch holes in the glass look.
+- Derived variables (`--k-surface-a`, `--k-on-accent`, `--k-inset*`, `--k-card-border`, `--k-scrim`, glass `--k-text-muted`) are computed once in `src/lib/theme/loader.ts` (`themeToCssVars`) or `app.css`, never per widget.
+- Inner tiles, chips and tracks use `--k-inset` / `--k-inset-deep`, not opaque `--k-bg` / `--k-bg-alt`: opaque boxes punch holes in the glass look. Dialogs and sheets stay opaque.
 
 Bundled reference values are in `themes/catppuccin-mocha.json` and `themes/catppuccin-latte.json`. The `kotilo-theme` skill holds the rest.
 
@@ -133,16 +135,17 @@ the setting shows "Glass needs a wallpaper or transparent background". Reference
 | Part | Glass treatment |
 |---|---|
 | Wallpaper scrim | layer above the wallpaper (image or video), below content: `color-mix(in srgb, var(--k-bg) 34%, transparent)`; strength setting 0–60 %, default 34 |
-| Card | `--k-surface-a`; defaults when unset: surface opacity 0.52, blur 32 px |
+| Card | `--k-surface-a`. Without a user opacity the default is `glassSurfaceOpacity(theme, scrim)`: the lowest value from 0.52 up at which text and muted text reach 4.5:1 over a pure white **and** a pure black wallpaper (Mocha 0.77, Latte 0.71 at scrim 34 %). Picking Glass while blur is off proposes 32 px |
 | Card backdrop | `blur(Npx) saturate(150%)`; `--k-backdrop: none` when blur is 0 |
 | Card border | `1px solid var(--k-card-border)` + `box-shadow: inset 0 1px 0 color-mix(in srgb, var(--k-text) 22%, transparent)` |
-| Inner tiles, chips, tracks | `--k-inset`, 1 px border `color-mix(in srgb, var(--k-text) 8%, transparent)` |
-| Muted text | `--k-text-muted: color-mix(in srgb, var(--k-text-muted) 45%, var(--k-text))`, set once under `[data-look='glass']` |
+| Inner tiles, chips, tracks | `--k-inset` / `--k-inset-deep`, ring `--k-inset-ring` |
+| Muted text | `--k-text-muted` = theme muted mixed 45 % with text (computed by the theme loader) |
 | Top bar | brand, workspace switcher, companion status, theme chip and Edit each become a glass pill (card background, border, backdrop) |
 | Attention border, edit mode | unchanged |
 
 Flat must stay pixel-identical to the pre-refresh look apart from the §5 widget changes. Contrast rules (§9) hold
-against the worst case behind the card; if a light theme fails at 0.52, raise its glass default opacity.
+against the worst case behind the card; the per-theme glass default above guarantees it for every bundled theme
+(unit-tested), and a user-chosen opacity is the user's call.
 
 ---
 
