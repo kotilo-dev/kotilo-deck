@@ -1,5 +1,6 @@
 /** Pure helpers for the Media widget: timeline extrapolation, time labels, repeat state. */
 import type { MediaSession } from '#lib/ipc/index.ts';
+import { contrastRatio, hexToRgb, mixHex } from '#lib/theme/index.ts';
 
 /** After a local action (play/pause, seek), backend values that disagree are ignored this long. */
 export const HOLD_MS = 1500;
@@ -76,3 +77,86 @@ export function applyOverrides(s: MediaSession, o: Overrides, now: number): Medi
 	if (o.repeat && now - o.repeat.at < HOLD_MS && s.repeat !== null) out = { ...out, repeat: o.repeat.value };
 	return out;
 }
+
+// ── Artwork tint (DESIGN §5.7, flat look only) ─────────────────────────────
+
+export type Rgb = [number, number, number];
+
+/**
+ * Average colour of RGBA pixels (a downscaled artwork), weighting by alpha so transparent corners don't
+ * pull it toward black. Null when every pixel is transparent.
+ */
+export function averageColor(data: ArrayLike<number>): Rgb | null {
+	let r = 0;
+	let g = 0;
+	let b = 0;
+	let w = 0;
+	for (let i = 0; i + 3 < data.length; i += 4) {
+		const a = data[i + 3] / 255;
+		r += data[i] * a;
+		g += data[i + 1] * a;
+		b += data[i + 2] * a;
+		w += a;
+	}
+	return w > 0 ? [Math.round(r / w), Math.round(g / w), Math.round(b / w)] : null;
+}
+
+function rgbToHsl([r, g, b]: Rgb): [number, number, number] {
+	const [R, G, B] = [r / 255, g / 255, b / 255];
+	const max = Math.max(R, G, B);
+	const min = Math.min(R, G, B);
+	const l = (max + min) / 2;
+	if (max === min) return [0, 0, l];
+	const d = max - min;
+	const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+	const h = max === R ? (G - B) / d + (G < B ? 6 : 0) : max === G ? (B - R) / d + 2 : (R - G) / d + 4;
+	return [h / 6, s, l];
+}
+
+function hslToRgb([h, s, l]: [number, number, number]): Rgb {
+	if (s === 0) return [Math.round(l * 255), Math.round(l * 255), Math.round(l * 255)];
+	const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+	const p = 2 * l - q;
+	const f = (t: number) => {
+		const x = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+		if (x < 1 / 6) return p + (q - p) * 6 * x;
+		if (x < 1 / 2) return q;
+		if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+		return p;
+	};
+	return [Math.round(f(h + 1 / 3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1 / 3) * 255)];
+}
+
+/** Share of the artwork colour in the flat card's background and border (DESIGN §5.7). */
+export const TINT_SHARE = 0.3;
+
+const toHex = (c: Rgb) => `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+
+/**
+ * Artwork colour safe to tint the card with in this theme. Saturation is capped at 0.75 (neon covers would
+ * glow); then the colour is pulled toward the surface in 10 % steps until, mixed 30 % into the surface, text
+ * keeps 4.5:1 and muted text 3:1 (or the plain surface's own ratio when a theme starts below that). The
+ * pull ends at the surface itself, so the result always passes.
+ */
+export function tintColor(rgb: Rgb, theme: { surface: string; text: string; muted: string }): Rgb {
+	const [h, sat, l] = rgbToHsl(rgb);
+	const base = hslToRgb([h, Math.min(sat, 0.75), l]);
+	const surface = hexToRgbTuple(theme.surface);
+	const need = (fg: string, min: number) => Math.min(min, contrastRatio(fg, theme.surface));
+	const needText = need(theme.text, 4.5);
+	const needMuted = need(theme.muted, 3);
+	for (let k = 0; k <= 10; k++) {
+		const c = base.map((v, i) => Math.round(v + (surface[i] - v) * (k / 10))) as Rgb;
+		const card = mixHex(toHex(c), theme.surface, TINT_SHARE);
+		if (contrastRatio(theme.text, card) >= needText && contrastRatio(theme.muted, card) >= needMuted) return c;
+	}
+	return surface;
+}
+
+const hexToRgbTuple = (hex: string): Rgb => {
+	const [r, g, b] = hexToRgb(hex);
+	return [r, g, b];
+};
+
+/** CSS value for the inline `--art` property (an `rgb()` function, so `lint:hex` stays clean). */
+export const rgbCss = ([r, g, b]: Rgb): string => `rgb(${r} ${g} ${b})`;

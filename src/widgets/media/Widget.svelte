@@ -11,10 +11,12 @@
 		type MediaAction,
 		type MediaSession
 	} from '#lib/ipc/index.ts';
+	import { getTheme } from '#lib/theme/index.ts';
 	import { isDeckVisible, onDeckVisibility, subscribeTick } from '#lib/time/index.ts';
 	import type { WidgetProps } from '../types';
 	import {
 		applyOverrides,
+		averageColor,
 		byline,
 		currentPosition,
 		formatTime,
@@ -22,8 +24,11 @@
 		nextRepeat,
 		progress,
 		repeatKey,
+		rgbCss,
 		seekSeconds,
-		type Overrides
+		tintColor,
+		type Overrides,
+		type Rgb
 	} from './logic';
 	import { defaults, type MediaSettings } from './settings';
 
@@ -144,6 +149,57 @@
 	const sub4x1 = $derived(view ? byline(view.artist, view.source) : '');
 	const sub4x2 = $derived(view ? byline(view.artist, s.showAlbum ? view.album : null) : '');
 	const timeLabel = $derived(t('widgets.media.position', { pos: formatTime(shownPos), dur: formatTime(duration) }));
+
+	// ── Artwork tint (DESIGN §5.7, flat look, 4×2) ──
+	// The root's data-theme / data-look attributes are the theme signal (set by applyTheme / the page).
+	const root = typeof document !== 'undefined' ? document.documentElement : null;
+	let themeId = $state(root?.dataset.theme ?? '');
+	let look = $state(root?.dataset.look ?? 'flat');
+	$effect(() => {
+		if (!root || size !== '4x2') return;
+		const obs = new MutationObserver(() => {
+			themeId = root.dataset.theme ?? '';
+			look = root.dataset.look ?? 'flat';
+		});
+		obs.observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-look'] });
+		return () => obs.disconnect();
+	});
+
+	/**
+	 * Average artwork colour, once per track: the artwork is a `data:` URL on every platform (the backend
+	 * inlines it), so drawing it on a canvas never taints it. 8×8 downscale, alpha-weighted.
+	 */
+	const artSrc = $derived(size === '4x2' ? (view?.artwork ?? null) : null);
+	let artRgb = $state<Rgb | null>(null);
+	$effect(() => {
+		const src = artSrc;
+		artRgb = null;
+		if (!src) return;
+		let off = false;
+		const img = new Image();
+		img.onload = () => {
+			if (off) return;
+			try {
+				const c = document.createElement('canvas');
+				c.width = c.height = 8;
+				const ctx = c.getContext('2d', { willReadFrequently: true });
+				if (!ctx) return;
+				ctx.drawImage(img, 0, 0, 8, 8);
+				artRgb = averageColor(ctx.getImageData(0, 0, 8, 8).data);
+			} catch {
+				artRgb = null;
+			}
+		};
+		img.src = src;
+		return () => {
+			off = true;
+		};
+	});
+	const tint = $derived.by(() => {
+		if (!artRgb || look === 'glass') return undefined;
+		const c = getTheme(themeId).colors;
+		return rgbCss(tintColor(artRgb, { surface: c.surface, text: c.text, muted: c['text-muted'] }));
+	});
 </script>
 
 {#snippet note(px: number)}
@@ -199,7 +255,7 @@
 	</svg>
 {/snippet}
 
-<section class="k-card media" class:idle data-size={size} aria-label={t('widgets.media.title')}>
+<section class="k-card media" class:idle data-size={size} style:--art={tint} aria-label={t('widgets.media.title')}>
 	{#if !tauri || !available}
 		<div class="state">
 			{@render stateIcon()}
@@ -217,7 +273,7 @@
 			<span class="sk-lines"><span class="bar" style="width: 60%; height: 16px"></span><span class="bar" style="width: 40%; height: 12px"></span></span>
 		</div>
 	{:else if size === '4x2'}
-		{@render artwork('art-l', 44)}
+		{@render artwork('art-l', 56)}
 		<div class="col">
 			<div class="meta-block">
 				{#if view}
@@ -320,15 +376,30 @@
 		gap: 16px;
 		padding: 14px 18px;
 		font-family: var(--k-font-ui);
+		/* Progress fill and play button: accent-2 in flat, text in glass (DESIGN §5.7). */
+		--fill: var(--k-accent-2);
+		--on-fill: var(--k-on-accent);
 	}
-	/* 4×2: artwork and the text/controls column form one block, top edges aligned, centred in the card.
-	   Artwork is 120 px (DESIGN §5.7) up to 1280×720 and grows on taller cards (1920×1080) instead of
-	   leaving the column to spread over the whole height. */
+	:global(html[data-look='glass']) .media {
+		--fill: var(--k-text);
+		--on-fill: var(--k-bg);
+	}
+	/* 4×2 (DESIGN §5.7): padding 26, artwork a square filling the card height, text column beside it.
+	   Flat: the card takes 30 % of the artwork colour (--art, inline), accent-2 without artwork. */
 	.media[data-size='4x2'] {
-		--art: clamp(min(120px, 100cqh), calc(100cqh - 150px), 320px);
-		padding: 18px 22px;
-		gap: 20px;
-		align-items: center;
+		--art-size: min(calc(100cqh - 52px), 47cqw);
+		padding: 26px;
+		gap: 28px;
+		align-items: stretch;
+		background-color: color-mix(in srgb, var(--art, var(--k-accent-2)) 30%, var(--k-surface-a));
+		border-color: color-mix(in srgb, var(--art, var(--k-accent-2)) 30%, var(--k-card-border, var(--k-border)));
+		transition:
+			background-color 200ms ease,
+			border-color 200ms ease;
+	}
+	:global(html[data-look='glass']) .media[data-size='4x2'] {
+		background-color: var(--k-surface-a);
+		border-color: var(--k-card-border);
 	}
 	.mono {
 		font-family: var(--k-font-mono);
@@ -352,9 +423,10 @@
 		border-radius: 12px;
 	}
 	.art-l {
-		width: var(--art);
-		height: var(--art);
-		border-radius: 14px;
+		width: var(--art-size);
+		height: var(--art-size);
+		align-self: center;
+		border-radius: 18px;
 	}
 	.art img {
 		width: 100%;
@@ -377,18 +449,22 @@
 	.col {
 		flex: 1;
 		min-width: 0;
-		min-height: var(--art);
-		max-height: 100%;
 		display: flex;
 		flex-direction: column;
-		justify-content: space-between;
-		gap: 8px;
+		gap: 12px;
+	}
+	/* Meta at the top, then a spacer: progress sits right above the controls (DESIGN §5.7). */
+	.col .meta-block {
+		margin-bottom: auto;
 	}
 	.meta-block {
 		display: flex;
 		flex-direction: column;
 		gap: 3px;
 		min-width: 0;
+	}
+	.col .meta-block {
+		gap: 6px;
 	}
 	.meta-block.tight {
 		gap: 2px;
@@ -411,18 +487,20 @@
 		color: var(--k-text-muted);
 	}
 	.tiny {
-		font-size: 11px;
+		font-size: var(--k-fs-meta);
 		color: var(--k-text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 	}
+	/* Container-scaled (DESIGN §3): 20 px at 1024×600, 44 px at 1920×1080. */
 	.title-l {
-		font-size: 20px;
+		font-size: max(20px, min(44px, 4.74cqw, calc(13cqh - 19px)));
 		font-weight: 600;
-		line-height: 1.25;
+		letter-spacing: -0.02em;
+		line-height: 1.15;
 	}
 	.sub-l {
-		font-size: 13px;
+		font-size: 19px;
 		color: var(--k-text-muted);
 	}
 
@@ -437,6 +515,9 @@
 		font-size: 11px;
 		color: var(--k-text-muted);
 	}
+	.col .time {
+		font-size: 14px;
+	}
 	.track {
 		flex: 1;
 		min-width: 0;
@@ -448,15 +529,15 @@
 		border-radius: 2px;
 	}
 	.track.l {
-		height: 6px;
-		border-radius: 3px;
+		height: 8px;
+		border-radius: 4px;
 	}
 	.fill {
 		height: 100%;
-		background: var(--k-accent-2);
+		background: var(--fill);
 	}
 
-	/* 4×2 seek bar: a native range drawn as the 6 px progress bar, 24 px tall to hit. */
+	/* 4×2 seek bar: a native range drawn as the 8 px progress bar, 24 px tall to hit. */
 	.seek {
 		--p: 0%;
 		flex: 1;
@@ -470,18 +551,18 @@
 		touch-action: none;
 	}
 	.seek::-webkit-slider-runnable-track {
-		height: 6px;
-		border-radius: 3px;
-		background: linear-gradient(to right, var(--k-accent-2) var(--p), var(--k-inset) var(--p));
+		height: 8px;
+		border-radius: 4px;
+		background: linear-gradient(to right, var(--fill) var(--p), var(--k-inset) var(--p));
 	}
 	.seek::-webkit-slider-thumb {
 		-webkit-appearance: none;
 		appearance: none;
-		width: 14px;
-		height: 14px;
+		width: 16px;
+		height: 16px;
 		margin-top: -4px;
 		border-radius: 50%;
-		background: var(--k-accent-2);
+		background: var(--fill);
 		border: 2px solid var(--k-surface);
 		opacity: 0;
 		transition: opacity 150ms ease;
@@ -492,18 +573,19 @@
 		opacity: 1;
 	}
 	.seek::-moz-range-track {
-		height: 6px;
-		border-radius: 3px;
-		background: linear-gradient(to right, var(--k-accent-2) var(--p), var(--k-inset) var(--p));
+		height: 8px;
+		border-radius: 4px;
+		background: linear-gradient(to right, var(--fill) var(--p), var(--k-inset) var(--p));
 	}
 	.seek::-moz-range-thumb {
-		width: 12px;
-		height: 12px;
+		width: 14px;
+		height: 14px;
 		border-radius: 50%;
-		background: var(--k-accent-2);
+		background: var(--fill);
 		border: 2px solid var(--k-surface);
 	}
 
+	/* Controls: play/pause is the only filled button (round); prev/next and toggles have no border or fill. */
 	.btns {
 		display: flex;
 		align-items: center;
@@ -511,9 +593,11 @@
 		flex-shrink: 0;
 	}
 	.media[data-size='4x2'] .btns {
-		gap: 10px;
+		justify-content: center;
+		gap: 14px;
 	}
 	.btn {
+		--ico: 16px;
 		width: 44px;
 		height: 44px;
 		flex-shrink: 0;
@@ -521,26 +605,72 @@
 		align-items: center;
 		justify-content: center;
 		padding: 0;
-		border-radius: 12px;
-		border: 1px solid var(--k-border);
+		border-radius: 50%;
+		border: 0;
 		background: transparent;
 		color: var(--k-text);
 	}
-	.btn.play {
-		border: 0;
-		background: var(--k-accent-2);
-		color: var(--k-on-accent);
+	.btn :global(svg) {
+		width: var(--ico);
+		height: var(--ico);
 	}
-	.btn.play.wide {
-		width: 56px;
+	.btn.play {
+		background: var(--fill);
+		color: var(--on-fill);
 	}
 	.btn.toggle {
 		color: var(--k-text-muted);
 	}
 	.btn.toggle[aria-pressed='true'] {
 		color: var(--k-accent-2);
-		border-color: color-mix(in srgb, var(--k-accent-2) 55%, var(--k-border));
-		background: color-mix(in srgb, var(--k-accent-2) 12%, transparent);
+		background: color-mix(in srgb, var(--k-accent-2) 22%, transparent);
+	}
+	/* 4×2 sizes: play 84, prev/next 60, shuffle/repeat 52. */
+	.media[data-size='4x2'] .btn.ghost {
+		width: 60px;
+		height: 60px;
+		--ico: 26px;
+	}
+	.media[data-size='4x2'] .btn.toggle {
+		width: 52px;
+		height: 52px;
+		--ico: 20px;
+	}
+	.media[data-size='4x2'] .btn.play {
+		width: 84px;
+		height: 84px;
+		--ico: 32px;
+	}
+	/* Small 4×2 cards (1024×600, 1280×720): the pre-refresh scale, touch targets stay ≥ 44 px. */
+	@container (width < 700px) or (height < 300px) {
+		.media[data-size='4x2'] {
+			--art-size: min(calc(100cqh - 36px), 30cqw);
+			padding: 18px;
+			gap: 18px;
+		}
+		.media[data-size='4x2'] .btns {
+			gap: 6px;
+		}
+		.media[data-size='4x2'] .btn.ghost,
+		.media[data-size='4x2'] .btn.toggle {
+			width: 44px;
+			height: 44px;
+			--ico: 16px;
+		}
+		.media[data-size='4x2'] .btn.play {
+			width: 56px;
+			height: 56px;
+			--ico: 20px;
+		}
+		.sub-l {
+			font-size: 13px;
+		}
+		.col .time {
+			font-size: 11px;
+		}
+		.col {
+			gap: 8px;
+		}
 	}
 	/* DESIGN §5.7: no session → disabled at .4. */
 	.media.idle .btn:disabled {
@@ -601,7 +731,8 @@
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.seek::-webkit-slider-thumb {
+		.seek::-webkit-slider-thumb,
+		.media[data-size='4x2'] {
 			transition: none;
 		}
 	}

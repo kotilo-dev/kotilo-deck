@@ -5,11 +5,13 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
+- Media 4×2 takes on the colour of the album artwork in the flat look, toned down per theme so text stays readable.
 - Calendar day timeline on large cards: today's events as blocks on an hour axis (09:00–18:00 by default, set per widget), all-day events in a top lane, overlapping events in two lanes with a "+N" block beyond that, and a line for now. The next-event card and rows get bigger on large screens, and in the glass look the countdown is a filled accent chip.
 - Widget settings can offer a time picker (`"format": "time"` in a manifest).
 - Glass card style (Settings ▸ Appearance ▸ Card style, also per workspace): frosted, saturated cards and top-bar pills over a wallpaper or transparent background, with a "Wallpaper dimming" slider. The default card opacity in Glass is worked out per theme so text stays readable even over a white or black wallpaper; picking Glass with blur off turns blur on at 32 px.
 
 ### Changed
+- Media: artwork fills the card height on large screens, the title grows with the card, and the controls are round: a large filled play button, borderless previous/next, and shuffle/repeat that show a tinted circle when on. In the glass look the play button and progress use the text colour.
 - System widget (4×2): bigger numbers on large screens, a sparkline with a soft fill under it in every tile (CPU, memory, GPU), a "peak N% · 60 s" label for CPU, and a per-core strip coloured by load with the busiest core named.
 - Sliders have a new look: a thick rounded track with an accent fill and a large round thumb, easier to grab on a touch screen.
 - Top bar: workspace pills are 44 px tall (touch-target rule) and the theme chip shows four colour swatches of the current theme.
