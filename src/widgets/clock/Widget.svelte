@@ -101,6 +101,18 @@
 		{/if}
 		<span class="foot">{formatShortDate(now, locale, tz)} · {t('widgets.common.weekShort', { week })}</span>
 	{:else}
+		<!-- Large 2×1 (DESIGN §5.1): scaled time over a date | city row. Short cards: the compact row. -->
+		<div class="wide">
+			<span class="wtime">
+				<span class="hm">{clock.hm}</span>
+				{#if s.seconds}<span class="sec">{clock.seconds}</span>{/if}
+				{#if clock.period}<span class="sec">{clock.period}</span>{/if}
+			</span>
+			<span class="wrow">
+				<span class="wdate">{formatLongDate(now, locale, tz)}</span>
+				<span class="wzone">{city} {offset}</span>
+			</span>
+		</div>
 		<div class="compact">
 			<span class="time">
 				<span class="hm">{clock.hm}</span>
@@ -346,6 +358,68 @@
 	}
 	@container (width < 170px) {
 		.cdate {
+			display: none;
+		}
+	}
+	.wide {
+		display: none;
+		flex-direction: column;
+		justify-content: space-between;
+		height: 100%;
+		min-width: 0;
+	}
+	.wtime {
+		display: flex;
+		align-items: baseline;
+		/* 32 px floor, 112 px at 1920×1080 (DESIGN §3). */
+		font-size: max(32px, min(112px, 24cqw, calc(55cqh - 18px)));
+		line-height: 1;
+		white-space: nowrap;
+	}
+	.wtime .hm {
+		font-weight: 500;
+		letter-spacing: -0.04em;
+	}
+	.wtime .sec {
+		font-size: 0.3em;
+		font-weight: 400;
+		color: var(--k-text-muted);
+		margin-left: 0.3em;
+	}
+	.wrow {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 12px;
+		min-width: 0;
+	}
+	.wdate {
+		font-size: 16px;
+		font-weight: 600;
+	}
+	.wzone {
+		font-size: 13px;
+		color: var(--k-text-muted);
+		flex-shrink: 0;
+	}
+	.wdate,
+	.wzone {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+	}
+	@container (height >= 100px) and (width >= 220px) {
+		.wide {
+			display: flex;
+		}
+		.compact {
+			display: none;
+		}
+	}
+	/* 1280×720: the full date wins over the zone label. */
+	@container (width < 320px) {
+		.wzone {
 			display: none;
 		}
 	}

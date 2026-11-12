@@ -160,7 +160,7 @@ Sizes are `w×h` in cells. "Compact" = 1-row variants.
 ### 5.1 Clock — `2×1, 2×2, 4×2`
 - **4×2:** time 128 mono + seconds 40 muted on one baseline. Bottom row: left = "Tuesday, 3 November" 18/600 over "Week 45 · Day 307 · Istanbul UTC+3" 13 muted; right = up to 3 extra time zones, each tiny-label city + mono 20 time, right-aligned, 20 px apart.
 - **2×2:** header "City" + mono 12 time; analog face 150 px (face `--k-bg`, 2 px border, 4 quarter ticks 3 px, hour hand 5 px `--k-text`, minute hand 3 px `--k-accent`, 4 px accent hub); footer "Tue 3 Nov · W45" 12 muted. Digital option: 48 mono centered.
-- **2×1:** time container-scaled (§3) on one baseline with seconds 0.3 em muted (when enabled). Bottom row: left "Thursday, November 5" 16/600, right "Istanbul UTC+3" 13 muted. Below the container-query breakpoint: mono time left, date 12 muted right on one row (the 1024×600 layout).
+- **2×1:** time container-scaled (§3) on one baseline with seconds 0.3 em muted (when enabled). Bottom row: left "Thursday, November 5" 16/600, right "Istanbul UTC+3" 13 muted. Below the container-query breakpoint: mono time left, date 12 muted right on one row (the 1024×600 layout). Breakpoint: content box ≥ 220×100 px (1280×720 and up); under 320 px wide the zone label is dropped so the date stays whole.
 
 ### 5.2 Date — `2×1`
 - Top: day number container-scaled (§3); beside it weekday 24/600 over "November · Week 45 · Day 309" 15 muted ("Day N" only when `dayOfYear` is on).
