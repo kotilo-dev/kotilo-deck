@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { gb, gbTotal, initialWarn, memLabel, percent, pushHistory, sparklinePoints, stepWarn, type WarnState } from './logic';
+import {
+	busiestCore,
+	coreBucket,
+	gb,
+	gbTotal,
+	initialWarn,
+	memLabel,
+	peak,
+	percent,
+	pushHistory,
+	sparklineArea,
+	sparklinePoints,
+	stepWarn,
+	type WarnState
+} from './logic';
 
 const run = (values: number[], threshold = 85, start: WarnState = initialWarn) => {
 	const states: WarnState[] = [];
@@ -75,5 +89,35 @@ describe('units', () => {
 	it('computes percentages safely', () => {
 		expect(percent(8, 32)).toBe(25);
 		expect(percent(1, 0)).toBe(0);
+	});
+});
+
+describe('4×2 refresh helpers (DESIGN §5.5)', () => {
+	it('area closes the line down to the bottom edge', () => {
+		expect(sparklineArea([], 240, 40)).toBe('');
+		const line = sparklinePoints([0, 100], 240, 40, 3);
+		expect(sparklineArea([0, 100], 240, 40, 3)).toBe(`120,40 ${line} 240,40`);
+		expect(sparklineArea([50], 240, 40)).toBe(`240,40 ${sparklinePoints([50], 240, 40)} 240,40`);
+	});
+
+	it('peak is the window maximum, clamped', () => {
+		expect(peak([])).toBeNull();
+		expect(peak([12, 61.4, 30])).toBe(61);
+		expect(peak([140])).toBe(100);
+	});
+
+	it('core buckets: <25 low, 25..threshold mid, >= threshold high', () => {
+		expect(coreBucket(0, 85)).toBe('low');
+		expect(coreBucket(24.9, 85)).toBe('low');
+		expect(coreBucket(25, 85)).toBe('mid');
+		expect(coreBucket(84.9, 85)).toBe('mid');
+		expect(coreBucket(85, 85)).toBe('high');
+		expect(coreBucket(NaN, 85)).toBe('low');
+	});
+
+	it('busiest core is 1-based, first wins a tie', () => {
+		expect(busiestCore([])).toBeNull();
+		expect(busiestCore([70, 12, 70])).toEqual({ core: 1, load: 70 });
+		expect(busiestCore([5, 33.6, 9])).toEqual({ core: 2, load: 34 });
 	});
 });

@@ -55,6 +55,34 @@ export function sparklinePoints(values: readonly number[], width: number, height
 		.join(' ');
 }
 
+/**
+ * SVG polygon points for the sparkline's area fill (DESIGN §5.5, §1.4 exception a): the line's points
+ * closed down to the bottom edge, so the fill sits under the line and bleeds to the box's bottom.
+ */
+export function sparklineArea(values: readonly number[], width: number, height: number, capacity = HISTORY, pad = 1): string {
+	if (values.length === 0) return '';
+	const line = sparklinePoints(values, width, height, capacity, pad);
+	const step = width / Math.max(1, capacity - 1);
+	const start = r1(width - (values.length - 1) * step);
+	return `${start},${height} ${line} ${r1(width)},${height}`;
+}
+
+/** Highest sample in the window, rounded (CPU tile "peak N% · 60 s"); null without samples. */
+export const peak = (values: readonly number[]): number | null =>
+	values.length ? Math.round(Math.max(...values.map(clampPct))) : null;
+
+/** Core bar colour bucket: below 25 % info, 25 % up to the threshold accent, at/above the threshold warning. */
+export type CoreBucket = 'low' | 'mid' | 'high';
+export const coreBucket = (load: number, threshold: number): CoreBucket =>
+	clampPct(load) >= threshold ? 'high' : clampPct(load) < 25 ? 'low' : 'mid';
+
+/** Busiest core, 1-based for display; the first one wins a tie. Null without per-core data. */
+export function busiestCore(perCore: readonly number[]): { core: number; load: number } | null {
+	let best = -1;
+	for (let i = 0; i < perCore.length; i++) if (best < 0 || clampPct(perCore[i]) > clampPct(perCore[best])) best = i;
+	return best < 0 ? null : { core: best + 1, load: Math.round(clampPct(perCore[best])) };
+}
+
 export const percent = (part: number, total: number): number => (total > 0 ? clampPct((part / total) * 100) : 0);
 
 const GIB = 1024 ** 3;
