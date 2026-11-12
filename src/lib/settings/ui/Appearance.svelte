@@ -6,10 +6,12 @@
 	import { wallpaperSrc } from '#lib/ipc/transport.ts';
 	import type { DeckAppearance } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
-	import { getTheme } from '#lib/theme/index.ts';
+	import { getTheme, glassSurfaceOpacity } from '#lib/theme/index.ts';
 	import Icon from '#lib/ui/Icon.svelte';
+	import { GLASS_BLUR } from '../look';
 	import { draftDirty, errText, getSettingsContext } from './context.svelte';
 	import Head from './Head.svelte';
+	import Segmented from './Segmented.svelte';
 	import Switch from './Switch.svelte';
 
 	const { store, ui, env, save } = getSettingsContext();
@@ -19,10 +21,15 @@
 		(k in draft.appearance ? draft.appearance[k] : saved[k]) as DeckAppearance[K];
 
 	const theme = $derived(getTheme(store.settings.theme));
-	const themePct = $derived(Math.round(theme.opacity.surface * 100));
+	const style = $derived(value('style') ?? 'flat');
+	const scrimPct = $derived(Math.round((value('scrim') ?? 0.34) * 100));
 	const background = $derived(value('background'));
+	/** Default opacity without an override: the theme's, or the contrast-safe glass value (DESIGN §4.5). */
+	const glassActive = $derived(style === 'glass' && background !== 'solid');
+	const defaultOpacity = $derived(glassActive ? glassSurfaceOpacity(theme, scrimPct / 100) : theme.opacity.surface);
+	const themePct = $derived(Math.round(defaultOpacity * 100));
 	const wallpaperName = $derived(value('wallpaper'));
-	const surfacePct = $derived(Math.round((value('surfaceOpacity') ?? theme.opacity.surface) * 100));
+	const surfacePct = $derived(Math.round((value('surfaceOpacity') ?? defaultOpacity) * 100));
 	const blur = $derived(value('blur'));
 	const windowPct = $derived(Math.round(value('windowOpacity') * 100));
 	const overlay = $derived(store.settings.displayMode === 'overlay');
@@ -41,13 +48,19 @@
 		env.draft = { ...draft, appearance: next };
 	}
 
+	/** Picking Glass while blur is off also proposes the glass blur (still a draft until Apply). */
+	function setStyle(next: DeckAppearance['style']) {
+		set('style', next);
+		if (next === 'glass' && blur === 0) set('blur', GLASS_BLUR);
+	}
+
 	function setToggle(which: 'night' | 'idle', v: boolean) {
 		const savedValue = which === 'night' ? night.enabled : idle.enabled;
 		env.draft = { ...draft, [which]: v === savedValue ? undefined : v };
 	}
 
 	function resetToTheme() {
-		const target: DeckAppearance = { ...saved, background: 'solid', surfaceOpacity: null, blur: 0, windowOpacity: 1 };
+		const target: DeckAppearance = { ...saved, background: 'solid', surfaceOpacity: null, blur: 0, windowOpacity: 1, style: 'flat', scrim: 0.34 };
 		const next: Partial<DeckAppearance> = {};
 		for (const k of Object.keys(target) as (keyof DeckAppearance)[]) {
 			if (target[k] !== saved[k]) (next as Record<string, unknown>)[k] = target[k];
@@ -186,10 +199,48 @@
 	<div class="s-group">
 		<h2 class="s-eyebrow">{t('settings.appearance.surfaces')}</h2>
 
+		<div class="s-card s-row">
+			<div class="s-label">
+				<span class="s-title">{t('settings.appearance.look')}</span>
+				<span class="s-help" class:warn={style === 'glass' && background === 'solid'}>
+					{style === 'glass' && background === 'solid' ? t('settings.appearance.glassNeedsBg') : t('settings.appearance.lookHelp')}
+				</span>
+			</div>
+			<Segmented
+				label={t('settings.appearance.look')}
+				value={style}
+				options={[
+					{ value: 'flat', label: t('settings.appearance.flat') },
+					{ value: 'glass', label: t('settings.appearance.glass') }
+				]}
+				onchange={setStyle}
+			/>
+		</div>
+
+		{#if style === 'glass'}
+			<div class="s-card s-slider">
+				<label for="k-scrim" class="s-label">
+					<span class="s-title">{t('settings.appearance.scrim')}</span>
+					<span class="s-help">{t('settings.appearance.scrimHelp')}</span>
+				</label>
+				<input
+					id="k-scrim"
+					type="range"
+					class="k-range"
+					min="0"
+					max="60"
+					step="1"
+					value={scrimPct}
+					oninput={(e) => set('scrim', Number(e.currentTarget.value) / 100)}
+				/>
+				<span class="s-value">{scrimPct}%</span>
+			</div>
+		{/if}
+
 		<div class="s-card s-slider">
 			<label for="k-opacity" class="s-label">
 				<span class="s-title">{t('settings.appearance.opacity')}</span>
-				<span class="s-help">{t('settings.appearance.opacityHelp', { pct: themePct })}</span>
+				<span class="s-help">{glassActive ? t('settings.appearance.opacityHelpGlass', { pct: themePct }) : t('settings.appearance.opacityHelp', { pct: themePct })}</span>
 			</label>
 			<input
 				id="k-opacity"

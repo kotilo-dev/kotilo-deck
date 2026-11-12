@@ -805,7 +805,7 @@
 		padding: 0 12px;
 		border-radius: 10px;
 		border: 1px solid var(--k-border);
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 		color: var(--k-text);
 		font: 13px var(--k-font-ui);
 	}
@@ -865,7 +865,7 @@
 		display: block;
 		height: 22px;
 		border-radius: 8px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 
 	/* Narrow 2×2 (1024×600): rows keep the day, the time goes; the reminder keeps only its buttons. */

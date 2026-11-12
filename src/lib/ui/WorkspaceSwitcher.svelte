@@ -25,7 +25,7 @@
 
 <svelte:window onresize={measure} />
 
-<nav bind:this={nav} class="pills" aria-label={t('shell.topbar.workspaces')}>
+<nav bind:this={nav} class="pills k-bar-pill" aria-label={t('shell.topbar.workspaces')}>
 	<span
 		class="indicator"
 		class:ready={indicator.ready}

@@ -308,7 +308,7 @@
 	.track {
 		height: 6px;
 		border-radius: 3px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 		overflow: hidden;
 	}
 	.fill {
@@ -342,7 +342,7 @@
 		overflow: hidden;
 		padding: 12px 14px;
 		border-radius: 12px;
-		background: var(--k-bg);
+		background: var(--k-inset-deep);
 		border: 1px solid transparent;
 	}
 	.tile.warn {
@@ -421,7 +421,7 @@
 	.bar {
 		display: block;
 		border-radius: 8px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 	.state-inline {
 		margin: auto;

@@ -42,7 +42,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	background: var(--k-surface-a);
-	border: 1px solid var(--k-border);
+	border: 1px solid var(--k-card-border, var(--k-border));
 	border-radius: var(--k-radius);
 	color: var(--k-text);
 	backdrop-filter: var(--k-backdrop);
@@ -54,6 +54,22 @@ body {
 }
 .k-card[data-attention='true'] {
 	border-color: var(--k-warning);
+}
+
+/*
+ * Glass look (DESIGN §4.5): set on <html> by the deck shell only over a wallpaper or transparent
+ * background. Token values (--k-inset, --k-card-border, lifted --k-text-muted, --k-scrim) come from
+ * themeToCssVars; this adds the 1 px inner top highlight and turns the top-bar items into glass pills.
+ */
+html[data-look='glass'] .k-card,
+html[data-look='glass'] .k-bar-pill {
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--k-text) 22%, transparent);
+}
+html[data-look='glass'] .k-bar-pill {
+	background: var(--k-surface-a);
+	border: 1px solid var(--k-card-border);
+	backdrop-filter: var(--k-backdrop);
+	-webkit-backdrop-filter: var(--k-backdrop);
 }
 
 :focus-visible {

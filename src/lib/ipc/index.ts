@@ -131,7 +131,13 @@ export interface DeckAppearance {
 	blur: number;
 	/** 0.2–1, overlay mode only. Default 1. */
 	windowOpacity: number;
+	/** Card look (DESIGN §4.5). Glass applies only over a wallpaper or transparent background. Default "flat". */
+	style: LookStyle;
+	/** Glass wallpaper scrim strength 0–0.6 (share of `--k-bg` over the wallpaper). Default 0.34. */
+	scrim: number;
 }
+
+export type LookStyle = 'flat' | 'glass';
 
 export interface BurnInSettings {
 	/** Pixel shift interval in minutes; 0 = off. Default 10. Shift is within ±4 px. */
@@ -163,6 +169,8 @@ export interface Appearance {
 	blur?: number;
 	/** Background spec, e.g. "solid" | "wallpaper:<file>" | "transparent" (Phase 2). */
 	background?: string;
+	/** Card look override, workspace level only (DESIGN §4.5). */
+	style?: LookStyle;
 }
 
 export interface WidgetInstance {

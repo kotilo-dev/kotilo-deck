@@ -363,7 +363,7 @@
 		gap: 3px;
 		padding: 8px 0;
 		border-radius: 10px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 		min-width: 0;
 	}
 	.chip-day {
@@ -500,7 +500,7 @@
 	.bar {
 		display: block;
 		border-radius: 8px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 
 	/* 1024×600: secondary rows go first, the hero number stays. */

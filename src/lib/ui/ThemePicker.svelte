@@ -29,7 +29,7 @@
 	popovertarget="k-theme-picker"
 	aria-label={t('shell.topbar.themeChip', { name: current.name })}
 >
-	<span class="chip">{themeLabel(current)}</span>
+	<span class="chip k-bar-pill">{themeLabel(current)}</span>
 </button>
 
 <Popover id="k-theme-picker" label={t('shell.theme.title')} align="end" width={300} onopen={onOpen}>

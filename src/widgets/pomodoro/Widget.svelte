@@ -675,7 +675,7 @@
 		height: 14px;
 		width: 100%;
 		border-radius: 8px;
-		background: var(--k-bg-alt);
+		background: var(--k-inset);
 	}
 	.bar.disc {
 		flex: 1;

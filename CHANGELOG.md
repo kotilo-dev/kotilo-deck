@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+- Glass card style (Settings ▸ Appearance ▸ Card style, also per workspace): frosted, saturated cards and top-bar pills over a wallpaper or transparent background, with a "Wallpaper dimming" slider. The default card opacity in Glass is worked out per theme so text stays readable even over a white or black wallpaper; picking Glass with blur off turns blur on at 32 px.
+
 ## [1.0.1] - 2026-11-06
 
 ### Security

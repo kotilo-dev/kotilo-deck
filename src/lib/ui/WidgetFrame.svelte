@@ -61,7 +61,7 @@
 		return o === null ? undefined : `color-mix(in srgb, var(--k-surface) ${Math.round(o * 100)}%, transparent)`;
 	});
 	/** Instance blur override only; the workspace/global value is inherited from :root. */
-	const backdrop = $derived(typeof own?.blur === 'number' ? backdropValue(clamp(Math.round(own.blur), 0, 40)) : undefined);
+	const backdrop = $derived(typeof own?.blur === 'number' ? backdropValue(clamp(Math.round(own.blur), 0, 40), ui.look.look) : undefined);
 
 	const transform = $derived(
 		lifted

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import mocha from './themes/catppuccin-mocha.json';
 import latte from './themes/catppuccin-latte.json';
-import { hexToRgb, parseTheme, themeToCssVars, ThemeError } from './loader';
-import { contrastRatio } from './contrast';
+import { GLASS_MIN_OPACITY, GLASS_MUTED_LIFT, glassSurfaceOpacity, hexToRgb, parseTheme, themeToCssVars, ThemeError } from './loader';
+import { contrastRatio, mixHex } from './contrast';
 import {
 	bundledThemes,
 	DEFAULT_THEME_ID,
@@ -154,6 +154,51 @@ describe('contrast (SPEC §9, DESIGN §2)', () => {
 
 		it(`${theme.id}: on-accent label reaches 4.5:1 on accent`, () => {
 			expect(contrastRatio(themeToCssVars(theme)['--k-on-accent'], theme.colors.accent)).toBeGreaterThanOrEqual(4.5);
+		});
+	}
+});
+
+describe('look tokens (DESIGN §2, §4.5)', () => {
+	const mo = getTheme('catppuccin-mocha');
+
+	it('flat reproduces the pre-glass surfaces exactly', () => {
+		const v = themeToCssVars(mo);
+		expect(v['--k-inset']).toBe(mo.colors['bg-alt']);
+		expect(v['--k-inset-deep']).toBe(mo.colors.bg);
+		expect(v['--k-card-border']).toBe(mo.colors.border);
+		expect(v['--k-text-muted']).toBe(mo.colors['text-muted']);
+		expect(v['--k-inset-ring']).toBe('transparent');
+		expect(v['--k-scrim']).toBe('transparent');
+	});
+
+	it('glass: translucent insets and border, lifted muted text, scrim from the setting', () => {
+		const v = themeToCssVars(mo, 0.6, { look: 'glass', scrim: 0.34 });
+		expect(v['--k-surface-a']).toBe('rgba(49, 50, 68, 0.6)');
+		expect(v['--k-inset']).toBe('color-mix(in srgb, #181825 45%, transparent)');
+		expect(v['--k-inset-deep']).toBe(v['--k-inset']);
+		expect(v['--k-card-border']).toBe('color-mix(in srgb, #cdd6f4 18%, transparent)');
+		expect(v['--k-scrim']).toBe('color-mix(in srgb, #1e1e2e 34%, transparent)');
+		expect(v['--k-text-muted']).toBe(mixHex('#a6adc8', '#cdd6f4', GLASS_MUTED_LIFT));
+	});
+
+	it('mixHex matches color-mix in srgb', () => {
+		expect(mixHex('#000000', '#ffffff', 0.5)).toBe('#808080');
+		expect(mixHex('#ff0000', '#0000ff', 1)).toBe('#ff0000');
+	});
+
+	for (const theme of themes.values()) {
+		it(`${theme.id}: default glass opacity keeps text and muted text at 4.5:1 over white and black`, () => {
+			for (const scrim of [0, 0.34, 0.6]) {
+				const alpha = glassSurfaceOpacity(theme, scrim);
+				expect(alpha).toBeGreaterThanOrEqual(GLASS_MIN_OPACITY);
+				const c = theme.colors;
+				const muted = themeToCssVars(theme, alpha, { look: 'glass', scrim })['--k-text-muted'];
+				for (const wall of ['#ffffff', '#000000']) {
+					const card = mixHex(c.surface, mixHex(c.bg, wall, scrim), alpha);
+					expect(contrastRatio(c.text, card), `text over ${wall} @${scrim}`).toBeGreaterThanOrEqual(4.5);
+					expect(contrastRatio(muted, card), `muted over ${wall} @${scrim}`).toBeGreaterThanOrEqual(4.5);
+				}
+			}
 		});
 	}
 });

@@ -2,8 +2,8 @@
  * Pure rules for the deck's appearance layers (SPEC §5.3, DESIGN §2/§8) and burn-in protection (SPEC §2).
  * No DOM, no timers: the deck runtime (`ambient.svelte.ts`) and the settings window both use these.
  */
-import type { Appearance, BurnInSettings, DeckAppearance } from '#lib/ipc/index.ts';
-import { inWindow, minuteOfDay, parseHm, type Theme } from '#lib/theme/index.ts';
+import type { Appearance, BurnInSettings, DeckAppearance, LookStyle } from '#lib/ipc/index.ts';
+import { glassSurfaceOpacity, inWindow, minuteOfDay, parseHm, type Theme } from '#lib/theme/index.ts';
 
 export const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -34,11 +34,34 @@ export function resolveBackground(workspace: Appearance | undefined, global: Dec
 	return { mode: global.background === 'transparent' ? 'transparent' : 'solid', wallpaper: null };
 }
 
-/** Surface opacity without an instance override: workspace > global setting > theme (0–1). */
-export function resolveSurfaceOpacity(workspace: Appearance | undefined, global: DeckAppearance, theme: Theme): number {
+/**
+ * Effective card look (DESIGN §4.5): workspace `style` > global. Glass needs something behind the cards,
+ * so over a solid background it renders flat (the settings page says so).
+ */
+export function resolveLook(workspace: Appearance | undefined, global: DeckAppearance, background: BackgroundMode): LookStyle {
+	const style = workspace?.style === 'flat' || workspace?.style === 'glass' ? workspace.style : global.style;
+	return style === 'glass' && background !== 'solid' ? 'glass' : 'flat';
+}
+
+/** Glass wallpaper scrim (0–0.6), default 0.34. */
+export const resolveScrim = (global: DeckAppearance): number => (num(global.scrim) ? clamp(global.scrim, 0, 0.6) : 0.34);
+
+/** Blur the settings page proposes when Glass is picked while blur is still off. */
+export const GLASS_BLUR = 32;
+
+/**
+ * Surface opacity without an instance override: workspace > global setting > theme (0–1). In the glass
+ * look the theme fallback is the per-theme contrast-safe glass opacity instead (`glassSurfaceOpacity`).
+ */
+export function resolveSurfaceOpacity(
+	workspace: Appearance | undefined,
+	global: DeckAppearance,
+	theme: Theme,
+	look: LookStyle = 'flat'
+): number {
 	if (num(workspace?.opacity)) return clamp(workspace.opacity, 0, 1);
 	if (num(global.surfaceOpacity)) return clamp(global.surfaceOpacity, 0, 1);
-	return theme.opacity.surface;
+	return look === 'glass' ? glassSurfaceOpacity(theme, resolveScrim(global)) : theme.opacity.surface;
 }
 
 /** Backdrop blur px (0 = off) for one card: instance > workspace > global. */
@@ -47,8 +70,9 @@ export function resolveBlur(instance: Appearance | undefined, workspace: Appeara
 	return num(v) ? clamp(Math.round(v), 0, 40) : 0;
 }
 
-/** CSS value for `--k-backdrop`; `none` keeps the GPU idle when blur is off. */
-export const backdropValue = (px: number): string => (px > 0 ? `blur(${px}px)` : 'none');
+/** CSS value for `--k-backdrop`; `none` keeps the GPU idle when blur is off. Glass adds `saturate(150%)`. */
+export const backdropValue = (px: number, look: LookStyle = 'flat'): string =>
+	px > 0 ? (look === 'glass' ? `blur(${px}px) saturate(150%)` : `blur(${px}px)`) : 'none';
 
 /** True while `now` is inside the night window. */
 export function nightActive(night: BurnInSettings['night'], now: Date): boolean {

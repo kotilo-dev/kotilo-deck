@@ -1,6 +1,6 @@
 /** Transient deck UI state (not persisted) + registry helpers shared by the shell components. */
 import { getContext, setContext } from 'svelte';
-import type { Capability, SizeKey, WidgetInstance } from '#lib/ipc/index.ts';
+import type { Capability, LookStyle, SizeKey, WidgetInstance } from '#lib/ipc/index.ts';
 import { t } from '#lib/i18n/index.ts';
 import { parseSize, type WidgetDefinition } from '../../widgets/index';
 import { allWidgets, builtinWidgets, getWidget, pluginWidgets, type PluginDefinition } from '#lib/plugins/registry.svelte.ts';
@@ -29,7 +29,7 @@ export class DeckUi {
 	/** null until the backend answered, so widgets don't flash "Not available" at boot. */
 	capabilities = $state<ReadonlySet<Capability> | null>(null);
 	/** Resolved appearance for cards without their own override (written by the deck page). */
-	look = $state({ surfaceOpacity: 0.85, blur: 0 });
+	look = $state<{ surfaceOpacity: number; blur: number; look: LookStyle }>({ surfaceOpacity: 0.85, blur: 0, look: 'flat' });
 	/** Instance to flash after placing it from the drawer. */
 	highlight = $state<string | null>(null);
 	reducedMotion = $state(false);
