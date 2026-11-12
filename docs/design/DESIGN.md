@@ -44,6 +44,7 @@ Theme JSON (`themes/<id>.json`, schema from spec §5.1) maps 1:1 to CSS custom p
 | `colors.info` | `--k-info` | memory/secondary meters |
 | `radius` | `--k-radius` | card radius (default 16 px) |
 | `font.ui` / `font.mono` | `--k-font-ui` / `--k-font-mono` | |
+| *(app.css)* | `--k-spark-fill` | sparkline area fill strength: 16 %, 22 % in glass. Use `color-mix(in srgb, currentColor var(--k-spark-fill), transparent)` |
 | *(runtime)* | `--k-dim` | 1.0 → 0.3 multiplier for night/idle dim (applied as `opacity` on the content layer) |
 | *(derived)* | `--k-inset` | chips, tracks, bars and fields **inside** a card. Flat: `bg-alt`. Glass: `color-mix(in srgb, bg-alt 45%, transparent)` |
 | *(derived)* | `--k-inset-deep` | stat tiles and dials inside a card. Flat: `bg`. Glass: same as `--k-inset` |
@@ -81,7 +82,10 @@ Fonts: **Inter** (ui), **JetBrains Mono** (mono). Bundle them (no Google Fonts a
 **Container-scaled type.** Every card root has `container-type: size`. Hero text follows the 4×2 clock pattern
 `font-size: max(<floor>, min(<cap>, <N>cqw, calc(100cqh - <reserved>px)))`: the floor keeps the 1024×600 layout,
 the cap is the size at 1920×1080. Tune `cqw` / reserved per widget so nothing clips at any supported size.
-Mono hero numerals use `letter-spacing: -0.04em` and `line-height: 1`.
+Mono hero numerals use `letter-spacing: -0.04em` and `line-height: 1`. Card title, meta and body rows use the shared
+`--k-fs-title` / `--k-fs-meta` / `--k-fs-body` variables from `app.css` (viewport-clamped 13→14, 11→12, 13→15).
+Text in a flex column that may get short is `flex-shrink: 0`; a sparkline or spacer gives up the height instead.
+Reference implementation: System 4×2 (`src/widgets/system/Widget.svelte`, `.val-l`).
 
 | Element | Floor (1024×600) | Cap (1920×1080) |
 |---|---|---|

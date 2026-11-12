@@ -11,7 +11,20 @@
 	} from '#lib/ipc/index.ts';
 	import { isDeckVisible, onDeckVisibility } from '#lib/time/index.ts';
 	import type { WidgetProps } from '../types';
-	import { gb, gbTotal, initialWarn, percent, pushHistory, sparklinePoints, stepWarn, type WarnState } from './logic';
+	import {
+		busiestCore,
+		coreBucket,
+		gb,
+		gbTotal,
+		initialWarn,
+		peak,
+		percent,
+		pushHistory,
+		sparklineArea,
+		sparklinePoints,
+		stepWarn,
+		type WarnState
+	} from './logic';
 	import ProcessSheet from './ProcessSheet.svelte';
 	import { defaults, type SystemSettings } from './settings';
 
@@ -25,7 +38,10 @@
 
 	let info = $state<SystemInfo | null>(null);
 	let sample = $state<SystemSample | null>(null);
+	/** 60-sample windows (DESIGN §5.5): every 4×2 tile has a sparkline. */
 	let history = $state<number[]>([]);
+	let memHistory = $state<number[]>([]);
+	let gpuHistory = $state<number[]>([]);
 	let cpuWarn = $state<WarnState>(initialWarn);
 	let memWarn = $state<WarnState>(initialWarn);
 	let gpuWarn = $state<WarnState>(initialWarn);
@@ -34,6 +50,8 @@
 	function onSample(next: SystemSample) {
 		sample = next;
 		history = pushHistory(history, next.cpu);
+		memHistory = pushHistory(memHistory, percent(next.memUsed, next.memTotal));
+		gpuHistory = next.gpu === null ? [] : pushHistory(gpuHistory, next.gpu);
 		cpuWarn = stepWarn(cpuWarn, next.cpu, threshold);
 		memWarn = stepWarn(memWarn, percent(next.memUsed, next.memTotal), threshold);
 		gpuWarn = next.gpu === null ? initialWarn : stepWarn(gpuWarn, next.gpu, threshold);
@@ -89,6 +107,8 @@
 	const memUsed = $derived(sample ? gb(sample.memUsed, locale) : '');
 	const memTotal = $derived(sample ? gbTotal(sample.memTotal, locale) : '');
 	const cores = $derived(sample?.perCore ?? []);
+	const busiest = $derived(busiestCore(cores));
+	const cpuPeak = $derived(peak(history));
 	const cpuName = $derived(info?.cpuName ?? '');
 	const wideMeta = $derived(
 		[cpuName, info ? t('widgets.system.cores', { n: info.cores }) : null, t('widgets.system.tapHint')]
@@ -97,18 +117,19 @@
 	);
 </script>
 
-{#snippet spark(height: number, warn: boolean, fill = false)}
-	<!-- `fill`: the 4×2 tile sparkline stretches to the tile's free height (non-scaling 2 px stroke). -->
-	<svg
-		class="spark"
-		class:warn
-		class:fill
-		style:height={fill ? undefined : `${height}px`}
-		viewBox="0 0 240 {height}"
-		preserveAspectRatio="none"
-		aria-hidden="true"
-	>
-		<polyline points={sparklinePoints(history, 240, height)} />
+{#snippet spark(values: number[], height: number, warn: boolean)}
+	<!-- 2×2: fixed-height line with its area fill. -->
+	<svg class="spark cpu" class:warn style:height="{height}px" viewBox="0 0 240 {height}" preserveAspectRatio="none" aria-hidden="true">
+		<polygon points={sparklineArea(values, 240, height)} />
+		<polyline points={sparklinePoints(values, 240, height)} />
+	</svg>
+{/snippet}
+
+{#snippet tileSpark(values: number[], kind: 'cpu' | 'mem' | 'gpu', warn: boolean)}
+	<!-- 4×2: fills the tile's free height and bleeds to its left, right and bottom edges. -->
+	<svg class="spark tile-spark {kind}" class:warn viewBox="0 0 240 100" preserveAspectRatio="none" aria-hidden="true">
+		<polygon points={sparklineArea(values, 240, 100, undefined, 2)} />
+		<polyline points={sparklinePoints(values, 240, 100, undefined, 2)} />
 	</svg>
 {/snippet}
 
@@ -165,25 +186,35 @@
 				<div class="tile" class:warn={cpuWarn.warn}>
 					<span class="tiny">{tileLabel('widgets.system.cpu', cpuWarn.warn)}</span>
 					<span class="mono val-l">{cpuPct}<span class="unit">%</span></span>
-					{@render spark(40, cpuWarn.warn, true)}
+					<span class="sub">{cpuPeak === null ? '' : t('widgets.system.peak', { n: cpuPeak })}</span>
+					{@render tileSpark(history, 'cpu', cpuWarn.warn)}
 				</div>
 				<div class="tile" class:warn={memWarn.warn}>
 					<span class="tiny">{tileLabel('widgets.system.memory', memWarn.warn)}</span>
 					<span class="mono val-l">{Math.round(memPct)}<span class="unit">%</span></span>
 					<span class="sub">{t('widgets.system.memOf', { used: memUsed, total: memTotal })}</span>
+					{@render tileSpark(memHistory, 'mem', memWarn.warn)}
 				</div>
 				{#if gpuPct !== null}
 					<div class="tile" class:warn={gpuWarn.warn}>
 						<span class="tiny">{tileLabel('widgets.system.gpu', gpuWarn.warn)}</span>
 						<span class="mono val-l">{gpuPct}<span class="unit">%</span></span>
 						<span class="sub">{info?.gpuName ?? ''}</span>
+						{@render tileSpark(gpuHistory, 'gpu', gpuWarn.warn)}
 					</div>
 				{/if}
 			</div>
-			<div class="cores" class:dense={cores.length > 32} role="img" aria-label={t('widgets.system.perCore')}>
-				{#each cores as c, i (i)}
-					<div class="core" style="height: {Math.max(4, Math.min(100, c))}%"></div>
-				{/each}
+			<div class="cores-block">
+				<div class="cores-head">
+					<span class="tiny">{t('widgets.system.coresLabel')}</span>
+					{#if busiest}<span class="mono busiest">{t('widgets.system.busiest', { n: busiest.core, x: busiest.load })}</span>{/if}
+				</div>
+				<!-- Height carries the load; colour (info / accent / warning) is a second cue, never the only one. -->
+				<div class="cores" class:dense={cores.length > 32} role="img" aria-label={t('widgets.system.perCore')}>
+					{#each cores as c, i (i)}
+						<div class="core {coreBucket(c, threshold)}" style="height: {Math.max(4, Math.min(100, c))}%"></div>
+					{/each}
+				</div>
 			</div>
 		{:else}
 			<div class="cpu">
@@ -191,7 +222,7 @@
 					<span class="label">{t('widgets.system.cpu')}</span>
 					<span class="mono val-m" class:warn-text={cpuWarn.warn}>{cpuPct}%</span>
 				</div>
-				{@render spark(36, cpuWarn.warn)}
+				{@render spark(history, 36, cpuWarn.warn)}
 			</div>
 			{@render meter(
 				t('widgets.system.memory'),
@@ -237,12 +268,12 @@
 		min-width: 0;
 	}
 	.title {
-		font-size: 13px;
+		font-size: var(--k-fs-title);
 		font-weight: 600;
 		flex-shrink: 0;
 	}
 	.meta {
-		font-size: 11px;
+		font-size: var(--k-fs-meta);
 		color: var(--k-text-muted);
 		white-space: nowrap;
 		overflow: hidden;
@@ -284,26 +315,44 @@
 		margin-left: 6px;
 		font-family: var(--k-font-ui);
 	}
+	/* Line colour via `color`: CPU accent, memory info, GPU accent-2, warning in warn state (DESIGN §5.5). */
 	.spark {
 		display: block;
 		width: 100%;
 		flex-shrink: 0;
+		color: var(--k-accent);
 	}
-	.spark.fill {
-		flex: 1 1 auto;
-		min-height: 24px;
-		height: auto;
+	.spark.mem {
+		color: var(--k-info);
+	}
+	.spark.gpu {
+		color: var(--k-accent-2);
+	}
+	.spark.warn {
+		color: var(--k-warning);
 	}
 	.spark polyline {
 		fill: none;
-		stroke: var(--k-accent);
+		stroke: currentColor;
 		stroke-width: 2;
 		stroke-linejoin: round;
 		stroke-linecap: round;
 		vector-effect: non-scaling-stroke;
 	}
-	.spark.warn polyline {
-		stroke: var(--k-warning);
+	.spark polygon {
+		fill: color-mix(in srgb, currentColor var(--k-spark-fill), transparent);
+		stroke: none;
+	}
+	.tile-spark {
+		flex: 1 1 auto;
+		min-height: 24px;
+		height: auto;
+		/* Bleed to the tile's left, right and bottom edges (the tile clips). */
+		width: calc(100% + 2 * var(--tile-px));
+		margin: 2px calc(-1 * var(--tile-px)) 0;
+	}
+	.tile-spark polyline {
+		stroke-width: 2.5;
 	}
 	.track {
 		height: 6px;
@@ -334,16 +383,22 @@
 		gap: 14px;
 	}
 	.tile {
+		/* Horizontal padding, shared with the sparkline's bleed. */
+		--tile-px: clamp(14px, 2cqw, 18px);
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
 		min-width: 0;
 		min-height: 0;
 		overflow: hidden;
-		padding: 12px 14px;
-		border-radius: 12px;
+		padding: clamp(12px, 3.6cqh, 18px) var(--tile-px) 0;
+		border-radius: 14px;
 		background: var(--k-inset-deep);
-		border: 1px solid transparent;
+		border: 1px solid var(--k-inset-ring);
+	}
+	/* Text never shrinks (it would overlap); only the sparkline gives up height. */
+	.tile > :not(svg) {
+		flex-shrink: 0;
 	}
 	.tile.warn {
 		background: color-mix(in srgb, var(--k-warning) 18%, var(--k-surface));
@@ -364,13 +419,16 @@
 	.tile.warn .unit {
 		color: var(--warn-text);
 	}
+	/* Container-scaled hero (DESIGN §3): 32 px at 1024×600, 68 px at 1920×1080. */
 	.val-l {
-		font-size: 32px;
+		font-size: max(32px, min(68px, 7.4cqw, calc(15cqh - 5px)));
 		font-weight: 500;
 		line-height: 1;
+		letter-spacing: -0.04em;
 	}
 	.unit {
-		font-size: 16px;
+		font-size: 0.35em;
+		letter-spacing: 0;
 		color: var(--k-text-muted);
 	}
 	.sub {
@@ -380,13 +438,32 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	.cores-block {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+	.cores-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 12px;
+		min-width: 0;
+	}
+	.busiest {
+		font-size: 11px;
+		color: var(--k-text-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 	.cores {
 		display: flex;
 		align-items: flex-end;
-		gap: 4px;
-		/* 40 px at 1280×720 (DESIGN §5.5); grows with taller cards up to ~25 % of the card (1920×1080). */
-		height: clamp(40px, calc((100cqh - 220px) / 2), 25cqh);
-		flex-shrink: 0;
+		/* 4 px gap / 40 px tall at 1280×720, 8 px / 64 px at 1920×1080 (DESIGN §5.5). */
+		gap: clamp(4px, 0.9cqw, 8px);
+		height: clamp(40px, calc((100cqh - 220px) / 4), 64px);
 	}
 	.cores.dense {
 		gap: 2px;
@@ -394,9 +471,15 @@
 	.core {
 		flex: 1;
 		min-width: 1px;
-		border-radius: 3px;
+		border-radius: clamp(3px, 0.65cqw, 6px);
 		background: var(--k-accent);
 		transition: height 200ms ease;
+	}
+	.core.low {
+		background: var(--k-info);
+	}
+	.core.high {
+		background: var(--k-warning);
 	}
 
 	/* States */
@@ -451,6 +534,15 @@
 		}
 		.system[data-size='4x2'] .tile {
 			padding: 10px 12px;
+		}
+	}
+	/* Short 4×2 (1024×600 up to ~1280×720): no cores header, thinner sparklines, so the tiles keep their text. */
+	@container (height < 320px) {
+		.system[data-size='4x2'] .cores-head {
+			display: none;
+		}
+		.system[data-size='4x2'] .tile-spark {
+			min-height: 12px;
 		}
 	}
 	@container (height < 190px) {
