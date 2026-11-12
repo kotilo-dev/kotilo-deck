@@ -290,6 +290,7 @@
 			}
 		},
 		"date": {
+			"week": "This week",
 			"title": "Date",
 			"name": "Date",
 			"settings": {

@@ -164,7 +164,7 @@ Sizes are `w×h` in cells. "Compact" = 1-row variants.
 
 ### 5.2 Date — `2×1`
 - Top: day number container-scaled (§3); beside it weekday 24/600 over "November · Week 45 · Day 309" 15 muted ("Day N" only when `dayOfYear` is on).
-- Bottom: week strip, 7 equal cells `M 2 … S 8`, mono 13; today a filled `--k-accent` pill with `--k-on-accent` text; past days muted. Week start follows the locale. Hidden when the card is short (then day number + weekday + ISO week, as before).
+- Bottom: week strip, 7 equal cells `M 2 … S 8`, mono 13; today a filled `--k-accent` pill with `--k-on-accent` text; past days muted. Week start follows the locale. Hidden when the card is short (then day number + weekday + ISO week, as before). Same breakpoint as Clock 2×1 (content ≥ 220×100). Week start: `Intl.Locale#getWeekInfo`, else a CLDR Sunday-region list (`weekStart` in `src/widgets/date/logic.ts`). Each strip cell has the long date as its accessible name; today has `aria-current="date"`.
 
 ### 5.3 Weather — `2×1, 2×2, 4×2`
 - **2×2:** header city + "N min ago"; hero 48 mono `14°` with "Partly cloudy · H 16° L 9°" 13 muted; condition icon 56 px (stroke 1.6, sun in `--k-warning`, cloud in `--k-text-muted`); 3-day row: three chips on `--k-bg-alt`, radius 10, "Wed" 11 muted over mono 13 `16° 9°` (low muted).

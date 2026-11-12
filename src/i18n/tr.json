@@ -290,6 +290,7 @@
 			}
 		},
 		"date": {
+			"week": "Bu hafta",
 			"title": "Tarih",
 			"name": "Tarih",
 			"settings": {
