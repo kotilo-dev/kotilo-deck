@@ -669,7 +669,7 @@
 			"glass": "Cam",
 			"glassNeedsBg": "Cam için duvar kâğıdı ya da saydam arka plan gerekir",
 			"scrim": "Duvar kâğıdı karartma",
-			"scrimHelp": "Metin okunur kalsın diye camın ardındaki duvar kâğıdını koyulaştırır",
+			"scrimHelp": "Camın ardındaki görseli koyulaştırır",
 			"opacityHelpGlass": "Cam varsayılanı %{pct} (metni okunur tutar)",
 			"opacity": "Yüzey opaklığı",
 			"opacityHelp": "Tema varsayılanı %{pct}",

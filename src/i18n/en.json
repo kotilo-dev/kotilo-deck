@@ -669,7 +669,7 @@
 			"glass": "Glass",
 			"glassNeedsBg": "Glass needs a wallpaper or transparent background",
 			"scrim": "Wallpaper dimming",
-			"scrimHelp": "Darkens the wallpaper behind glass so text stays readable",
+			"scrimHelp": "Darkens the wallpaper behind glass",
 			"opacityHelpGlass": "Glass default {pct}% (keeps text readable)",
 			"opacity": "Surface opacity",
 			"opacityHelp": "Theme default {pct}%",

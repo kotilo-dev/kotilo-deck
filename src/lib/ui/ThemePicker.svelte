@@ -29,7 +29,15 @@
 	popovertarget="k-theme-picker"
 	aria-label={t('shell.topbar.themeChip', { name: current.name })}
 >
-	<span class="chip k-bar-pill">{themeLabel(current)}</span>
+	<span class="chip k-bar-pill">
+		<span class="chip-swatches" aria-hidden="true">
+			<span style:background="var(--k-accent)"></span>
+			<span style:background="var(--k-accent-2)"></span>
+			<span style:background="var(--k-info)"></span>
+			<span style:background="var(--k-warning)"></span>
+		</span>
+		{themeLabel(current)}
+	</span>
 </button>
 
 <Popover id="k-theme-picker" label={t('shell.theme.title')} align="end" width={300} onopen={onOpen}>
@@ -91,14 +99,29 @@
 		border: 0;
 		background: transparent;
 	}
+	/* 44 px chip: four token swatches, then the theme name (DESIGN §4.2). */
 	.chip {
-		padding: 4px 10px;
+		box-sizing: border-box;
+		display: inline-flex;
+		align-items: center;
+		gap: 10px;
+		height: 44px;
+		padding: 0 12px;
 		border: 1px solid var(--k-border);
-		border-radius: 8px;
+		border-radius: 10px;
 		font-family: var(--k-font-mono);
 		font-size: 12px;
 		color: var(--k-text-muted);
 		white-space: nowrap;
+	}
+	.chip-swatches {
+		display: inline-flex;
+		gap: 3px;
+	}
+	.chip-swatches > span {
+		width: 10px;
+		height: 18px;
+		border-radius: 3px;
 	}
 	.chip-btn:hover .chip {
 		color: var(--k-text);

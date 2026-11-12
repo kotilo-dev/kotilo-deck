@@ -1,5 +1,6 @@
 <script lang="ts">
 	/** Burn-in & night (SPEC §2, §5.3): pixel shift interval, night dim schedule, idle dim + clock face. */
+	import { rangeFill } from '#lib/ui/range.ts';
 	import type { BurnInSettings } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { parseHm } from '#lib/theme/index.ts';
@@ -71,7 +72,7 @@
 				<input
 					id="k-bn-ndim"
 					type="range"
-					class="k-range"
+					class="k-range" use:rangeFill={nightPct}
 					min="30"
 					max="100"
 					step="5"
@@ -110,7 +111,7 @@
 				<input
 					id="k-bn-idim"
 					type="range"
-					class="k-range"
+					class="k-range" use:rangeFill={idlePct}
 					min="30"
 					max="100"
 					step="5"

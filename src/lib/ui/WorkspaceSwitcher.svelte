@@ -64,7 +64,7 @@
 		position: absolute;
 		top: 4px;
 		left: 0;
-		height: 36px;
+		height: 44px;
 		border-radius: 999px;
 		background: var(--k-accent);
 		opacity: 0;
@@ -78,7 +78,7 @@
 	.pill {
 		position: relative;
 		flex: none;
-		height: 36px;
+		height: 44px;
 		padding: 0 18px;
 		border: 0;
 		border-radius: 999px;

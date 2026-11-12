@@ -3,6 +3,7 @@
 	 * Appearance (DESIGN §7, reference/settings-appearance.html): background layer, widget surfaces,
 	 * dim toggles. Edits are a draft until Apply; "Reset to theme" drafts the theme defaults.
 	 */
+	import { rangeFill } from '#lib/ui/range.ts';
 	import { wallpaperSrc } from '#lib/ipc/transport.ts';
 	import type { DeckAppearance } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
@@ -226,7 +227,7 @@
 				<input
 					id="k-scrim"
 					type="range"
-					class="k-range"
+					class="k-range" use:rangeFill={scrimPct}
 					min="0"
 					max="60"
 					step="1"
@@ -245,7 +246,7 @@
 			<input
 				id="k-opacity"
 				type="range"
-				class="k-range"
+				class="k-range" use:rangeFill={surfacePct}
 				min="0"
 				max="100"
 				step="1"
@@ -266,7 +267,7 @@
 			<input
 				id="k-blur"
 				type="range"
-				class="k-range"
+				class="k-range" use:rangeFill={blur}
 				min="0"
 				max="40"
 				step="1"
@@ -284,7 +285,7 @@
 			<input
 				id="k-winop"
 				type="range"
-				class="k-range"
+				class="k-range" use:rangeFill={windowPct}
 				min="20"
 				max="100"
 				step="1"
