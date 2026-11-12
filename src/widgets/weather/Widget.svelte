@@ -139,6 +139,14 @@
 			: ''
 	);
 	const title = $derived(loc?.name ?? t('widgets.weather.title'));
+	/** Large 2×1 (DESIGN §5.3): "H 19° · L 12°". */
+	const hiLoDot = $derived(
+		report
+			? `${t('widgets.weather.high', { t: formatTemp(report.current.high) })} · ${t('widgets.weather.low', {
+					t: formatTemp(report.current.low)
+				})}`
+			: ''
+	);
 </script>
 
 {#snippet staleBadge()}
@@ -208,6 +216,26 @@
 		</div>
 	{:else if report}
 		{#if size === '2x1'}
+			<!-- Large 2×1: header, scaled temperature + condition + 84 px filled icon, one-line 3-day chips. -->
+			<div class="w21">
+				{@render header()}
+				<div class="w21-mid">
+					<span class="mono w21-temp">{formatTemp(report.current.temp)}</span>
+					<span class="w21-text">
+						<span class="w21-cond">{cond}</span>
+						<span class="mono w21-hl">{hiLoDot}</span>
+					</span>
+					<span class="w21-icon"><WeatherIcon {family} isDay={report.current.isDay} size={84} /></span>
+				</div>
+				<ul class="w21-chips" aria-label={t('widgets.weather.daily')}>
+					{#each chipDays(report.daily) as d (d.date)}
+						<li>
+							<span class="w21-day">{dayLabel(d.date, locale)}</span>
+							<span class="mono">{formatTemp(d.max)} <span class="muted">{formatTemp(d.min)}</span></span>
+						</li>
+					{/each}
+				</ul>
+			</div>
 			<div class="compact">
 				<div class="compact-text">
 					<span class="title">
@@ -524,6 +552,111 @@
 	@container (width < 210px) {
 		.compact-icon {
 			display: none;
+		}
+	}
+
+	/* Large 2×1 ----------------------------------------------------------- */
+	.w21 {
+		display: none;
+		flex-direction: column;
+		justify-content: space-between;
+		gap: 8px;
+		height: 100%;
+		min-width: 0;
+		/* Temperature and icon share one size: 32 px floor, 84 px at 1920×1080 (DESIGN §3). */
+		--hero: max(32px, min(84px, 20cqw, calc(100cqh - 40px)));
+	}
+	.w21-mid {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		min-width: 0;
+		flex: 1;
+		min-height: 0;
+	}
+	.w21-temp {
+		font-size: var(--hero);
+		font-weight: 500;
+		letter-spacing: -0.04em;
+		line-height: 1;
+		white-space: nowrap;
+	}
+	.w21-text {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.w21-cond {
+		font-size: 16px;
+		font-weight: 500;
+	}
+	.w21-hl {
+		font-size: 13px;
+		color: var(--k-text-muted);
+	}
+	.w21-cond,
+	.w21-hl {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.w21-icon {
+		display: flex;
+		flex-shrink: 0;
+	}
+	.w21-icon :global(svg) {
+		width: var(--hero);
+		height: var(--hero);
+	}
+	/* Compact 3-day chips: "Fri  16° 11°" on one line. */
+	.w21-chips {
+		display: none;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 8px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		flex-shrink: 0;
+	}
+	.w21-chips li {
+		display: flex;
+		align-items: baseline;
+		justify-content: center;
+		gap: 8px;
+		padding: 6px 8px;
+		border-radius: 10px;
+		background: var(--k-inset);
+		font-size: 13px;
+		white-space: nowrap;
+		overflow: hidden;
+		min-width: 0;
+	}
+	.w21-day {
+		color: var(--k-text-muted);
+	}
+	@container (height >= 100px) and (width >= 220px) {
+		.w21 {
+			display: flex;
+		}
+		.compact {
+			display: none;
+		}
+	}
+	/* 1280×720: the condition text wins over the icon. */
+	@container (width < 300px) {
+		.w21-icon {
+			display: none;
+		}
+	}
+	/* Room for the chips (1920×1080, portrait); the hero gives up their height. */
+	@container (height >= 150px) and (width >= 300px) {
+		.w21 {
+			--hero: max(32px, min(84px, 20cqw, calc(100cqh - 116px)));
+		}
+		.w21-chips {
+			display: grid;
 		}
 	}
 	@container (width < 400px) {

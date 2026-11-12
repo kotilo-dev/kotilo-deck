@@ -168,7 +168,7 @@ Sizes are `w×h` in cells. "Compact" = 1-row variants.
 
 ### 5.3 Weather — `2×1, 2×2, 4×2`
 - **2×2:** header city + "N min ago"; hero 48 mono `14°` with "Partly cloudy · H 16° L 9°" 13 muted; condition icon 56 px (stroke 1.6, sun in `--k-warning`, cloud in `--k-text-muted`); 3-day row: three chips on `--k-bg-alt`, radius 10, "Wed" 11 muted over mono 13 `16° 9°` (low muted).
-- **2×1:** header city + "N min ago" (stale badge unchanged). Middle: temperature container-scaled (§3), condition 16/500 over mono 13 "H 19° · L 12°", icon 84 px. Bottom: the 3-day chips in one-line form (`Fri  16° 11°`) on `--k-inset`, hidden when the card is short. Short card: city + stale badge, condition 12 muted | hero + 36 px icon.
+- **2×1:** header city + "N min ago" (stale badge unchanged). Middle: temperature container-scaled (§3), condition 16/500 over mono 13 "H 19° · L 12°", icon 84 px. Bottom: the 3-day chips in one-line form (`Fri  16° 11°`) on `--k-inset`, hidden when the card is short. Short card: city + stale badge, condition 12 muted | hero + 36 px icon. Breakpoints (content box): large layout ≥ 220×100; chips ≥ 300×150 (1920×1080, portrait); under 300 px wide the icon is dropped so the condition stays whole (1280×720). Temperature and icon share one size (`--hero`).
 - **Icons ≥ 56 px** use the filled variant: sun disc filled `--k-warning` with rays, cloud filled `--k-text` with a thin `--k-border` outline. Smaller icons keep the stroke style.
 - **4×2:** 2×2 content + 6-hour strip (6 columns: hour, icon 20 px, temp).
 - **Stale state:** badge "stale" 11/500, warning tint chip; subtitle "last update N min ago".

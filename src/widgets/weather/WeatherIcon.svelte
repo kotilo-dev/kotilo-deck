@@ -8,6 +8,8 @@
 		stroke?: number;
 	}
 	let { family, isDay = true, size, stroke = 1.6 }: Props = $props();
+	/** DESIGN §5.3: icons ≥ 56 px use the filled variant (sun disc, solid cloud); smaller ones stay stroked. */
+	const filled = $derived(size >= 56);
 
 	// Cloud raised to leave room for precipitation (DESIGN reference 2×1 rain icon).
 	const highCloud = 'M8 15h9a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.6-1.3A4 4 0 0 0 8 15Z';
@@ -15,6 +17,7 @@
 
 <svg
 	class="wx"
+	class:filled
 	width={size}
 	height={size}
 	viewBox="0 0 24 24"
@@ -47,7 +50,7 @@
 		<path class="cloud" d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
 	{:else if family === 'fog'}
 		<path class="cloud" d={highCloud} />
-		<path class="cloud" d="M5 18.5h14M7 21.5h10" />
+		<path class="mist" d="M5 18.5h14M7 21.5h10" />
 	{:else if family === 'drizzle'}
 		<path class="cloud" d={highCloud} />
 		<path class="drop" d="M8 18.5v.5M12 18.5v.5M16 18.5v.5M10 21.5v.5M14 21.5v.5" />
@@ -71,8 +74,17 @@
 	.bolt {
 		stroke: var(--k-warning);
 	}
-	.cloud {
+	.cloud,
+	.mist {
 		stroke: var(--k-text-muted);
+	}
+	.filled .sun circle {
+		fill: var(--k-warning);
+	}
+	.filled .cloud {
+		fill: var(--k-text);
+		stroke: var(--k-border);
+		stroke-width: 0.6;
 	}
 	.drop {
 		stroke: var(--k-accent);
