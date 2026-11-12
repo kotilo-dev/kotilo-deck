@@ -12,6 +12,7 @@
 		type AudioState
 	} from '#lib/ipc/index.ts';
 	import { isDeckVisible, onDeckVisibility } from '#lib/time/index.ts';
+	import { rangeFill } from '#lib/ui/range.ts';
 	import type { WidgetProps } from '../types';
 	import { createOptimistic, createThrottle, deviceRows, fromPct, speakerLevel, toPct } from './logic';
 	import MixerSheet from './MixerSheet.svelte';
@@ -102,6 +103,8 @@
 	const hasDevice = $derived(!!audio?.device || devices.length > 0);
 	const level = $derived(speakerLevel(pct / 100, muted));
 	const valueText = $derived(muted ? t('widgets.volume.muted') : t('widgets.volume.percent', { n: pct }));
+	/** The localized "{n}%" / "%{n}" split around the number, so the sign can be drawn smaller (DESIGN §5.6). */
+	const pctParts = $derived(t('widgets.volume.percent', { n: '\u0000' }).split('\u0000'));
 
 	function onInput(e: Event & { currentTarget: HTMLInputElement }) {
 		const v = fromPct(Number(e.currentTarget.value));
@@ -204,20 +207,24 @@
 			disabled={editing || !hasDevice}
 			onclick={toggleMute}
 		>
-			<SpeakerIcon {level} />
+			<SpeakerIcon {level} size={20} />
 		</button>
 		<span class="name">{hasDevice ? deviceName || t('widgets.volume.title') : t('widgets.volume.noDevice')}</span>
 		{#if hasDevice}
 			{#if muted}
 				<span class="pct muted-text">{t('widgets.volume.muted')}</span>
 			{:else}
-				<span class="pct mono">{t('widgets.volume.percent', { n: pct })}</span>
+				<span class="pct mono" aria-label={valueText}
+					>{#if pctParts[0]}<span class="unit" aria-hidden="true">{pctParts[0]}</span>{/if}<span aria-hidden="true">{pct}</span
+					>{#if pctParts[1]}<span class="unit" aria-hidden="true">{pctParts[1]}</span>{/if}</span
+				>
 			{/if}
 		{/if}
 	</div>
 	<input
 		type="range"
-		class="range"
+		class="k-range range"
+		use:rangeFill={pct}
 		min="0"
 		max="100"
 		step="1"
@@ -409,36 +416,54 @@
 	.name {
 		flex: 1;
 		min-width: 0;
-		font-size: 13px;
+		font-size: 14px;
 		font-weight: 600;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	/* 2×1 percent: 13 px floor, 56 px at 1920×1080, the sign at 0.36 em muted (DESIGN §3). */
 	.pct {
 		flex-shrink: 0;
 		font-size: 13px;
+		line-height: 1;
+	}
+	.volume[data-size='2x1'] .pct.mono {
+		font-size: max(13px, min(56px, 12cqw, calc(100cqh - 104px)));
+		font-weight: 500;
+		letter-spacing: -0.03em;
+	}
+	.unit {
+		font-size: max(10px, 0.36em);
+		color: var(--k-text-muted);
+		letter-spacing: 0;
+	}
+	.pct.mono .unit {
+		margin: 0 0.1em;
+	}
+	.volume[data-size='2x2'] .unit {
+		font-size: 1em;
+		margin: 0;
 	}
 	.muted-text {
 		color: var(--k-text-muted);
 	}
+	/* Shared .k-range look (app.css); only layout here. */
 	.range {
-		width: 100%;
-		height: 28px;
-		margin: 0;
 		flex-shrink: 0;
-		accent-color: var(--k-accent);
+		margin: 0;
 		touch-action: none;
 	}
 
-	/* 2×1 ghost buttons, 28 px (DESIGN §5.6). */
+	/* 2×1 buttons, 44 px tall (DESIGN §5.6); short cards keep 28 px visually with a 44 px hit area. */
 	.actions {
 		display: flex;
 		gap: 8px;
 		min-width: 0;
 	}
 	.ghost {
-		height: 28px;
+		position: relative;
+		height: 44px;
 		padding: 0 10px;
 		display: inline-flex;
 		align-items: center;
@@ -448,7 +473,8 @@
 		border: 1px solid var(--k-border);
 		background: transparent;
 		color: var(--k-text-muted);
-		font-size: 11px;
+		font-size: 13px;
+		font-weight: 600;
 		white-space: nowrap;
 	}
 	.ghost:hover:not(:disabled) {
@@ -581,9 +607,16 @@
 	}
 
 	/* 1024×600: a 2×1 cell is ~112 px tall — tighten the stack, keep all three rows. */
-	@container (height < 100px) {
-		.volume[data-size='2x1'] {
-			gap: 4px;
+	@container (height < 108px) {
+		.ghost {
+			height: 28px;
+			font-size: 11px;
+			font-weight: 400;
+		}
+		.ghost::before {
+			content: '';
+			position: absolute;
+			inset: -8px 0;
 		}
 	}
 	/* Narrow 2×1: icon-only Mixer button. */

@@ -11,6 +11,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Glass card style (Settings ▸ Appearance ▸ Card style, also per workspace): frosted, saturated cards and top-bar pills over a wallpaper or transparent background, with a "Wallpaper dimming" slider. The default card opacity in Glass is worked out per theme so text stays readable even over a white or black wallpaper; picking Glass with blur off turns blur on at 32 px.
 
 ### Changed
+- Volume 2×1: the percentage grows with the card, the slider uses the new rounded style, and the Output device and Mixer buttons are 44 px tall (short cards keep them slim but still 44 px to tap).
 - Weather 2×1: on larger cards a big temperature with the condition and today's high/low, a large filled icon and a one-line 3-day forecast. Large weather icons (56 px and up) are now filled. Small cards keep the compact layout.
 - Date 2×1: on larger cards a big day number beside the weekday and "November · Week 45", with a strip of this week's days below (today highlighted, past days dimmed, first day of the week from your locale). Small cards keep the compact layout.
 - Clock 2×1: on larger cards the time grows with the card, with the full date and the city with its UTC offset underneath. Small cards keep the single-row layout.

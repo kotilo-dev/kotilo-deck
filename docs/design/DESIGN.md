@@ -197,7 +197,7 @@ Sizes are `w×h` in cells. "Compact" = 1-row variants.
 - Tap anywhere → modal sheet with top-5 processes (name, CPU %, RAM).
 
 ### 5.6 Volume — `2×1, 2×2`
-- **2×1:** speaker icon 20 + device name 14/600 | percent container-scaled (§3), `%` 0.36 em muted. Native `<input type=range>` (kept for keyboard and screen readers) styled as the shared `.k-range`. "Output device ▾" and "Mixer" buttons 44 px tall.
+- **2×1:** speaker icon 20 + device name 14/600 | percent container-scaled (§3), `%` 0.36 em muted. Native `<input type=range>` (kept for keyboard and screen readers) styled as the shared `.k-range`. "Output device ▾" and "Mixer" buttons 44 px tall. Short cards (content < 108 px, 1024×600) draw them 28 px with a transparent 44 px hit area. The `%` follows the locale's position (`%42` in Turkish) and keeps a 10 px floor.
 - **2×2:** same + device list (radio rows 40 px) and mute toggle.
 - Muted state: icon with slash, percent replaced by "Muted" muted.
 - **Shared `.k-range`** (`app.css`, used by every slider including settings and the mixer sheet): 28 px tall, track 14 px fully rounded, filled part `--k-accent`, rest `--k-inset`, thumb 28 px `--k-text` circle with a 4 px `--k-bg` ring. Fill = inline `--p` kept by the `rangeFill` action (`#lib/ui/range.ts`); Firefox uses `::-moz-range-progress`.
