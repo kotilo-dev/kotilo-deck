@@ -4,8 +4,9 @@
 //   pnpm screenshots            build, serve with `vite preview`, capture everything
 //   pnpm screenshots --no-build reuse an existing build/
 //
-// Writes docs/screenshots/: deck-<preset>-<theme>.png (1920×1080), deck-edit.png, deck-7in-<preset>.png (1024×600),
-// deck-portrait.png (4×8), widgets/<widget>-<theme>.png and deck.gif (pure JS: gifenc + pngjs, no ffmpeg).
+// Writes docs/screenshots/: deck-<preset>-<theme>.png (1920×1080), deck-<preset>-glass.png (glass look over the
+// bundled "Ember" gradient, static/wallpapers/ember.svg), deck-edit.png, deck-7in-<preset>.png (1024×600),
+// deck-portrait.png (4×8), widgets/<widget>-<theme>.png and deck.gif (glass Ops first; pure JS: gifenc + pngjs).
 // The clock is pinned and animations are off, so reruns produce the same pictures.
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, statSync, readdirSync, writeFileSync } from 'node:fs';
@@ -33,7 +34,7 @@ const WIDGETS = {
 	pomodoro: 'focus',
 	weather: 'focus',
 	todo: 'focus',
-	date: 'focus',
+	date: 'ops',
 	system: 'ops',
 	calendar: 'ops',
 	media: 'ops',
@@ -137,10 +138,11 @@ async function settle(page, still = true) {
 	await page.waitForTimeout(1200);
 }
 
-/** @param {Page} page @param {string} base @param {{ theme: string; workspace?: string; still?: boolean }} opts */
-async function open(page, base, { theme, workspace, still = true }) {
+/** @param {Page} page @param {string} base @param {{ theme: string; workspace?: string; glass?: boolean; still?: boolean }} opts */
+async function open(page, base, { theme, workspace, glass = false, still = true }) {
 	const q = new URLSearchParams({ demo: '', theme });
 	if (workspace) q.set('workspace', workspace);
+	if (glass) q.set('look', 'glass');
 	await page.goto(`${base}/?${q.toString().replace('demo=', 'demo')}`);
 	await settle(page, still);
 }
@@ -161,6 +163,12 @@ async function stills(browser, base) {
 			}
 			log('deck', preset, theme);
 		}
+	}
+	// Glass look (DESIGN §4.5) over the Ember wallpaper, every preset in the default theme.
+	for (const preset of PRESETS) {
+		await open(page, base, { theme: THEMES[0], workspace: preset, glass: true });
+		await page.screenshot({ path: join(OUT, `deck-${preset}-glass.png`) });
+		log('deck', preset, 'glass');
 	}
 	// Edit mode (E): dot grid, resize handles, drawer button.
 	await open(page, base, { theme: THEMES[0], workspace: 'focus' });
@@ -206,7 +214,8 @@ function blend(a, b, t) {
 async function gif(browser, base) {
 	// 1280×720 CSS px rendered at 0.625 → 800×450 frames.
 	const { context, page } = await newPage(browser, { width: 1280, height: 720, scale: 0.625 });
-	await open(page, base, { theme: THEMES[0], workspace: 'focus' });
+	// Opens on the glass Ops capture (README hero), then walks the workspaces and themes.
+	await open(page, base, { theme: THEMES[0], workspace: 'ops', glass: true });
 	const shot = async () => rgba(await page.screenshot());
 	/** @type {[Frame, number][]} [frame, hold ms] */
 	const states = [[await shot(), 1800]];
@@ -225,9 +234,9 @@ async function gif(browser, base) {
 			before
 		);
 	};
-	await step(next, 1500); // Ops
 	await step(next, 1500); // Agents
 	await step(next, 1500); // Full
+	await step(next, 1500); // Focus
 	/** @param {string} id */
 	const theme = (id) => async () => {
 		const bg = () => getComputedStyle(document.documentElement).getPropertyValue('--k-bg');
@@ -238,7 +247,7 @@ async function gif(browser, base) {
 	await step(theme('tokyo-night'), 1300);
 	await step(theme('catppuccin-latte'), 1300);
 	await step(theme('nord'), 1300);
-	await step(next, 1800); // back to Focus
+	await step(next, 1800); // back to Ops
 	await context.close();
 
 	/** @param {number} blends */
