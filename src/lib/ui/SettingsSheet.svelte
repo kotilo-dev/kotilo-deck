@@ -3,6 +3,7 @@
 	 * Per-instance settings sheet (DESIGN §6 gear): the widget's own Settings.svelte (if any) on top,
 	 * then a generic form from the manifest schema (boolean / enum / number / string), then Appearance.
 	 */
+	import { rangeFill } from '#lib/ui/range.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import type { SettingSchema } from '../../widgets/index';
 	import FallbackCard from './FallbackCard.svelte';
@@ -118,7 +119,7 @@
 									<span class="split">{label}<span class="k-mono val">{value ?? ''}</span></span>
 									<input
 										type="range"
-										class="k-range"
+										class="k-range" use:rangeFill={Number(value ?? schema.minimum)}
 										min={schema.minimum}
 										max={schema.maximum}
 										step={schema.step ?? 1}
@@ -156,7 +157,7 @@
 							{t('shell.sheet.opacity')}
 							<span class="k-mono val">{opacityPct}%</span>
 						</span>
-						<input type="range" class="k-range" min="0" max="100" step="1" value={opacityPct} oninput={(e) => setOpacity(Number(e.currentTarget.value))} />
+						<input type="range" class="k-range" use:rangeFill={opacityPct} min="0" max="100" step="1" value={opacityPct} oninput={(e) => setOpacity(Number(e.currentTarget.value))} />
 					</label>
 					<div class="split">
 						<span class="muted small">{appearance.opacity === undefined ? t('shell.sheet.opacityDefault') : ''}</span>
@@ -169,7 +170,7 @@
 							{t('shell.sheet.blur')}
 							<span class="k-mono val">{blurPx > 0 ? `${blurPx} px` : t('settings.common.off')}</span>
 						</span>
-						<input type="range" class="k-range" min="0" max="40" step="1" value={blurPx} oninput={(e) => setAppearance('blur', Number(e.currentTarget.value))} />
+						<input type="range" class="k-range" use:rangeFill={blurPx} min="0" max="40" step="1" value={blurPx} oninput={(e) => setAppearance('blur', Number(e.currentTarget.value))} />
 					</label>
 					<div class="split">
 						<span class="muted small">{appearance.blur === undefined ? t('shell.sheet.opacityDefault') : t('shell.sheet.blurHint')}</span>

@@ -168,10 +168,61 @@ button:disabled {
 	color: var(--k-text);
 	font-size: 13px;
 }
+/*
+ * Range (DESIGN §5.6): 14 px rounded track, accent fill, 28 px --k-text thumb with a 4 px --k-bg ring.
+ * The fill stops at --p (set by the `rangeFill` action); the thumb always covers the stop.
+ */
 .k-range {
+	-webkit-appearance: none;
+	appearance: none;
+	box-sizing: border-box;
 	width: 100%;
 	height: 28px;
-	accent-color: var(--k-accent);
+	margin: 0;
+	background: transparent;
+	cursor: pointer;
+}
+.k-range::-webkit-slider-runnable-track {
+	height: 14px;
+	border-radius: 999px;
+	background: linear-gradient(to right, var(--k-accent) var(--p, 0%), var(--k-inset) var(--p, 0%));
+	box-shadow: inset 0 0 0 1px var(--k-inset-ring, transparent);
+}
+.k-range::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	box-sizing: border-box;
+	width: 28px;
+	height: 28px;
+	margin-top: -7px;
+	border-radius: 50%;
+	border: 4px solid var(--k-bg);
+	background: var(--k-text);
+}
+.k-range::-moz-range-track {
+	height: 14px;
+	border-radius: 999px;
+	background: var(--k-inset);
+}
+.k-range::-moz-range-progress {
+	height: 14px;
+	border-radius: 999px;
+	background: var(--k-accent);
+}
+.k-range::-moz-range-thumb {
+	box-sizing: border-box;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	border: 4px solid var(--k-bg);
+	background: var(--k-text);
+}
+.k-range:disabled {
+	cursor: default;
+}
+.k-range:focus-visible {
+	outline-offset: 4px;
+	border-radius: 999px;
 }
 .k-check {
 	width: 18px;

@@ -191,9 +191,10 @@ Sizes are `w×h` in cells. "Compact" = 1-row variants.
 - Tap anywhere → modal sheet with top-5 processes (name, CPU %, RAM).
 
 ### 5.6 Volume — `2×1, 2×2`
-- **2×1:** speaker icon 20 + device name 14/600 | percent container-scaled (§3), `%` 0.36 em muted. Native `<input type=range>` (kept for keyboard and screen readers), custom-styled like the shared `.k-range`: track 14 px fully rounded, filled part `--k-accent`, rest `--k-inset`, thumb 28 px `--k-text` circle with a 4 px `--k-bg` ring; fill via inline `--p`; both `::-webkit-slider-*` and `::-moz-range-*`. "Output device ▾" and "Mixer" buttons 44 px tall.
+- **2×1:** speaker icon 20 + device name 14/600 | percent container-scaled (§3), `%` 0.36 em muted. Native `<input type=range>` (kept for keyboard and screen readers) styled as the shared `.k-range`. "Output device ▾" and "Mixer" buttons 44 px tall.
 - **2×2:** same + device list (radio rows 40 px) and mute toggle.
 - Muted state: icon with slash, percent replaced by "Muted" muted.
+- **Shared `.k-range`** (`app.css`, used by every slider including settings and the mixer sheet): 28 px tall, track 14 px fully rounded, filled part `--k-accent`, rest `--k-inset`, thumb 28 px `--k-text` circle with a 4 px `--k-bg` ring. Fill = inline `--p` kept by the `rangeFill` action (`#lib/ui/range.ts`); Firefox uses `::-moz-range-progress`.
 
 ### 5.7 Media — `4×1, 4×2`
 - **4×1:** artwork 84 px radius 12 (fallback: `--k-accent-2` square with note icon in `--k-bg`); title 15/600 ellipsis + "Artist · Source" 12 muted; progress 4 px with mono 11 times; 3 buttons 44 px (prev borderless · play/pause round filled `--k-accent-2` · next borderless).

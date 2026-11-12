@@ -4,6 +4,7 @@
 	 * inherits the global Appearance setting or sets its own value. Saved with the workspace file, so the
 	 * deck picks it up through `workspace://changed`.
 	 */
+	import { rangeFill } from '#lib/ui/range.ts';
 	import type { LookStyle, Workspace } from '#lib/ipc/index.ts';
 	import { t } from '#lib/i18n/index.ts';
 	import { getTheme } from '#lib/theme/index.ts';
@@ -74,7 +75,7 @@
 		<input
 			id="{id}-op"
 			type="range"
-			class="k-range"
+			class="k-range" use:rangeFill={opacityPct}
 			min="0"
 			max="100"
 			step="1"
@@ -100,7 +101,7 @@
 		<input
 			id="{id}-blur"
 			type="range"
-			class="k-range"
+			class="k-range" use:rangeFill={blur}
 			min="0"
 			max="40"
 			step="1"
