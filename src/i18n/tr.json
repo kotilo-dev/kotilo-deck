@@ -557,8 +557,12 @@
 			"feedError": "{name} yenilenemedi",
 			"feedErrors": "{n} takvim yenilenemedi",
 			"events": "Yaklaşan etkinlikler",
+			"timeline": "Bugünün çizelgesi",
+			"timelineMore": "{n} daha",
 			"settings": {
-				"allDay": "Tüm gün etkinliklerini göster"
+				"allDay": "Tüm gün etkinliklerini göster",
+				"timelineFrom": "Gün çizelgesi başlangıcı",
+				"timelineTo": "Gün çizelgesi bitişi"
 			}
 		}
 	},

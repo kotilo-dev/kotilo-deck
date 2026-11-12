@@ -184,7 +184,9 @@ Sizes are `w×h` in cells. "Compact" = 1-row variants.
   - Top lane 20 px: all-day events as a tinted bar with the title.
   - Main lane: one block per timed event by start/end, feed colour ~30 % with a 4 px solid left edge, title 12/500 ellipsised; blocks under 30 min have no label. Overlaps stack in up to two sub-lanes; more collapse into a `+N` block. Events crossing the range edges are clipped.
   - "Now": 2 px `--k-text` line with a small mono time label, hidden outside the range, moved by the shared minute tick.
-  - Hour labels under the lane, mono 11 muted.
+  - Hour labels under the lane, mono 11 muted (hour number only, the locale's 12/24 h).
+  - Layout maths in `src/widgets/calendar/timeline.ts` (tested); 4×2 hides the timeline below a 400 px card height.
+  - Range settings use the manifest's `"format": "time"` string field, rendered as `<input type="time">`.
 
 ### 5.5 System — `2×2, 4×2`
 - **2×2:** header + "60 s"; CPU row: label 12 muted / mono 20 value, sparkline 36 px tall (2 px accent line, 60 samples, no fill); Memory & GPU: label/value row + 6 px bar on `--k-bg-alt` (fill `--k-info` memory, `--k-warning` when in warn state).

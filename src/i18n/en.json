@@ -557,8 +557,12 @@
 			"feedError": "{name} couldn't refresh",
 			"feedErrors": "{n} feeds couldn't refresh",
 			"events": "Upcoming events",
+			"timeline": "Today's timeline",
+			"timelineMore": "{n} more",
 			"settings": {
-				"allDay": "Show all-day events"
+				"allDay": "Show all-day events",
+				"timelineFrom": "Day timeline from",
+				"timelineTo": "Day timeline to"
 			}
 		}
 	},

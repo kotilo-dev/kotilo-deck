@@ -83,7 +83,8 @@ const TRACKS = [
 
 const FEEDS: CalendarFeed[] = [
 	{ id: 'work', name: 'Work', url: 'https://calendar.example.com/work.ics', color: 'accent', enabled: true },
-	{ id: 'personal', name: 'Personal', url: 'https://calendar.example.com/personal.ics', color: 'success', enabled: true }
+	{ id: 'personal', name: 'Personal', url: 'https://calendar.example.com/personal.ics', color: 'success', enabled: true },
+	{ id: 'design', name: 'Design', url: 'https://calendar.example.com/design.ics', color: 'accent-2', enabled: true }
 ];
 
 /** One CPU reading of a gentle, deterministic wave at step `k`. */
@@ -358,7 +359,7 @@ export function createDemoBackend(opts: DemoOptions = {}): DemoBackend & {
 		const list: Omit<CalendarEvent, 'id'>[] = [
 			{ feedId: 'work', title: 'Release week', start: midnight.getTime(), end: midnight.getTime() + 24 * HOUR, allDay: true, location: null },
 			{ feedId: 'work', title: 'Team stand-up', start: base, end: base + 15 * MIN, allDay: false, location: 'Video call' },
-			{ feedId: 'work', title: 'Design review: tablet mode', start: base + 2.5 * HOUR, end: base + 3.5 * HOUR, allDay: false, location: 'Room 3' },
+			{ feedId: 'design', title: 'Design review: tablet mode', start: base + 2.5 * HOUR, end: base + 3.5 * HOUR, allDay: false, location: 'Room 3' },
 			{ feedId: 'work', title: 'Release planning', start: base + 5 * HOUR, end: base + 6 * HOUR, allDay: false, location: null },
 			{ feedId: 'personal', title: 'Climbing gym', start: base + 7.5 * HOUR, end: base + 9 * HOUR, allDay: false, location: null },
 			{ feedId: 'personal', title: 'Lunch with Ada', start: base + 26 * HOUR, end: base + 27 * HOUR, allDay: false, location: 'Karaköy' },

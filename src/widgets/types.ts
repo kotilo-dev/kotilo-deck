@@ -18,7 +18,7 @@ export interface WidgetManifest {
 
 export type SettingSchema =
 	| { type: 'boolean'; title?: string; default?: boolean }
-	| { type: 'string'; title?: string; enum?: string[]; default?: string }
+	| { type: 'string'; title?: string; enum?: string[]; default?: string; /** "time": an "HH:MM" picker. */ format?: 'time' }
 	| { type: 'number'; title?: string; minimum?: number; maximum?: number; step?: number; default?: number }
 	| { type: 'array' | 'object'; title?: string };
 
