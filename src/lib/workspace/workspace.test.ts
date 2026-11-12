@@ -186,7 +186,9 @@ describe('WorkspaceStore', () => {
 	it('coalesces rapid edits into one save per workspace', async () => {
 		const { store, spy } = setup();
 		await store.init();
+		store.create('Blank');
 		await store.flush();
+		await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
 		spy.save.mockClear();
 		store.addWidget('date', { w: 2, h: 1 });
 		store.addWidget('date', { w: 2, h: 1 });
@@ -194,7 +196,7 @@ describe('WorkspaceStore', () => {
 		store.addWidget('date', { w: 2, h: 1 });
 		await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
 		expect(spy.save).toHaveBeenCalledTimes(1);
-		expect(spy.save.mock.calls[0][0].widgets.filter((w) => w.widget === 'date')).toHaveLength(4);
+		expect(spy.save.mock.calls[0][0].widgets.filter((w) => w.widget === 'date')).toHaveLength(3);
 	});
 
 	it('creates, duplicates and switches', async () => {
@@ -285,10 +287,15 @@ describe('WorkspaceStore', () => {
 	it('adds widgets in the first free slot and reports a full grid', async () => {
 		const { store } = setup();
 		await store.init();
-		// Focus leaves 6,2 (2×1) and the 4×1 strip at 4,3 free.
-		expect(store.addWidget('clock', { w: 4, h: 2 })).toBeNull();
-		expect(store.addWidget('clock', { w: 2, h: 1 })).toMatchObject({ instance: 'clock-2', x: 6, y: 2 });
-		expect(store.addWidget('media', { w: 4, h: 1 })).toMatchObject({ x: 4, y: 3 });
+		// Focus fills the 8×4 grid.
+		expect(store.addWidget('date', { w: 2, h: 1 })).toBeNull();
+		store.create('Blank');
+		expect(store.addWidget('clock', { w: 4, h: 2 })).toMatchObject({ instance: 'clock-1', x: 0, y: 0 });
+		expect(store.addWidget('clock', { w: 2, h: 1 })).toMatchObject({ instance: 'clock-2', x: 4, y: 0 });
+		expect(store.addWidget('media', { w: 4, h: 1 })).toMatchObject({ x: 4, y: 1 });
+		expect(store.addWidget('todo', { w: 4, h: 2 })).toMatchObject({ x: 0, y: 2 });
+		expect(store.addWidget('calendar', { w: 4, h: 2 })).toMatchObject({ x: 4, y: 2 });
+		expect(store.addWidget('date', { w: 2, h: 1 })).toMatchObject({ x: 6, y: 0 });
 		expect(store.addWidget('date', { w: 2, h: 1 })).toBeNull();
 	});
 

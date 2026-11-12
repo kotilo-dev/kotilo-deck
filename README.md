@@ -1,6 +1,6 @@
 # Kotilo Deck
 
-![Kotilo Deck switching workspaces and themes](docs/screenshots/deck.gif)
+![Kotilo Deck in the glass look, switching workspaces and themes](docs/screenshots/deck.gif)
 
 A full-screen developer dashboard for your second display. Kotilo Deck keeps the things you glance at all day on a small screen next to your main monitor: clock, weather, calendar, system load, media, volume, a pomodoro timer, todos and your AI agents. Arrange them on a snap-to-grid layout, save layouts as workspaces, and match them to the colour theme you already use in your editor. Part of [Kotilo](https://kotilo.dev); free and open source (MIT).
 
@@ -9,7 +9,7 @@ A full-screen developer dashboard for your second display. Kotilo Deck keeps the
 - **Ten widgets**: Clock (time zones, analog/digital), Date, Weather (Open-Meteo, no API key), Calendar (ICS feeds, countdown to the next event), System (CPU per core, RAM, GPU, 60 s sparkline, top processes), Volume (output device, per-app mixer), Media (artwork, controls, progress), Pomodoro (daily goal ring, notifications), Todo (quick add like `deploy tomorrow 9am`, reminders) and Agent Status.
 - **Workspaces**: saved dashboards (Focus, Ops, Agents, Full presets) with their own layout and theme. Switch with a swipe, the top bar, `Ctrl+Alt+←/→`, the tray, or auto-switch rules (time of day, pomodoro start, calendar event).
 - **Android-style grid**: 8×4 landscape, 4×8 portrait, adjustable density; each widget has a few fixed sizes with a layout per size.
-- **31 themes**: Catppuccin, Tokyo Night, Nord, Dracula, Gruvbox, Rosé Pine, Solarized, GitHub, One Dark and more, plus your own JSON themes. Light/dark auto switch, wallpapers, transparency and blur.
+- **31 themes**: Catppuccin, Tokyo Night, Nord, Dracula, Gruvbox, Rosé Pine, Solarized, GitHub, One Dark and more, plus your own JSON themes. Light/dark auto switch, wallpapers, transparency and blur, and a frosted glass look over a wallpaper.
 - **Companion for Kotilo desktop**: see running agents, approve or deny pending actions from the deck, focus suggestions for the pomodoro timer ([protocol](protocol.md)).
 - **Tablet / LAN mode**: open the deck in any browser on your network (old tablet, phone) by scanning a QR code; token protected.
 - **Widget plugins**: drop an HTML widget into `~/.kotilo/deck/widgets/` ([plugin API](docs/plugin-api.md)).
@@ -24,6 +24,8 @@ A full-screen developer dashboard for your second display. Kotilo Deck keeps the
 | ![Ops workspace in Catppuccin Mocha](docs/screenshots/deck-ops-catppuccin-mocha.png) | ![Agents workspace in Tokyo Night](docs/screenshots/deck-agents-tokyo-night.png) |
 | **Nord** | **Catppuccin Latte** |
 | ![Full workspace in Nord](docs/screenshots/deck-full-nord.png) | ![Focus workspace in Catppuccin Latte](docs/screenshots/deck-focus-catppuccin-latte.png) |
+| **Glass look (Ops)** | **Glass look (Focus)** |
+| ![Ops workspace in the glass look over a wallpaper](docs/screenshots/deck-ops-glass.png) | ![Focus workspace in the glass look over a wallpaper](docs/screenshots/deck-focus-glass.png) |
 
 Edit mode, a 7" 1024×600 display, and portrait (4×8):
 

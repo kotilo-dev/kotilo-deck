@@ -13,13 +13,14 @@ export type PresetId = (typeof PRESET_IDS)[number];
 type Slot = [widget: string, x: number, y: number, w: number, h: number];
 
 const LAYOUTS: Record<PresetId, Slot[]> = {
-	// Calm: big clock and the timer side by side, weather beside them, today's todos below.
+	// Calm: big clock and the timer side by side, weather beside them; today's todos and the next meeting
+	// below (the 4×2 clock already shows the date and week, so no Date card).
 	focus: [
 		['clock', 0, 0, 4, 2],
 		['pomodoro', 4, 0, 2, 2],
 		['weather', 6, 0, 2, 2],
 		['todo', 0, 2, 4, 2],
-		['date', 4, 2, 2, 1]
+		['calendar', 4, 2, 4, 2]
 	],
 	// Machine and schedule first: system and calendar on top, media and small tiles below.
 	ops: [
