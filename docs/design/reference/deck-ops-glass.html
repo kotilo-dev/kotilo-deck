@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<title>Kotilo Deck — Ops glass look (1920×1080)</title>
+<!-- Pixel reference for docs/design/UI-REFRESH.md. Wallpaper: wallpaper-example.svg (made for this repo). Swap in any local image to try others; do not commit an image of unknown licence. Static comp with sample data. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+body{margin:0}
+a{color:#fab387}a:hover{color:#f9e2af}
+button{font:inherit;color:inherit;cursor:pointer}
+.vol{-webkit-appearance:none;appearance:none;width:100%;height:14px;margin:0;border-radius:999px;background:linear-gradient(to right,var(--acc) 62%,rgba(0,0,0,0.38) 62%);outline-offset:4px}
+.vol::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;border-radius:50%;background:#ffffff;border:4px solid #2a2230}
+.vol::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#ffffff;border:4px solid #2a2230}
+</style>
+</head>
+<body>
+<div style="--acc: #fab387; --glass: rgba(24,24,37,0.52); --blur: 32px; position: relative; width: 1920px; height: 1080px; box-sizing: border-box; overflow: hidden; background: #11111b; color: #f5f5fa; font-family: Inter, system-ui, sans-serif">
+
+<img src="wallpaper-example.svg" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(17,17,27,0.34)"></div>
+
+<!-- Top bar -->
+<div style="position: relative; height: 56px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; justify-content: space-between">
+  <div style="min-width: 360px; display: flex; align-items: center">
+    <div style="height: 44px; padding: 0 16px; display: flex; align-items: center; gap: 10px; border-radius: 999px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%)">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linejoin="round"><path d="M12 2 22 12 12 22 2 12Z" style="stroke: var(--acc)"/><path d="M12 8v8M8 12h8" stroke="#ffffff" stroke-linecap="round"/></svg>
+      <span style="font-size: 14px; font-weight: 600">Kotilo Deck</span>
+    </div>
+  </div>
+  <div style="display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%)">
+    <button style="height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: transparent; color: #e2e3ec; font-size: 13px; font-weight: 500">Focus</button>
+    <button style="height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--acc); color: #181825; font-size: 13px; font-weight: 600">Ops</button>
+    <button style="height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: transparent; color: #e2e3ec; font-size: 13px; font-weight: 500">Agents</button>
+    <button style="height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: transparent; color: #e2e3ec; font-size: 13px; font-weight: 500">Full</button>
+  </div>
+  <div style="min-width: 360px; display: flex; align-items: center; justify-content: flex-end; gap: 10px">
+    <div style="height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 12px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); font-size: 12px; color: #e2e3ec">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #a6e3a1"></span>
+      <span>Kotilo desktop</span>
+    </div>
+    <button style="height: 44px; padding: 0 12px; display: flex; align-items: center; gap: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: var(--glass); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%)">
+      <span aria-hidden="true" style="display: flex; gap: 3px">
+        <span style="width: 10px; height: 18px; border-radius: 3px; background: #fab387"></span>
+        <span style="width: 10px; height: 18px; border-radius: 3px; background: #f38ba8"></span>
+        <span style="width: 10px; height: 18px; border-radius: 3px; background: #94e2d5"></span>
+        <span style="width: 10px; height: 18px; border-radius: 3px; background: #cba6f7"></span>
+      </span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px">mocha · glass</span>
+    </button>
+    <button aria-label="Edit layout" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: var(--glass); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); color: #e2e3ec">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Grid 8 x 4 -->
+<div style="position: relative; height: 1024px; box-sizing: border-box; padding: 8px 24px 24px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 16px">
+
+  <!-- System 4x2 -->
+  <div style="grid-column: 1 / span 4; grid-row: 1 / span 2; box-sizing: border-box; min-width: 0; min-height: 0; padding: 22px 26px; border-radius: 24px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <span style="font-size: 14px; font-weight: 600">System</span>
+      <span style="font-size: 12px; color: #dcdde8">Demo 8-Core Processor · 8 cores · tap for processes</span>
+    </div>
+    <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px">
+      <div style="min-height: 0; padding: 16px 18px 0; border-radius: 16px; background: rgba(0,0,0,0.24); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; overflow: hidden">
+        <span style="font-size: 11px; letter-spacing: 0.08em; color: #dcdde8">CPU</span>
+        <div style="margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 68px; line-height: 1; letter-spacing: -0.04em">25<span style="font-size: 24px; color: #dcdde8; letter-spacing: 0">%</span></div>
+        <span style="margin-top: 8px; font-size: 13px; color: #dcdde8">peak 61% · 60 s</span>
+        <svg aria-hidden="true" viewBox="0 0 240 60" preserveAspectRatio="none" style="flex: 1; min-height: 0; width: calc(100% + 36px); margin: 12px -18px 0">
+          <polygon points="0,40 12,38 24,41 36,36 48,34 60,39 72,46 84,50 96,47 108,44 120,45 132,40 144,32 156,26 168,28 180,34 192,37 204,36 216,38 228,37 240,39 240,60 0,60" style="fill: var(--acc); opacity: 0.22"/>
+          <polyline points="0,40 12,38 24,41 36,36 48,34 60,39 72,46 84,50 96,47 108,44 120,45 132,40 144,32 156,26 168,28 180,34 192,37 204,36 216,38 228,37 240,39" fill="none" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke" style="stroke: var(--acc)"/>
+        </svg>
+      </div>
+      <div style="min-height: 0; padding: 16px 18px 0; border-radius: 16px; background: rgba(0,0,0,0.24); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; overflow: hidden">
+        <span style="font-size: 11px; letter-spacing: 0.08em; color: #dcdde8">MEMORY</span>
+        <div style="margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 68px; line-height: 1; letter-spacing: -0.04em">43<span style="font-size: 24px; color: #dcdde8; letter-spacing: 0">%</span></div>
+        <span style="margin-top: 8px; font-size: 13px; color: #dcdde8">13.7 of 32 GB</span>
+        <svg aria-hidden="true" viewBox="0 0 240 60" preserveAspectRatio="none" style="flex: 1; min-height: 0; width: calc(100% + 36px); margin: 12px -18px 0">
+          <polygon points="0,36 12,36 24,35 36,35 48,34 60,35 72,34 84,33 96,33 108,34 120,33 132,32 144,32 156,31 168,32 180,31 192,31 204,30 216,31 228,30 240,30 240,60 0,60" fill="#94e2d5" opacity="0.22"/>
+          <polyline points="0,36 12,36 24,35 36,35 48,34 60,35 72,34 84,33 96,33 108,34 120,33 132,32 144,32 156,31 168,32 180,31 192,31 204,30 216,31 228,30 240,30" fill="none" stroke="#94e2d5" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
+      <div style="min-height: 0; padding: 16px 18px 0; border-radius: 16px; background: rgba(0,0,0,0.24); border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; overflow: hidden">
+        <span style="font-size: 11px; letter-spacing: 0.08em; color: #dcdde8">GPU</span>
+        <div style="margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 68px; line-height: 1; letter-spacing: -0.04em">23<span style="font-size: 24px; color: #dcdde8; letter-spacing: 0">%</span></div>
+        <span style="margin-top: 8px; font-size: 13px; color: #dcdde8">Demo Graphics 16 GB</span>
+        <svg aria-hidden="true" viewBox="0 0 240 60" preserveAspectRatio="none" style="flex: 1; min-height: 0; width: calc(100% + 36px); margin: 12px -18px 0">
+          <polygon points="0,46 12,47 24,44 36,45 48,48 60,42 72,38 84,44 96,47 108,46 120,48 132,45 144,40 156,43 168,47 180,48 192,46 204,44 216,45 228,46 240,46 240,60 0,60" fill="#cba6f7" opacity="0.22"/>
+          <polyline points="0,46 12,47 24,44 36,45 48,48 60,42 72,38 84,44 96,47 108,46 120,48 132,45 144,40 156,43 168,47 180,48 192,46 204,44 216,45 228,46 240,46" fill="none" stroke="#cba6f7" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 0.08em; color: #dcdde8">
+        <span>CORES</span>
+        <span style="font-family: 'JetBrains Mono', monospace; letter-spacing: 0">busiest: core 1 · 70%</span>
+      </div>
+      <div style="height: 64px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; align-items: end">
+        <div style="height: 45px; border-radius: 6px; background: #f38ba8"></div>
+        <div style="height: 10px; border-radius: 6px; background: #94e2d5"></div>
+        <div style="height: 26px; border-radius: 6px; background: var(--acc)"></div>
+        <div style="height: 40px; border-radius: 6px; background: var(--acc)"></div>
+        <div style="height: 31px; border-radius: 6px; background: var(--acc)"></div>
+        <div style="height: 14px; border-radius: 6px; background: #94e2d5"></div>
+        <div style="height: 13px; border-radius: 6px; background: #94e2d5"></div>
+        <div style="height: 11px; border-radius: 6px; background: #94e2d5"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calendar 4x2 -->
+  <div style="grid-column: 5 / span 4; grid-row: 1 / span 2; box-sizing: border-box; min-width: 0; min-height: 0; padding: 22px 26px; border-radius: 24px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <span style="font-size: 14px; font-weight: 600">Up next</span>
+      <span style="font-size: 12px; color: #dcdde8">2 feeds · Thu, Nov 5</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 16px; background: rgba(0,0,0,0.30); border: 1px solid var(--acc)">
+      <span style="align-self: stretch; width: 5px; border-radius: 3px; background: var(--acc)"></span>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 24px; font-weight: 600">Team stand-up</span>
+        <span style="font-size: 14px; color: #e2e3ec">11:00 – 11:15 AM · Video call · Work</span>
+      </div>
+      <span style="padding: 10px 16px; border-radius: 10px; background: var(--acc); font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 600; color: #181825">in 18 min</span>
+    </div>
+    <div style="display: flex; flex-direction: column">
+      <div style="height: 38px; display: flex; align-items: center; gap: 14px; padding: 0 18px">
+        <span style="width: 5px; height: 18px; border-radius: 3px; background: #a6e3a1"></span>
+        <span style="width: 150px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #dcdde8">All day</span>
+        <span style="flex: 1; font-size: 15px">Release week</span>
+        <span style="font-size: 12px; color: #dcdde8">Work</span>
+      </div>
+      <div style="height: 38px; display: flex; align-items: center; gap: 14px; padding: 0 18px">
+        <span style="width: 5px; height: 18px; border-radius: 3px; background: #cba6f7"></span>
+        <span style="width: 150px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #dcdde8">1:30 – 2:30 PM</span>
+        <span style="flex: 1; font-size: 15px">Design review: tablet mode</span>
+        <span style="font-size: 12px; color: #dcdde8">Design</span>
+      </div>
+      <div style="height: 38px; display: flex; align-items: center; gap: 14px; padding: 0 18px">
+        <span style="width: 5px; height: 18px; border-radius: 3px; background: var(--acc)"></span>
+        <span style="width: 150px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #dcdde8">4:00 – 5:00 PM</span>
+        <span style="flex: 1; font-size: 15px">Release planning</span>
+        <span style="font-size: 12px; color: #dcdde8">Work</span>
+      </div>
+    </div>
+    <!-- Day timeline, 9 AM to 6 PM in quarter hours -->
+    <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px">
+      <div style="position: relative; flex: 1; min-height: 0; box-sizing: border-box; padding: 8px 0; border-radius: 14px; background: rgba(0,0,0,0.24); border: 1px solid rgba(255,255,255,0.08); display: grid; grid-template-columns: repeat(36, minmax(0, 1fr)); grid-template-rows: 20px minmax(0, 1fr); row-gap: 6px">
+        <div style="grid-column: 1 / span 36; grid-row: 1; margin: 0 8px; padding: 0 10px; border-radius: 6px; background: rgba(166,227,161,0.24); color: #c9f2c5; font-size: 11px; font-weight: 500; line-height: 20px">Release week</div>
+        <div style="grid-column: 9 / span 1; grid-row: 2; border-radius: 6px; background: var(--acc)"></div>
+        <div style="grid-column: 19 / span 4; grid-row: 2; box-sizing: border-box; padding: 8px 10px; border-radius: 6px; background: rgba(203,166,247,0.34); border-left: 4px solid #cba6f7; font-size: 12px; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis">Design review</div>
+        <div style="grid-column: 29 / span 4; grid-row: 2; box-sizing: border-box; padding: 8px 10px; border-radius: 6px; background: rgba(250,179,135,0.30); border-left: 4px solid var(--acc); font-size: 12px; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis">Planning</div>
+        <div style="position: absolute; top: 0; bottom: 0; left: 18.9%; width: 2px; background: #ffffff"></div>
+        <div style="position: absolute; bottom: 8px; left: 18.9%; transform: translateX(-100%); margin-left: -6px; padding: 2px 6px; border-radius: 6px; background: #ffffff; color: #11111b; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600">10:42</div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #dcdde8">
+        <span>9</span><span>10</span><span>11</span><span>12</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Media 4x2 -->
+  <div style="grid-column: 1 / span 4; grid-row: 3 / span 2; box-sizing: border-box; min-width: 0; min-height: 0; padding: 26px; border-radius: 24px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); display: flex; align-items: stretch; gap: 32px">
+    <div aria-hidden="true" style="position: relative; flex: none; width: 436px; border-radius: 18px; overflow: hidden; background: linear-gradient(135deg, #f38ba8, #cba6f7 50%, #89b4fa)">
+      <div style="position: absolute; left: 30px; top: 190px; width: 230px; height: 230px; border-radius: 50%; background: rgba(255,255,255,0.20)"></div>
+      <div style="position: absolute; left: 230px; top: 60px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,0.24)"></div>
+    </div>
+    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 6px 0">
+      <span style="font-size: 11px; letter-spacing: 0.08em; color: #dcdde8">MUSIC PLAYER</span>
+      <span style="margin-top: 10px; font-size: 44px; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em">Low Tide Signals</span>
+      <span style="margin-top: 8px; font-size: 19px; color: #e2e3ec">Mira Vale · Harbor Lights</span>
+      <div style="flex: 1"></div>
+      <div style="display: flex; align-items: center; gap: 14px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #e2e3ec">1:23</span>
+        <div style="flex: 1; height: 8px; border-radius: 999px; background: rgba(0,0,0,0.38)">
+          <div style="width: 34.4%; height: 100%; border-radius: 999px; background: #ffffff"></div>
+        </div>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #e2e3ec">4:01</span>
+      </div>
+      <div style="margin-top: 26px; display: flex; align-items: center; justify-content: center; gap: 14px">
+        <button aria-label="Shuffle" style="width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: #e2e3ec">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="m4 4 5 5"/></svg>
+        </button>
+        <button aria-label="Previous track" style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: #ffffff">
+          <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5v14l-10-7Z"/><path d="M5 5v14" fill="none"/></svg>
+        </button>
+        <button aria-label="Pause" style="width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: #ffffff; color: #181825">
+          <svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4.5" height="15" rx="1.2"/><rect x="13.5" y="4.5" width="4.5" height="15" rx="1.2"/></svg>
+        </button>
+        <button aria-label="Next track" style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: #ffffff">
+          <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5v14l10-7Z"/><path d="M19 5v14" fill="none"/></svg>
+        </button>
+        <button aria-label="Repeat, on" style="width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: rgba(255,255,255,0.20); color: #ffffff">
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clock 2x1 -->
+  <div style="grid-column: 5 / span 2; grid-row: 3; box-sizing: border-box; min-width: 0; min-height: 0; padding: 22px 26px; border-radius: 24px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); display: flex; flex-direction: column; justify-content: space-between">
+    <div style="display: flex; align-items: baseline; gap: 10px; font-family: 'JetBrains Mono', monospace">
+      <span style="font-size: 112px; font-weight: 500; line-height: 1; letter-spacing: -0.04em">10:42</span>
+      <span style="font-size: 34px; color: #dcdde8">37</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <span style="font-size: 16px; font-weight: 600">Thursday, November 5</span>
+      <span style="font-size: 13px; color: #dcdde8">Istanbul UTC+3</span>
+    </div>
+  </div>
+
+  <!-- Date 2x1 -->
+  <div style="grid-column: 7 / span 2; grid-row: 3; box-sizing: border-box; min-width: 0; min-height: 0; padding: 22px 26px; border-radius: 24px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); display: flex; flex-direction: column; justify-content: space-between">
+    <div style="display: flex; align-items: center; gap: 22px">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 112px; font-weight: 500; line-height: 1; letter-spacing: -0.04em">5</span>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 24px; font-weight: 600">Thursday</span>
+        <span style="font-size: 15px; color: #dcdde8">November · Week 45 · Day 309</span>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 13px; text-align: center">
+      <div style="padding: 7px 0; border-radius: 8px; color: #dcdde8">M 2</div>
+      <div style="padding: 7px 0; border-radius: 8px; color: #dcdde8">T 3</div>
+      <div style="padding: 7px 0; border-radius: 8px; color: #dcdde8">W 4</div>
+      <div style="padding: 7px 0; border-radius: 8px; background: var(--acc); color: #181825; font-weight: 600">T 5</div>
+      <div style="padding: 7px 0; border-radius: 8px">F 6</div>
+      <div style="padding: 7px 0; border-radius: 8px; color: #dcdde8">S 7</div>
+      <div style="padding: 7px 0; border-radius: 8px; color: #dcdde8">S 8</div>
+    </div>
+  </div>
+
+  <!-- Weather 2x1 -->
+  <div style="grid-column: 5 / span 2; grid-row: 4; box-sizing: border-box; min-width: 0; min-height: 0; padding: 20px 26px; border-radius: 24px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); display: flex; flex-direction: column; justify-content: space-between">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <span style="font-size: 14px; font-weight: 600">İstanbul</span>
+      <span style="font-size: 12px; color: #dcdde8">6 min ago</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 18px">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 84px; font-weight: 500; line-height: 1; letter-spacing: -0.04em">17°</span>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-size: 16px; font-weight: 500">Partly cloudy</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #dcdde8">H 19° · L 12°</span>
+      </div>
+      <svg role="img" aria-label="Partly cloudy" width="84" height="84" viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <g stroke="#f9e2af" stroke-width="3.5"><path d="M24 5v5M9 11l3.5 3.5M4 26h5M39 11l-3.5 3.5"/></g>
+        <circle cx="24" cy="26" r="11" fill="#f9e2af"/>
+        <path d="M22 54h24a11 11 0 0 0 1.5-21.9A14 14 0 0 0 20.6 36 9.2 9.2 0 0 0 22 54Z" fill="#ffffff" stroke="#585b70" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 13px">
+      <div style="padding: 7px 10px; border-radius: 8px; background: rgba(0,0,0,0.24); display: flex; justify-content: space-between"><span style="font-family: Inter, sans-serif; color: #dcdde8">Fri</span><span>16° <span style="color: #dcdde8">11°</span></span></div>
+      <div style="padding: 7px 10px; border-radius: 8px; background: rgba(0,0,0,0.24); display: flex; justify-content: space-between"><span style="font-family: Inter, sans-serif; color: #dcdde8">Sat</span><span>18° <span style="color: #dcdde8">10°</span></span></div>
+      <div style="padding: 7px 10px; border-radius: 8px; background: rgba(0,0,0,0.24); display: flex; justify-content: space-between"><span style="font-family: Inter, sans-serif; color: #dcdde8">Sun</span><span>20° <span style="color: #dcdde8">12°</span></span></div>
+    </div>
+  </div>
+
+  <!-- Volume 2x1 -->
+  <div style="grid-column: 7 / span 2; grid-row: 4; box-sizing: border-box; min-width: 0; min-height: 0; padding: 20px 26px; border-radius: 24px; background: var(--glass); border: 1px solid rgba(255,255,255,0.18); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22); backdrop-filter: blur(var(--blur)) saturate(150%); -webkit-backdrop-filter: blur(var(--blur)) saturate(150%); display: flex; flex-direction: column; justify-content: space-between">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        <label for="vol" style="font-size: 14px; font-weight: 600">Speakers (USB Audio)</label>
+      </div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 56px; font-weight: 500; line-height: 1; letter-spacing: -0.04em">62<span style="font-size: 20px; color: #dcdde8; letter-spacing: 0">%</span></div>
+    </div>
+    <input id="vol" class="vol" type="range" min="0" max="100" value="62">
+    <div style="display: flex; gap: 10px">
+      <button style="height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.22); background: rgba(0,0,0,0.18); font-size: 13px; font-weight: 500">Output device
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <button style="height: 44px; padding: 0 14px; display: flex; align-items: center; gap: 8px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.22); background: rgba(0,0,0,0.18); font-size: 13px; font-weight: 500">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21v-7M5 10V3M12 21v-9M12 8V3M19 21v-5M19 12V3M2 14h6M9 8h6M16 16h6"/></svg>
+        Mixer
+      </button>
+    </div>
+  </div>
+
+</div>
+</div>
+</body>
+</html>

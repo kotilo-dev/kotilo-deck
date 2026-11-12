@@ -9,7 +9,7 @@
 - Put this folder at `docs/design/` in the repo. Add to `CLAUDE.md`: *"Read `docs/design/DESIGN.md` before touching anything under `src/widgets/`, `src/lib/grid/` or `src/lib/theme/`."*
 - `ui-widgets` agent: every widget PR must match the matching section in `## 5` for **each supported size**.
 - `reviewer` agent: check PRs against `## 9` (checklist). Reject any hardcoded hex under `src/widgets/**`.
-- `reference/*.html` are pixel references, not code to copy. They are 1280×720 (deck) and 960×680 (settings) static comps.
+- `reference/*.html` are pixel references, not code to copy. They are 1280×720 (deck) and 960×680 (settings) static comps; the `deck-ops-*` refresh comps are 1920×1080.
 
 ---
 
@@ -18,7 +18,7 @@
 1. **Ambient first.** Readable at arm's length across a desk: big numerals, few words, high contrast. Nothing blinks.
 2. **Theme is data.** Every colour is a `--k-*` token. A new theme JSON must make the whole deck look right without touching a widget.
 3. **Touch and glance.** Hit targets ≥ 44×44 px. Primary action of a widget is one tap (pause pomodoro, approve agent, play/pause).
-4. **Quiet surfaces.** Flat cards with a 1 px border; no gradients, no glow, no drop shadows except the *lifted* card in edit mode.
+4. **Quiet surfaces.** Flat cards with a 1 px border; no gradients, no glow, no drop shadows except the *lifted* card in edit mode. Three exceptions: (a) sparkline area fills at ≤ 22 % of the line colour; (b) the media card tint from artwork (§5.7, flat look only); (c) the glass look's 1 px inner top highlight (§4.5).
 5. **Mono for numbers, sans for words.** Time, percentages, temperatures, sizes → `--k-font-mono`. Everything else → `--k-font-ui`.
 
 ---
@@ -45,11 +45,16 @@ Theme JSON (`themes/<id>.json`, schema from spec §5.1) maps 1:1 to CSS custom p
 | `radius` | `--k-radius` | card radius (default 16 px) |
 | `font.ui` / `font.mono` | `--k-font-ui` / `--k-font-mono` | |
 | *(runtime)* | `--k-dim` | 1.0 → 0.3 multiplier for night/idle dim (applied as `opacity` on the content layer) |
+| *(derived)* | `--k-inset` | background of tiles, chips and tracks that sit **inside** a card. Flat: `var(--k-bg)` for stat tiles, `var(--k-bg-alt)` for chips (today's look). Glass: `color-mix(in srgb, var(--k-bg-alt) 45%, transparent)` |
+| *(derived)* | `--k-card-border` | card border. Flat: `var(--k-border)`. Glass: `color-mix(in srgb, var(--k-text) 18%, transparent)` |
+| *(derived)* | `--k-scrim` | wallpaper overlay, glass look only (§4.5) |
 
 Rules:
 - Widgets use **only** `var(--k-…)`. CI lint: regex `#[0-9a-fA-F]{3,8}` under `src/widgets/**` fails the build (allow-list: `transparent`, `currentColor`).
 - Text on an **accent-filled** button uses the theme's `bg-alt` (dark themes) or `#fff` (light themes). Expose this as `--k-on-accent`, computed by the theme loader: if `variant == "dark"` → `bg-alt`, else `#ffffff`.
 - Tinted states (warning card, selected calendar row) are `color-mix(in srgb, var(--k-warning) 18%, var(--k-surface))` — never a second hex.
+- Derived variables (`--k-surface-a`, `--k-on-accent`, `--k-inset`, `--k-card-border`, `--k-scrim`) are computed once in `src/lib/theme/loader.ts` (`themeToCssVars`) or `app.css`, never per widget.
+- Inner tiles, chips and tracks use `--k-inset`, not opaque `--k-bg` / `--k-bg-alt`: opaque boxes punch holes in the glass look.
 
 Bundled reference values are in `themes/catppuccin-mocha.json` and `themes/catppuccin-latte.json`. The `kotilo-theme` skill holds the rest.
 
@@ -62,14 +67,32 @@ Fonts: **Inter** (ui), **JetBrains Mono** (mono). Bundle them (no Google Fonts a
 | Role | Font | Size / weight | Notes |
 |---|---|---|---|
 | Clock 4×2 | mono | 128 / 500, `letter-spacing: -0.04em`, `line-height: 1` | seconds: 40 / 400 muted |
-| Hero number (weather, CPU, timer) | mono | 48 / 500 (2×2) · 32 / 500 (2×1 & settings) | |
+| Hero number (weather, CPU, timer) | mono | 48 / 500 (2×2) · container-scaled in 2×1 and 4×2 tiles (table below) · 32 / 500 in settings | |
 | Timer in ring | mono | 30 / 600 | |
-| Widget title | ui | 13 / 600 | top-left of every card |
-| Widget meta (right of title) | ui | 11 / 400 muted | "6 min ago", "2 left", "60 s" |
-| Body row | ui | 13 / 400 | todo item, calendar title |
+| Widget title | ui | 13 / 600 → 14 at 1920×1080 | top-left of every card |
+| Widget meta (right of title) | ui | 11 / 400 muted → 12 at 1920×1080 | "6 min ago", "2 left", "60 s" |
+| Body row | ui | 13 / 400 → 15 at 1920×1080 | todo item, calendar title |
 | Tiny label | ui | 11 / 400 muted, uppercase, `letter-spacing: .08em` | "BERLIN", "CPU" |
 | Button label | ui | 12–13 / 600 | |
 | Size chip | mono | 11 / 400 | "2×2" |
+
+**Container-scaled type.** Every card root has `container-type: size`. Hero text follows the 4×2 clock pattern
+`font-size: max(<floor>, min(<cap>, <N>cqw, calc(100cqh - <reserved>px)))`: the floor keeps the 1024×600 layout,
+the cap is the size at 1920×1080. Tune `cqw` / reserved per widget so nothing clips at any supported size.
+Mono hero numerals use `letter-spacing: -0.04em` and `line-height: 1`.
+
+| Element | Floor (1024×600) | Cap (1920×1080) |
+|---|---|---|
+| Clock 2×1 time | 32 | 112, seconds at 0.3 em muted |
+| Date 2×1 day number | 32 | 112 |
+| Weather 2×1 temperature | 32 | 84 |
+| Volume 2×1 percent | 13 | 56, `%` at 0.36 em muted |
+| System 4×2 tile value | 32 | 68, `%` at 0.35 em muted |
+| Calendar next-event title | 15 | 24 |
+| Calendar countdown chip | 14 | 22 |
+| Media 4×2 title | 20 | 44, weight 600, `letter-spacing: -0.02em` |
+| Card title / meta | 13 / 11 | 14 / 12 |
+| Body rows (calendar, todo) | 13 | 15 |
 
 Spacing scale: 4, 6, 8, 10, 12, 14, 16, 20, 24. Card padding: **18 px 20 px** (2×N cards), **22 px 28 px** (4×2 clock), **14 px 18 px** (1-row cards). Inner chips radius 10 px, buttons 12 px, pills 999 px.
 
@@ -83,8 +106,8 @@ Fullscreen on the chosen monitor. Root is a column: **top bar 56 px** + **grid a
 ### 4.2 Top bar (56 px)
 Three zones, `justify-content: space-between`:
 - **Left (min 220 px):** Kotilo diamond mark (22 px, accent stroke, accent-2 cross) + "Kotilo Deck" 14/600.
-- **Center:** workspace switcher — pill group on `--k-bg-alt`, 1 px border, radius 999, padding 4. Each pill 36 px tall, padding 0 18, 13 px. Active: `--k-accent` fill, `--k-on-accent` text, 600. Inactive: transparent, muted, 500. Swipe/hotkey changes active pill with a 200 ms slide.
-- **Right (min 220 px):** companion status (8 px dot: success = connected, border = not running; label 12 px muted) · theme chip (mono 12, 1 px border, radius 8, e.g. `mocha`) · **Edit** icon button 44×44, 1 px border, radius 12.
+- **Center:** workspace switcher — pill group on `--k-bg-alt`, 1 px border, radius 999, padding 4. Each pill 44 px tall (touch-target rule), padding 0 18, 13 px. Active: `--k-accent` fill, `--k-on-accent` text, 600. Inactive: transparent, muted, 500. Swipe/hotkey changes active pill with a 200 ms slide.
+- **Right (min 220 px):** companion status (8 px dot: success = connected, border = not running; label 12 px muted) · theme chip (44 px tall, four 10×18 px swatches `--k-accent` / `--k-accent-2` / `--k-info` / `--k-warning`, then the name in mono 12, 1 px border, radius 8, e.g. `mocha`) · **Edit** icon button 44×44, 1 px border, radius 12.
 
 In **edit mode** the top bar becomes: accent dot + "Editing *Focus*" + grid density chip (`8 × 4`) | hint text | **Add widget** (secondary) + **Done** (primary). Bottom border 1 px.
 
@@ -101,6 +124,26 @@ In **edit mode** the top bar becomes: accent dot + "Editing *Focus*" + grid dens
 ```
 Cards never scroll; a size variant shows what fits. Attention border: `border-color: var(--k-warning)` when the widget needs the user (pending approval, threshold breached).
 
+### 4.5 Look: flat or glass
+`style: 'flat' | 'glass'` in the global and the workspace appearance (workspace wins; default `flat`), exposed as
+`html[data-look='glass']` and styled from `app.css`. Glass is a preset over the existing background / surface
+opacity / blur settings, not a new renderer. It needs a wallpaper or transparent background; with a solid background
+the setting shows "Glass needs a wallpaper or transparent background". Reference: `reference/deck-ops-glass.html`.
+
+| Part | Glass treatment |
+|---|---|
+| Wallpaper scrim | layer above the wallpaper (image or video), below content: `color-mix(in srgb, var(--k-bg) 34%, transparent)`; strength setting 0–60 %, default 34 |
+| Card | `--k-surface-a`; defaults when unset: surface opacity 0.52, blur 32 px |
+| Card backdrop | `blur(Npx) saturate(150%)`; `--k-backdrop: none` when blur is 0 |
+| Card border | `1px solid var(--k-card-border)` + `box-shadow: inset 0 1px 0 color-mix(in srgb, var(--k-text) 22%, transparent)` |
+| Inner tiles, chips, tracks | `--k-inset`, 1 px border `color-mix(in srgb, var(--k-text) 8%, transparent)` |
+| Muted text | `--k-text-muted: color-mix(in srgb, var(--k-text-muted) 45%, var(--k-text))`, set once under `[data-look='glass']` |
+| Top bar | brand, workspace switcher, companion status, theme chip and Edit each become a glass pill (card background, border, backdrop) |
+| Attention border, edit mode | unchanged |
+
+Flat must stay pixel-identical to the pre-refresh look apart from the §5 widget changes. Contrast rules (§9) hold
+against the worst case behind the card; if a light theme fails at 0.52, raise its glass default opacity.
+
 ---
 
 ## 5. Widgets — per-size specification
@@ -110,14 +153,16 @@ Sizes are `w×h` in cells. "Compact" = 1-row variants.
 ### 5.1 Clock — `2×1, 2×2, 4×2`
 - **4×2:** time 128 mono + seconds 40 muted on one baseline. Bottom row: left = "Tuesday, 3 November" 18/600 over "Week 45 · Day 307 · Istanbul UTC+3" 13 muted; right = up to 3 extra time zones, each tiny-label city + mono 20 time, right-aligned, 20 px apart.
 - **2×2:** header "City" + mono 12 time; analog face 150 px (face `--k-bg`, 2 px border, 4 quarter ticks 3 px, hour hand 5 px `--k-text`, minute hand 3 px `--k-accent`, 4 px accent hub); footer "Tue 3 Nov · W45" 12 muted. Digital option: 48 mono centered.
-- **2×1:** mono 32 time left, date 12 muted right.
+- **2×1:** time container-scaled (§3) on one baseline with seconds 0.3 em muted (when enabled). Bottom row: left "Thursday, November 5" 16/600, right "Istanbul UTC+3" 13 muted. Below the container-query breakpoint: mono time left, date 12 muted right on one row (the 1024×600 layout).
 
 ### 5.2 Date — `2×1`
-Big day number mono 32, weekday + ISO week on the right. (Same style as clock 2×1.)
+- Top: day number container-scaled (§3); beside it weekday 24/600 over "November · Week 45 · Day 309" 15 muted ("Day N" only when `dayOfYear` is on).
+- Bottom: week strip, 7 equal cells `M 2 … S 8`, mono 13; today a filled `--k-accent` pill with `--k-on-accent` text; past days muted. Week start follows the locale. Hidden when the card is short (then day number + weekday + ISO week, as before).
 
 ### 5.3 Weather — `2×1, 2×2, 4×2`
 - **2×2:** header city + "N min ago"; hero 48 mono `14°` with "Partly cloudy · H 16° L 9°" 13 muted; condition icon 56 px (stroke 1.6, sun in `--k-warning`, cloud in `--k-text-muted`); 3-day row: three chips on `--k-bg-alt`, radius 10, "Wed" 11 muted over mono 13 `16° 9°` (low muted).
-- **2×1:** city + stale badge, condition text 12 muted | hero 32 + 36 px icon.
+- **2×1:** header city + "N min ago" (stale badge unchanged). Middle: temperature container-scaled (§3), condition 16/500 over mono 13 "H 19° · L 12°", icon 84 px. Bottom: the 3-day chips in one-line form (`Fri  16° 11°`) on `--k-inset`, hidden when the card is short. Short card: city + stale badge, condition 12 muted | hero + 36 px icon.
+- **Icons ≥ 56 px** use the filled variant: sun disc filled `--k-warning` with rays, cloud filled `--k-text` with a thin `--k-border` outline. Smaller icons keep the stroke style.
 - **4×2:** 2×2 content + 6-hour strip (6 columns: hour, icon 20 px, temp).
 - **Stale state:** badge "stale" 11/500, warning tint chip; subtitle "last update N min ago".
 
@@ -126,21 +171,31 @@ Big day number mono 32, weekday + ISO week on the right. (Same style as clock 2�
 - **Next event card:** accent-tinted (`color-mix` 14% accent on surface), 1 px accent border, 4 px feed-colour bar, title 15/600, "10:00 – 10:45 · Teams · Work" 12 muted, countdown chip mono 14/600 on `--k-surface` → "in 12 min" (switches to "now" at 0, danger text if overrunning).
 - Following rows: 4 px feed bar · mono 12 time range (92 px col) · title 13 · feed name 11 muted. All-day shows "All day".
 - 4×2 shows next + 3 rows; 4×4 next + 8 rows.
+- **4×2 at large sizes:** next-event card padding 16 18, feed bar 5 px, title and countdown container-scaled (§3); in glass the countdown chip is filled `--k-accent` with `--k-on-accent` text, in flat it sits on `--k-inset`. Rows 38 px, feed bar in the feed's colour, mono time column, right column = feed name.
+- **Day timeline** fills the remaining height (4×2) or sits above the rows (4×4); hidden by container query when the card is short (1024×600 keeps next + 3 rows):
+  - Range from settings `timelineFrom` / `timelineTo` (default `09:00` / `18:00`), 15-minute columns.
+  - Top lane 20 px: all-day events as a tinted bar with the title.
+  - Main lane: one block per timed event by start/end, feed colour ~30 % with a 4 px solid left edge, title 12/500 ellipsised; blocks under 30 min have no label. Overlaps stack in up to two sub-lanes; more collapse into a `+N` block. Events crossing the range edges are clipped.
+  - "Now": 2 px `--k-text` line with a small mono time label, hidden outside the range, moved by the shared minute tick.
+  - Hour labels under the lane, mono 11 muted.
 
 ### 5.5 System — `2×2, 4×2`
 - **2×2:** header + "60 s"; CPU row: label 12 muted / mono 20 value, sparkline 36 px tall (2 px accent line, 60 samples, no fill); Memory & GPU: label/value row + 6 px bar on `--k-bg-alt` (fill `--k-info` memory, `--k-warning` when in warn state).
-- **4×2:** header + CPU name; three stat tiles on `--k-bg` radius 12: tiny label, mono 32 value, sparkline (CPU) / "11.2 of 32 GB" (RAM) / model (GPU). Warn tile: warning tint bg + warning border, text darkened for contrast. Below: per-core bar strip 40 px tall, 4 px gap, 3 px radius, accent.
+- **2×2 sparkline** gets the area fill described under 4×2; layout unchanged.
+- **4×2:** header + CPU name; three stat tiles on `--k-inset` radius 14: tiny label, value container-scaled (§3), sub-label (CPU `peak N% · 60 s` = max of the history window; RAM "11.2 of 32 GB"; GPU model), and a sparkline in every tile (60 samples; CPU `--k-accent`, memory `--k-info`, GPU `--k-accent-2`, `--k-warning` in warn state). Sparkline: 2.5 px line + area fill at 16 % of the line colour (22 % in glass), bleeding to the tile's left, right and bottom edges (`overflow: hidden`, no bottom padding). Warn tile: warning tint bg + warning border, text darkened for contrast.
+- **Per-core strip** below the tiles: header row tiny label `CORES` + `busiest: core N · X%` mono 11 right; bars 64 px tall at 1080p (40 px floor), 8 px gap, 6 px radius, height proportional to load; colour below 25 % `--k-info`, 25 % to threshold `--k-accent`, at/above threshold `--k-warning`.
 - **Warn rule** (from SysPulse): value > threshold for 3 consecutive samples → tile/bar turns warning, header meta shows "N samples over X%". Clears after 3 samples under.
 - Tap anywhere → modal sheet with top-5 processes (name, CPU %, RAM).
 
 ### 5.6 Volume — `2×1, 2×2`
-- **2×1:** speaker icon 18 + device name 13/600 | mono 13 percent; native `<input type=range>` 28 px tall with `accent-color: var(--k-accent)`; optional "Output device ▾" ghost button 28 px.
+- **2×1:** speaker icon 20 + device name 14/600 | percent container-scaled (§3), `%` 0.36 em muted. Native `<input type=range>` (kept for keyboard and screen readers), custom-styled like the shared `.k-range`: track 14 px fully rounded, filled part `--k-accent`, rest `--k-inset`, thumb 28 px `--k-text` circle with a 4 px `--k-bg` ring; fill via inline `--p`; both `::-webkit-slider-*` and `::-moz-range-*`. "Output device ▾" and "Mixer" buttons 44 px tall.
 - **2×2:** same + device list (radio rows 40 px) and mute toggle.
 - Muted state: icon with slash, percent replaced by "Muted" muted.
 
 ### 5.7 Media — `4×1, 4×2`
-- **4×1:** artwork 84 px radius 12 (fallback: `--k-accent-2` square with note icon in `--k-bg`); title 15/600 ellipsis + "Artist · Source" 12 muted; progress 4 px with mono 11 times; 3 buttons 44 px (prev ghost · pause filled `--k-accent-2` · next ghost).
-- **4×2:** artwork 120 px radius 14; source as tiny label, title 20/600, artist 13 muted; like button top-right; progress 6 px; 5 buttons (shuffle · prev · play/pause 56×44 filled · next · repeat), shuffle/repeat muted when off.
+- **4×1:** artwork 84 px radius 12 (fallback: `--k-accent-2` square with note icon in `--k-bg`); title 15/600 ellipsis + "Artist · Source" 12 muted; progress 4 px with mono 11 times; 3 buttons 44 px (prev borderless · play/pause round filled `--k-accent-2` · next borderless).
+- **4×2:** card padding 26; artwork a square filling the card height, radius 18 (placeholder as 4×1). Text column: source tiny label, title container-scaled (§3), "Artist · Album" 19 px, spacer, progress row (8 px track on `--k-inset`, mono 14 times), controls centred under it. Play/pause is the only filled button: 84 px circle `--k-accent-2`, `--k-on-accent` icon. Prev/next 60 px, no border or background. Shuffle/repeat 52 px, no border, muted; active = 22 % `--k-accent-2` tint circle + `--k-accent-2` icon, `aria-pressed`. Every control has an `aria-label`.
+- **Artwork tint (flat look only):** card background `color-mix(in srgb, var(--art) 30%, var(--k-surface-a))`, border `color-mix(in srgb, var(--art) 30%, var(--k-border))`, 200 ms transition. `--art` is the artwork's average/dominant colour, computed once per track, lightness-clamped for contrast, set as an inline custom property; no artwork → `--k-accent-2`. In glass the card stays neutral and the progress fill and play button use `--k-text`.
 - No session → artwork placeholder + "Nothing playing" muted, buttons disabled (opacity .4).
 
 ### 5.8 Pomodoro — `2×1, 2×2, 4×2`
@@ -214,7 +269,9 @@ Icons: inline stroke SVG (Lucide-style, 2 px stroke, round caps), sized 16/18/20
 
 ## 9. Review checklist (for `reviewer`)
 
-- [ ] No hex colours under `src/widgets/**`; cards use `--k-surface-a`.
+- [ ] No hex colours under `src/widgets/**`; cards use `--k-surface-a`; inner tiles, chips and tracks use `--k-inset`.
+- [ ] Hero text is container-scaled (§3): floor at 1024×600, cap at 1920×1080, nothing clipped in portrait (4×8).
+- [ ] Glass look (§4.5) checked over a bright and a dark wallpaper; flat look unchanged outside the listed widget changes.
 - [ ] Every size in `manifest.sizes` has a layout matching §5 and renders at 1024×600.
 - [ ] All tap targets ≥ 44 px (36 px allowed only for secondary in-card buttons, as specified).
 - [ ] Numbers in mono, text in ui font; title 13/600 + meta 11 muted header on every card.
@@ -231,6 +288,7 @@ Icons: inline stroke SVG (Lucide-style, 2 px stroke, round caps), sized 16/18/20
 ```
 docs/design/
 ├── DESIGN.md                     ← this file
+├── UI-REFRESH.md                 ← task brief for the 1920×1080 refresh and the glass look
 ├── themes/
 │   ├── catppuccin-mocha.json     ← spec §5.1 schema, exact official palette
 │   └── catppuccin-latte.json
@@ -238,5 +296,8 @@ docs/design/
     ├── deck-focus-mocha.html     ← 1280×720, Focus workspace, all widgets
     ├── deck-edit-mode.html       ← edit mode + widget drawer
     ├── deck-ops-latte.html       ← Ops workspace, light theme, 4×2 variants
-    └── settings-appearance.html  ← 960×680 settings window
+    ├── settings-appearance.html  ← 960×680 settings window
+    ├── deck-ops-refresh.html/.png ← 1920×1080, Ops workspace, flat look, Mocha
+    ├── deck-ops-glass.html/.png  ← 1920×1080, Ops workspace, glass look over a wallpaper
+    └── wallpaper-example.svg     ← "Ember" gradient wallpaper made for this repo (safe to ship)
 ```
