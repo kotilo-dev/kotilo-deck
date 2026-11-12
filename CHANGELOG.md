@@ -11,6 +11,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Glass card style (Settings ▸ Appearance ▸ Card style, also per workspace): frosted, saturated cards and top-bar pills over a wallpaper or transparent background, with a "Wallpaper dimming" slider. The default card opacity in Glass is worked out per theme so text stays readable even over a white or black wallpaper; picking Glass with blur off turns blur on at 32 px.
 
 ### Changed
+- Date 2×1: on larger cards a big day number beside the weekday and "November · Week 45", with a strip of this week's days below (today highlighted, past days dimmed, first day of the week from your locale). Small cards keep the compact layout.
 - Clock 2×1: on larger cards the time grows with the card, with the full date and the city with its UTC offset underneath. Small cards keep the single-row layout.
 - Media: artwork fills the card height on large screens, the title grows with the card, and the controls are round: a large filled play button, borderless previous/next, and shuffle/repeat that show a tinted circle when on. In the glass look the play button and progress use the text colour.
 - System widget (4×2): bigger numbers on large screens, a sparkline with a soft fill under it in every tile (CPU, memory, GPU), a "peak N% · 60 s" label for CPU, and a per-core strip coloured by load with the busiest core named.
