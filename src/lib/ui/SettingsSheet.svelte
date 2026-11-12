@@ -109,6 +109,11 @@
 										{/each}
 									</select>
 								</label>
+							{:else if schema.type === 'string' && schema.format === 'time'}
+								<label class="row">
+									<span>{label}</span>
+									<input type="time" class="k-input k-mono" value={String(value ?? '')} onchange={(e) => e.currentTarget.value && set(key, e.currentTarget.value)} />
+								</label>
 							{:else if schema.type === 'string'}
 								<label class="row">
 									<span>{label}</span>

@@ -35,14 +35,16 @@
 	} from './logic';
 	import { defaults, type CalendarSettings } from './settings';
 	import { loadFeeds, watchFeeds } from './store';
+	import Timeline from './Timeline.svelte';
 
 	let { size, settings, editing }: WidgetProps<CalendarSettings> = $props();
 
 	const s = $derived({ ...defaults, ...settings });
 	const tauri = hasBackend();
 
-	/** Row 32 px (8 px padding + 16 px line), day heading 18 px, 4 px gap. */
+	/** Row 32 px (8 px padding + 16 px line), 38 px on large cards with the timeline; day heading 18 px, 4 px gap. */
 	const ROW = 32;
+	const ROW_ROOMY = 38;
 	const HEAD = 18;
 	const GAP = 4;
 
@@ -151,8 +153,17 @@
 	);
 
 	let rowsH = $state(0);
+	/**
+	 * Day timeline (DESIGN §5.4): shown by a container query on large cards. Its measured height tells the
+	 * script whether it is on: then 4×2 rows are the plain next-3 list (the timeline takes the rest of the
+	 * height) and rows grow to 38 px; otherwise rows fit the free height as before.
+	 */
+	let tlH = $state(0);
+	const timelineOn = $derived(tlH > 0);
 	const grouped = $derived(groupRows(view.rest, now, ROW_CAP[size === '4x4' ? '4x4' : '4x2']));
-	const rows = $derived(fitRows(grouped, rowsH, ROW, HEAD, GAP));
+	const rows = $derived(
+		timelineOn && size !== '4x4' ? grouped : fitRows(grouped, rowsH, timelineOn ? ROW_ROOMY : ROW, HEAD, GAP)
+	);
 
 	const whenCh = $derived(Math.max(0, ...rows.map((r) => (r.kind === 'event' ? whenText(r.event).length : 0))));
 
@@ -212,7 +223,22 @@
 	{/if}
 {/snippet}
 
-<section class="k-card cal" data-size={size} aria-label={t('widgets.calendar.name')}>
+{#snippet timeline()}
+	<div class="tl-wrap" bind:clientHeight={tlH}>
+		<Timeline
+			events={data?.events ?? []}
+			{now}
+			from={s.timelineFrom}
+			to={s.timelineTo}
+			allDay={s.allDay}
+			{locale}
+			{colorOf}
+			moreLabel={(n) => t('widgets.calendar.timelineMore', { n })}
+		/>
+	</div>
+{/snippet}
+
+<section class="k-card cal" class:roomy={timelineOn} data-size={size} aria-label={t('widgets.calendar.name')}>
 	<header class="hdr">
 		<span class="title">{t('widgets.calendar.title')}</span>
 		<span class="meta-wrap">
@@ -261,13 +287,15 @@
 			</div>
 			<span class="mono chip" class:over={nextCd?.kind === 'over'} class:now={nextCd?.kind === 'now'}>{chip}</span>
 		</div>
-		<div class="rows-wrap" bind:clientHeight={rowsH}>
+		{#if size === '4x4'}{@render timeline()}{/if}
+		<div class="rows-wrap" class:capped={timelineOn && size !== '4x4'} bind:clientHeight={rowsH}>
 			<ul class="rows" style:--when-ch={whenCh} aria-label={t('widgets.calendar.events')}>
 				{#each rows as r (r.kind === 'day' ? `d${r.day}` : r.event.id)}
 					{@render row(r)}
 				{/each}
 			</ul>
 		</div>
+		{#if size !== '4x4'}{@render timeline()}{/if}
 	{/if}
 
 	{#if data && errors.length && active.length && tauri}
@@ -298,7 +326,7 @@
 		flex-shrink: 0;
 	}
 	.title {
-		font-size: 13px;
+		font-size: var(--k-fs-title);
 		font-weight: 600;
 		flex-shrink: 0;
 	}
@@ -309,7 +337,7 @@
 		min-width: 0;
 	}
 	.meta {
-		font-size: 11px;
+		font-size: var(--k-fs-meta);
 		color: var(--k-text-muted);
 		white-space: nowrap;
 		overflow: hidden;
@@ -352,8 +380,9 @@
 		flex-direction: column;
 		gap: 2px;
 	}
+	/* Container-scaled (DESIGN §3): 15 px at 1024×600, 24 px at 1920×1080. */
 	.next-title {
-		font-size: 15px;
+		font-size: max(15px, min(24px, 2.6cqw, calc(3.75cqh + 5.7px)));
 		font-weight: 600;
 		white-space: nowrap;
 		overflow: hidden;
@@ -366,15 +395,24 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	/* Countdown: 14 → 22 px with the card. Flat: on --k-inset; glass: filled accent (DESIGN §5.4). */
 	.chip {
 		flex-shrink: 0;
-		font-size: 14px;
+		font-size: max(14px, min(22px, 2.37cqw, calc(3.33cqh + 5.7px)));
 		font-weight: 600;
-		padding: 6px 10px;
+		padding: 0.43em 0.7em;
 		border-radius: 8px;
-		background: var(--k-surface);
+		background: var(--k-inset);
 		color: color-mix(in srgb, var(--k-accent) 70%, var(--k-text));
 		white-space: nowrap;
+	}
+	:global(html[data-look='glass']) .chip {
+		background: var(--k-accent);
+		color: var(--k-on-accent);
+	}
+	:global(html[data-look='glass']) .chip.over {
+		background: var(--k-danger);
+		color: var(--k-on-accent);
 	}
 	.chip.now {
 		color: var(--k-text);
@@ -382,12 +420,48 @@
 	.chip.over {
 		color: var(--k-danger);
 	}
+	:global(html[data-look='glass']) .chip.now {
+		color: var(--k-on-accent);
+	}
 
 	/* Following rows: bar · mono time (92 px column) · title · feed. Subgrid keeps the columns aligned. */
 	.rows-wrap {
 		flex: 1;
 		min-height: 0;
 		overflow: hidden;
+	}
+	.rows-wrap.capped {
+		flex: none;
+	}
+	.tl-wrap {
+		flex: 1 1 0;
+		min-height: 0;
+		display: flex;
+	}
+	.cal[data-size='4x4'] .tl-wrap {
+		flex: none;
+		height: clamp(110px, 24cqh, 200px);
+	}
+	/* Short cards keep the pre-timeline layout (next + 3 rows at 1024×600). */
+	@container (height < 400px) {
+		.tl-wrap {
+			display: none;
+		}
+	}
+	/* Large cards: roomier next card and 38 px rows (DESIGN §5.4). */
+	.roomy .next {
+		padding: 16px 18px;
+	}
+	.roomy .next .fbar {
+		width: 5px;
+	}
+	.roomy .row {
+		height: 38px;
+		padding: 0 14px;
+		box-sizing: border-box;
+	}
+	.roomy .what {
+		font-size: var(--k-fs-body);
 	}
 	.rows {
 		list-style: none;

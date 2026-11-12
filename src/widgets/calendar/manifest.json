@@ -9,7 +9,9 @@
 	"settings": {
 		"type": "object",
 		"properties": {
-			"allDay": { "type": "boolean", "title": "Show all-day events", "default": true }
+			"allDay": { "type": "boolean", "title": "Show all-day events", "default": true },
+			"timelineFrom": { "type": "string", "format": "time", "title": "Day timeline from", "default": "09:00" },
+			"timelineTo": { "type": "string", "format": "time", "title": "Day timeline to", "default": "18:00" }
 		}
 	}
 }
