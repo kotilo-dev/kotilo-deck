@@ -36,7 +36,6 @@ use ics::VEvent;
 
 pub const EVENT_CHANGED: &str = "calendar://changed";
 /// Kept local (not `crate::settings`) so this module does not depend on the settings struct.
-const SETTINGS_FILE: &str = "settings.json";
 const SETTINGS_CHANGED: &str = "settings://changed";
 const FEEDS_KEY: &str = "calendarFeeds";
 
@@ -719,7 +718,7 @@ fn sort_events(events: &mut [CalendarEvent], local: Tz) {
 
 /// `None` when the store cannot be read (keep the current feeds rather than drop them).
 fn read_feeds(app: &AppHandle) -> Option<Vec<FeedConfig>> {
-    match app.store(SETTINGS_FILE) {
+    match app.store(crate::paths::settings_store_file()) {
         Ok(store) => Some(parse_feeds(store.get(FEEDS_KEY).as_ref())),
         Err(e) => {
             tracing::warn!("calendar: settings store unavailable: {e}");
