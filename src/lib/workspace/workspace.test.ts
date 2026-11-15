@@ -534,6 +534,32 @@ describe('WorkspaceStore', () => {
 		expect(store.removeWidget('nope')).toBeNull();
 	});
 
+	it('removes a hidden (unplaced) widget and undo puts it back hidden, never lost', async () => {
+		const { store } = setup();
+		await store.init();
+		store.create('Blank');
+		for (let i = 0; i < 4; i++) store.addWidget('todo', { w: 4, h: 2 }); // fills 8×4
+		const lost = store.setGrid({ cols: 6, rows: 3 });
+		expect(lost.length).toBeGreaterThan(0);
+		const hiddenId = lost[0];
+		const before = JSON.parse(JSON.stringify(store.active.widgets.find((w) => w.instance === hiddenId)));
+
+		const removed = store.removeWidget(hiddenId)!;
+		expect(removed.hidden).toBe(true);
+		expect(store.active.widgets.some((w) => w.instance === hiddenId)).toBe(false);
+		expect(store.unplaced[store.activeId]).not.toContain(hiddenId);
+
+		// No free slot on 6×3 for a 4×2: a normal restore would fail, a hidden one goes back as it was.
+		expect(store.restoreWidget(removed.workspace, removed.widget, removed.hidden)).toBe(true);
+		const back = store.active.widgets.find((w) => w.instance === hiddenId);
+		expect(back).toMatchObject(before);
+		expect(layout(store.active.widgets, store.active.grid).unplaced.map((w) => w.instance)).toContain(hiddenId);
+
+		// A placed widget reports hidden: false.
+		const placedId = layout(store.active.widgets, store.active.grid).placed[0].instance;
+		expect(store.removeWidget(placedId)!.hidden).toBe(false);
+	});
+
 	it('updateSettings rejects with the backend error and re-syncs', async () => {
 		const backend = storageBackend(memoryStorage());
 		const real = backend.setSettings.bind(backend);

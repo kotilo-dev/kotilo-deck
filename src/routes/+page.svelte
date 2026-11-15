@@ -69,9 +69,9 @@
 		rules: () => store.settings.autoSwitch,
 		hasWorkspace: (id) => store.workspaces.some((w) => w.id === id),
 		activeId: () => store.activeId,
+		// Never yank the layout away mid-edit: the switcher defers the trigger until edit mode ends.
+		held: () => ui.editing,
 		switchTo: (id) => {
-			// Never yank the layout away mid-edit; the trigger is simply skipped.
-			if (ui.editing) return;
 			store.switchTo(id);
 			const name = store.workspaces.find((w) => w.id === id)?.name ?? id;
 			ui.say(t('shell.autoSwitch.switched', { name }));
@@ -120,6 +120,14 @@
 			// catches up on the latest due rule.
 			return subscribeTick((now) => switcher.evaluate(now.getTime()));
 		});
+	});
+
+	// Edit mode ended (Done, Esc, layout lock…): apply an auto-switch that fired meanwhile, if still due.
+	let wasEditing = false;
+	$effect(() => {
+		const editing = ui.editing;
+		if (wasEditing && !editing) untrack(() => switcher.resume(Date.now()));
+		wasEditing = editing;
 	});
 
 	let wallpapers = $state<Wallpaper[]>([]);

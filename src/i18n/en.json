@@ -167,7 +167,10 @@
 			"widgetLabel": "{name} widget, {size}",
 			"unplacedOne": "1 widget doesn't fit this grid: {names}",
 			"undo": "Undo",
-			"undoNoRoom": "No room to put {name} back"
+			"undoNoRoom": "No room to put {name} back",
+			"hiddenTitle": "Hidden widgets",
+			"hiddenHelp": "These don't fit this grid. Raise the density to show them, or remove them.",
+			"hiddenRemove": "Remove {name}"
 		},
 		"drawer": {
 			"title": "Add widget",

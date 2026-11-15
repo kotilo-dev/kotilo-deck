@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import mocha from './themes/catppuccin-mocha.json';
 import latte from './themes/catppuccin-latte.json';
-import { GLASS_MIN_OPACITY, GLASS_MUTED_LIFT, glassSurfaceOpacity, hexToRgb, parseTheme, themeToCssVars, ThemeError } from './loader';
+import {
+	DEFAULT_FONT_MONO,
+	DEFAULT_FONT_UI,
+	DEFAULT_RADIUS,
+	GLASS_MIN_OPACITY,
+	GLASS_MUTED_LIFT,
+	glassSurfaceOpacity,
+	hexToRgb,
+	isFontList,
+	isRadius,
+	parseTheme,
+	themeToCssVars,
+	ThemeError
+} from './loader';
 import { contrastRatio, mixHex } from './contrast';
 import {
 	bundledThemes,
@@ -43,6 +56,61 @@ describe('parseTheme', () => {
 		expect(t.radius).toBe('16px');
 		expect(t.opacity.surface).toBe(0.85);
 		expect(t.font.mono).toContain('JetBrains Mono');
+	});
+
+	it('keeps a valid radius and font list', () => {
+		const t = parseTheme({ ...mocha, radius: ' 1.25rem ', font: { ui: `"Noto Sans", 'Segoe UI', system-ui`, mono: 'Fira Code, monospace' } });
+		expect(t.radius).toBe('1.25rem');
+		expect(t.font).toEqual({ ui: `"Noto Sans", 'Segoe UI', system-ui`, mono: 'Fira Code, monospace' });
+		for (const ok of ['0', '16px', '.5em', '8%']) expect(isRadius(ok)).toBe(true);
+		for (const ok of ['Inter', 'ヒラギノ角ゴシック, sans-serif', '"JetBrains Mono"']) expect(isFontList(ok)).toBe(true);
+	});
+
+	it('no bundled theme falls back: its own radius and fonts all pass', () => {
+		const raw = import.meta.glob<Record<string, any>>('./themes/*.json', { eager: true, import: 'default' });
+		const bad: string[] = [];
+		for (const [file, t] of Object.entries(raw)) {
+			if (t.radius !== undefined && !isRadius(t.radius)) bad.push(`${file} radius`);
+			if (t.font?.ui !== undefined && !isFontList(t.font.ui)) bad.push(`${file} font.ui`);
+			if (t.font?.mono !== undefined && !isFontList(t.font.mono)) bad.push(`${file} font.mono`);
+		}
+		expect(Object.keys(raw).length).toBeGreaterThan(10);
+		expect(bad).toEqual([]);
+	});
+
+	it('falls back to the default radius and fonts when they are not safe CSS values', () => {
+		const bad = [
+			'16px; color: red',
+			'calc(100% - 1px)',
+			'var(--x)',
+			'-4px',
+			'16',
+			'px',
+			'',
+			16,
+			null
+		];
+		for (const radius of bad) expect(parseTheme({ ...mocha, radius }).radius).toBe(DEFAULT_RADIUS);
+
+		const badFonts = [
+			'Inter; } body { display: none',
+			'url(https://example.com/x.woff)',
+			'var(--k-font-mono)',
+			'"Inter',
+			'"a\\"b"',
+			'Inter,,sans-serif',
+			'',
+			'a'.repeat(201),
+			42,
+			{ name: 'Inter' }
+		];
+		for (const f of badFonts) {
+			const t = parseTheme({ ...mocha, font: { ui: f, mono: f } });
+			expect(t.font).toEqual({ ui: DEFAULT_FONT_UI, mono: DEFAULT_FONT_MONO });
+		}
+		// Each font falls back on its own.
+		expect(parseTheme({ ...mocha, font: { ui: 'Inter', mono: 'x;y' } }).font).toEqual({ ui: 'Inter', mono: DEFAULT_FONT_MONO });
+		expect(themeToCssVars(parseTheme({ ...mocha, radius: '1px;x' }))['--k-radius']).toBe(DEFAULT_RADIUS);
 	});
 });
 

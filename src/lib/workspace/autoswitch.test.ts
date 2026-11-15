@@ -3,6 +3,7 @@ import type { AutoSwitchRule, CalendarEvent, PomodoroState } from '#lib/ipc/inde
 import {
 	AutoSwitcher,
 	calendarCrossings,
+	DEFER_MAX_MS,
 	needsCalendar,
 	parseAt,
 	pickLatest,
@@ -47,7 +48,7 @@ const event = (id: string, start: number, end: number, feedId = 'work', allDay =
 
 function harness(rules: AutoSwitchRule[], opts: { workspaces?: string[]; active?: string; last?: number | null } = {}) {
 	const workspaces = opts.workspaces ?? ['focus', 'ops', 'agents', 'evening'];
-	const state = { active: opts.active ?? 'ops', stored: opts.last ?? null, switches: [] as string[] };
+	const state = { active: opts.active ?? 'ops', stored: opts.last ?? null, switches: [] as string[], editing: false, now: 0 };
 	const deps: AutoSwitchDeps = {
 		rules: () => rules,
 		hasWorkspace: (id) => workspaces.includes(id),
@@ -57,7 +58,9 @@ function harness(rules: AutoSwitchRule[], opts: { workspaces?: string[]; active?
 			state.switches.push(id);
 		},
 		loadLast: () => state.stored,
-		saveLast: (ms) => (state.stored = ms)
+		saveLast: (ms) => (state.stored = ms),
+		held: () => state.editing,
+		now: () => state.now
 	};
 	return { sw: new AutoSwitcher(deps), state };
 }
@@ -238,6 +241,83 @@ describe('AutoSwitcher', () => {
 		expect(state.switches).toEqual([]);
 		sw.evaluate(at(MON, 10, 0) + 5);
 		expect(state.switches).toEqual(['agents']);
+	});
+
+	it('defers a switch fired during edit mode and applies it when editing ends', () => {
+		const { sw, state } = harness([timeRule('a', '09:00', 'focus')]);
+		sw.start(at(MON, 8, 59));
+		state.editing = true;
+		sw.evaluate(at(MON, 9, 0) + 5);
+		expect(state.switches).toEqual([]);
+		state.editing = false;
+		sw.resume(at(MON, 9, 3));
+		expect(state.switches).toEqual(['focus']);
+		sw.resume(at(MON, 9, 4)); // applied once
+		expect(state.switches).toEqual(['focus']);
+	});
+
+	it('applies only the latest deferred switch; a later one for the shown workspace cancels it', () => {
+		const rules = [timeRule('a', '09:00', 'focus'), timeRule('b', '09:05', 'agents'), timeRule('c', '09:10', 'ops')];
+		const { sw, state } = harness(rules);
+		sw.start(at(MON, 8, 59));
+		state.editing = true;
+		sw.evaluate(at(MON, 9, 0) + 5);
+		sw.evaluate(at(MON, 9, 5) + 5);
+		state.editing = false;
+		sw.resume(at(MON, 9, 6));
+		expect(state.switches).toEqual(['agents']);
+
+		const { sw: sw2, state: s2 } = harness(rules);
+		sw2.start(at(MON, 8, 59));
+		s2.editing = true;
+		sw2.evaluate(at(MON, 9, 5) + 5); // → agents (deferred)
+		sw2.evaluate(at(MON, 9, 10) + 5); // → ops, already shown: cancels it
+		s2.editing = false;
+		sw2.resume(at(MON, 9, 11));
+		expect(s2.switches).toEqual([]);
+	});
+
+	it('drops a deferred switch that went stale, lost its rule, or after a manual switch', () => {
+		const rules = [timeRule('a', '09:00', 'focus')];
+		const stale = harness(rules);
+		stale.sw.start(at(MON, 8, 59));
+		stale.state.editing = true;
+		stale.sw.evaluate(at(MON, 9, 0) + 5);
+		stale.state.editing = false;
+		stale.sw.resume(at(MON, 9, 0) + DEFER_MAX_MS + 1000);
+		expect(stale.state.switches).toEqual([]);
+
+		const manual = harness(rules);
+		manual.sw.start(at(MON, 8, 59));
+		manual.state.editing = true;
+		manual.sw.evaluate(at(MON, 9, 0) + 5);
+		manual.state.active = 'evening'; // hotkey / tray while editing
+		manual.state.editing = false;
+		manual.sw.resume(at(MON, 9, 1));
+		expect(manual.state.active).toBe('evening');
+		expect(manual.state.switches).toEqual([]);
+
+		const list = [...rules];
+		const gone = harness(list);
+		gone.sw.start(at(MON, 8, 59));
+		gone.state.editing = true;
+		gone.sw.evaluate(at(MON, 9, 0) + 5);
+		list[0] = { ...list[0], enabled: false };
+		gone.state.editing = false;
+		gone.sw.resume(at(MON, 9, 1));
+		expect(gone.state.switches).toEqual([]);
+	});
+
+	it('defers pomodoro triggers too, timed by the injected clock', () => {
+		const rules: AutoSwitchRule[] = [{ id: 'e', enabled: true, trigger: { type: 'pomodoro-end' }, workspace: 'evening' }];
+		const { sw, state } = harness(rules);
+		state.editing = true;
+		state.now = at(MON, 10);
+		sw.phaseEnd('focus');
+		expect(state.switches).toEqual([]);
+		state.editing = false;
+		sw.resume(at(MON, 10, 2));
+		expect(state.switches).toEqual(['evening']);
 	});
 
 	it('makes unique rule ids', () => {
