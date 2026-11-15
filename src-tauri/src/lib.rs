@@ -35,11 +35,19 @@ pub fn run() {
     logging::init();
     // Phase 5: crash logs; installed before anything else can panic.
     crash::install();
-    let builder = tauri::Builder::default()
-        // Must be first: a second launch focuses the running deck and exits.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    if paths::data_dir_override().is_some() {
+        tracing::info!("data folder overridden by {}", paths::DATA_DIR_ENV);
+    }
+    let mut builder = tauri::Builder::default();
+    // Must be first: a second launch focuses the running deck and exits. A deck started on
+    // its own data folder (`KOTILO_DECK_DATA_DIR`, the soak run) shares no state with the
+    // user's deck, so it may run beside it.
+    if paths::data_dir_override().is_none() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             window::show(app)
-        }))
+        }));
+    }
+    let builder = builder
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
