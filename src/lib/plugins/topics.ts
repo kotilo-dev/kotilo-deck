@@ -8,6 +8,7 @@ import {
 	mediaSubscribe,
 	mediaUnsubscribe,
 	on,
+	onMediaState,
 	pomodoroState,
 	systemSubscribe,
 	systemUnsubscribe,
@@ -30,7 +31,7 @@ const listenTo =
 
 export const TOPIC_IPC: Record<PluginTopic, TopicIpc> = {
 	system: { subscribe: systemSubscribe, unsubscribe: systemUnsubscribe, listen: listenTo('system://sample') },
-	media: { subscribe: mediaSubscribe, unsubscribe: mediaUnsubscribe, initial: mediaState, listen: listenTo('media://state') },
+	media: { subscribe: mediaSubscribe, unsubscribe: mediaUnsubscribe, initial: mediaState, listen: (cb) => onMediaState(cb) },
 	// Backend-owned timer: no subscribe command, `pomodoro://state` fires on every change.
 	pomodoro: { initial: pomodoroState, listen: listenTo('pomodoro://state') }
 };

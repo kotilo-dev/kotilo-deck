@@ -692,9 +692,18 @@ pub fn merge(base: &DeckSettings, patch: &Map<String, Value>) -> Result<DeckSett
     Ok(merged)
 }
 
-/// Serialises read-modify-write cycles on the store.
+/// `store` serialises read-modify-write cycles on the store ([`update`]). `apply`
+/// serialises whole [`apply_patch`] calls, so their hotkey / autostart side effects are
+/// decided from the same old state the save starts from, and broadcasts go out in save
+/// order. Only `apply_patch` changes those two fields, so other `update` callers (the
+/// tray's monitor pick, on the main thread) never take `apply`. `store` is never held
+/// across side effects: registering a hotkey waits for the main thread, which may itself
+/// be waiting for `store`.
 #[derive(Default)]
-pub struct SettingsLock(Mutex<()>);
+pub struct SettingsLock {
+    store: Mutex<()>,
+    apply: Mutex<()>,
+}
 
 /// Whether `settings.json` is on disk (readable or not).
 fn store_file_exists(app: &AppHandle) -> bool {
@@ -724,7 +733,7 @@ pub fn update(
     patch: &Map<String, Value>,
 ) -> Result<(DeckSettings, DeckSettings), String> {
     let lock = app.state::<SettingsLock>();
-    let _guard = lock.0.lock().unwrap_or_else(|p| p.into_inner());
+    let _guard = lock.store.lock().unwrap_or_else(|p| p.into_inner());
     let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
     let old = from_stored_on_disk(
         store.entries().into_iter().collect(),
@@ -768,8 +777,12 @@ pub fn sync_autostart(app: &AppHandle, settings: &DeckSettings) {
 
 /// `settings_set` without the IPC wrapper. Side effects that can fail (hotkey, autostart)
 /// are applied before saving and rolled back if saving fails; then window side effects are
-/// applied and `settings://changed` is broadcast.
+/// applied and `settings://changed` is broadcast. Concurrent calls run one at a time
+/// (`SettingsLock::apply`), so the side effects always match what gets saved. Never call
+/// it on the main thread (hotkey registration waits for it).
 pub fn apply_patch(app: &AppHandle, patch: &Map<String, Value>) -> Result<DeckSettings, String> {
+    let lock = app.state::<SettingsLock>();
+    let _apply = lock.apply.lock().unwrap_or_else(|p| p.into_inner());
     let before = load(app);
     let wanted = merge(&before, patch)?;
     let hotkey_changed = wanted.hotkey != before.hotkey;
@@ -1274,5 +1287,15 @@ mod tests {
         for bad in ["", ".hidden", "a/b.png", "a\\b.png", "C:x.png", ".."] {
             assert!(!valid_file_name(bad), "{bad}");
         }
+    }
+
+    /// `apply_patch` holds `apply` across hotkey registration (which waits for the main
+    /// thread); the main thread's `update` (tray monitor pick) must still get `store`.
+    #[test]
+    fn apply_lock_never_blocks_store_updates() {
+        let lock = SettingsLock::default();
+        let _apply = lock.apply.lock().unwrap();
+        assert!(lock.store.try_lock().is_ok());
+        assert!(lock.apply.try_lock().is_err(), "a second apply waits");
     }
 }

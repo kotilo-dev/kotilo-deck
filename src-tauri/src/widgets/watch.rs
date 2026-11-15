@@ -3,7 +3,7 @@
 //! state read + event. Nothing here polls: threads block until a signal or stop arrives.
 
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use crate::platform::{self, ChangeFn, Watch};
@@ -42,17 +42,52 @@ impl Counts {
     }
 }
 
+struct State<H> {
+    counts: Counts,
+    handle: Option<H>,
+    /// A `start()` is running outside the lock.
+    starting: bool,
+}
+
 /// Subscriber counts + the running handle (dropping the handle stops the work). The work
 /// runs while the deck and remote counts together are above zero.
-pub struct Subscription<H>(Mutex<(Counts, Option<H>)>);
+///
+/// `start()` runs outside the mutex (starting a watcher waits for WinRT / D-Bus setup), so
+/// `reset()`, which runs on the main thread on every page load, never waits for it.
+/// At most one `start()` runs at a time: later subscribers wait on `started`.
+pub struct Subscription<H> {
+    state: Mutex<State<H>>,
+    started: Condvar,
+}
 
 impl<H> Default for Subscription<H> {
     fn default() -> Self {
-        Self(Mutex::new((Counts::default(), None)))
+        Self {
+            state: Mutex::new(State {
+                counts: Counts::default(),
+                handle: None,
+                starting: false,
+            }),
+            started: Condvar::new(),
+        }
+    }
+}
+
+/// Clears `starting` and wakes waiters even if `start()` panics.
+struct Starting<'a, H>(&'a Subscription<H>);
+
+impl<H> Drop for Starting<'_, H> {
+    fn drop(&mut self) {
+        self.0.lock().starting = false;
+        self.0.started.notify_all();
     }
 }
 
 impl<H> Subscription<H> {
+    fn lock(&self) -> MutexGuard<'_, State<H>> {
+        self.state.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
     #[cfg(test)]
     pub fn subscribe(&self, start: impl FnOnce() -> Option<H>) {
         self.subscribe_as(Owner::Deck, start);
@@ -63,24 +98,44 @@ impl<H> Subscription<H> {
         self.unsubscribe_as(Owner::Deck);
     }
 
-    /// Adds a subscriber; starts the work on 0 → 1 (or if a previous start failed).
+    /// Adds a subscriber; starts the work on 0 → 1 (or if a previous start failed). Returns
+    /// once the work is running or its start failed. If every subscriber left while
+    /// `start()` ran, the fresh handle is dropped again.
     pub fn subscribe_as(&self, owner: Owner, start: impl FnOnce() -> Option<H>) {
-        let mut s = self.0.lock().unwrap_or_else(|p| p.into_inner());
-        let n = s.0.get(owner);
+        let mut s = self.lock();
+        let n = s.counts.get(owner);
         *n = n.saturating_add(1);
-        if s.1.is_none() {
-            s.1 = start();
+        while s.starting {
+            s = self.started.wait(s).unwrap_or_else(|p| p.into_inner());
         }
+        if s.handle.is_some() {
+            return;
+        }
+        s.starting = true;
+        drop(s);
+        let guard = Starting(self);
+        let handle = start();
+        let stale = {
+            let mut s = self.lock();
+            if s.counts.total() > 0 {
+                s.handle = handle;
+                None
+            } else {
+                handle
+            }
+        };
+        drop(guard);
+        drop(stale); // outside the lock, like `unsubscribe_as`
     }
 
     /// Removes a subscriber; stops the work when no subscriber of either owner is left.
     pub fn unsubscribe_as(&self, owner: Owner) {
         let handle = {
-            let mut s = self.0.lock().unwrap_or_else(|p| p.into_inner());
-            let n = s.0.get(owner);
+            let mut s = self.lock();
+            let n = s.counts.get(owner);
             *n = n.saturating_sub(1);
-            if s.0.total() == 0 {
-                s.1.take()
+            if s.counts.total() == 0 {
+                s.handle.take()
             } else {
                 None
             }
@@ -90,12 +145,17 @@ impl<H> Subscription<H> {
 
     /// Drops every deck subscription (webview reload never runs widget cleanup); the work
     /// keeps running for remote subscribers. Returns the deck count that was dropped.
+    /// Never waits for a running `start()`.
     pub fn reset(&self) -> u32 {
         let (count, handle) = {
-            let mut s = self.0.lock().unwrap_or_else(|p| p.into_inner());
-            let count = s.0.deck;
-            s.0.deck = 0;
-            let handle = if s.0.remote == 0 { s.1.take() } else { None };
+            let mut s = self.lock();
+            let count = s.counts.deck;
+            s.counts.deck = 0;
+            let handle = if s.counts.remote == 0 {
+                s.handle.take()
+            } else {
+                None
+            };
             (count, handle)
         };
         drop(handle);
@@ -104,12 +164,12 @@ impl<H> Subscription<H> {
 
     #[cfg(test)]
     pub fn count(&self) -> u32 {
-        self.0.lock().unwrap_or_else(|p| p.into_inner()).0.total()
+        self.lock().counts.total()
     }
 
     #[cfg(test)]
     pub fn is_running(&self) -> bool {
-        self.0.lock().unwrap_or_else(|p| p.into_inner()).1.is_some()
+        self.lock().handle.is_some()
     }
 }
 
@@ -273,6 +333,81 @@ mod tests {
         sub.subscribe(|| Some(1));
         assert!(sub.is_running());
         assert_eq!(sub.count(), 2);
+    }
+
+    /// A slow `start()` (WinRT / D-Bus setup) must not hold up `reset()` on the main
+    /// thread; a reset during the start drops the fresh handle, and later subscribers wait
+    /// for the running start instead of starting a second one.
+    #[test]
+    fn reset_never_waits_for_a_slow_start() {
+        let sub = Arc::new(Subscription::<Flag>::default());
+        let dropped = Arc::new(AtomicUsize::new(0));
+        let starts = Arc::new(AtomicUsize::new(0));
+        let (entered_tx, entered_rx) = mpsc::channel::<()>();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let first = {
+            let (sub, dropped, starts) = (sub.clone(), dropped.clone(), starts.clone());
+            std::thread::spawn(move || {
+                sub.subscribe(|| {
+                    starts.fetch_add(1, Ordering::SeqCst);
+                    entered_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                    Some(Flag(dropped))
+                });
+            })
+        };
+        entered_rx.recv().unwrap();
+        // Start is blocked: reset returns at once (it used to wait on the mutex).
+        let begin = Instant::now();
+        assert_eq!(sub.reset(), 1);
+        assert!(begin.elapsed() < Duration::from_millis(500));
+        // A subscriber arriving now waits for the running start rather than starting again.
+        let second = {
+            let (sub, starts) = (sub.clone(), starts.clone());
+            std::thread::spawn(move || {
+                sub.subscribe(|| {
+                    starts.fetch_add(1, Ordering::SeqCst);
+                    None
+                });
+            })
+        };
+        std::thread::sleep(Duration::from_millis(50));
+        release_tx.send(()).unwrap();
+        first.join().unwrap();
+        second.join().unwrap();
+        assert_eq!(starts.load(Ordering::SeqCst), 1, "exactly one start");
+        assert!(sub.is_running(), "the second subscriber keeps the work");
+        assert_eq!(sub.count(), 1);
+        assert_eq!(dropped.load(Ordering::SeqCst), 0);
+        sub.unsubscribe();
+        assert_eq!(dropped.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn start_finishing_with_no_subscribers_is_dropped() {
+        let sub = Arc::new(Subscription::<Flag>::default());
+        let dropped = Arc::new(AtomicUsize::new(0));
+        let (entered_tx, entered_rx) = mpsc::channel::<()>();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let t = {
+            let (sub, dropped) = (sub.clone(), dropped.clone());
+            std::thread::spawn(move || {
+                sub.subscribe(|| {
+                    entered_tx.send(()).unwrap();
+                    release_rx.recv().unwrap();
+                    Some(Flag(dropped))
+                });
+            })
+        };
+        entered_rx.recv().unwrap();
+        sub.unsubscribe();
+        release_tx.send(()).unwrap();
+        t.join().unwrap();
+        assert!(!sub.is_running());
+        assert_eq!(dropped.load(Ordering::SeqCst), 1);
+        // The next subscriber starts again.
+        sub.subscribe(|| Some(Flag(dropped.clone())));
+        assert!(sub.is_running());
     }
 
     #[test]

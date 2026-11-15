@@ -55,6 +55,10 @@ pub struct PluginWidget {
     pub error_code: Option<&'static str>,
     /// iframe `src` for the entry file inside the Tauri webview; `None` when invalid.
     pub entry_url: Option<String>,
+    /// Newest file modification in the folder (Unix ms); `None` when invalid. A change
+    /// makes the list differ, so `plugin://changed` fires and the frame reloads with it as
+    /// a cache-busting query.
+    pub modified: Option<u64>,
 }
 
 /// CSP sent with every plugin file (URI scheme and LAN `/plugins/...`). No `connect-src`.
@@ -96,13 +100,14 @@ fn invalid(folder: &str, why: Rejection) -> PluginWidget {
         error: Some(why.message),
         error_code: Some(why.code),
         entry_url: None,
+        modified: None,
     }
 }
 
 /// Validates one plugin folder (name already checked).
 fn load(dir: &Path, folder: &str) -> PluginWidget {
     match load_manifest(dir, folder) {
-        Ok(m) => {
+        Ok((m, modified)) => {
             let entry = m["entry"].as_str().unwrap_or(manifest::DEFAULT_ENTRY);
             PluginWidget {
                 id: format!("ext.{folder}"),
@@ -111,14 +116,16 @@ fn load(dir: &Path, folder: &str) -> PluginWidget {
                 manifest: Some(m),
                 error: None,
                 error_code: None,
+                modified: Some(modified),
             }
         }
         Err(e) => invalid(folder, e),
     }
 }
 
-fn load_manifest(dir: &Path, folder: &str) -> Result<Value, Rejection> {
-    serve::check_limits(dir)?;
+/// The validated manifest plus the folder's newest file time.
+fn load_manifest(dir: &Path, folder: &str) -> Result<(Value, u64), Rejection> {
+    let modified = serve::check_limits(dir)?;
     let path = dir.join("manifest.json");
     let meta = match fs::symlink_metadata(&path) {
         Ok(m) if m.is_file() => m,
@@ -150,6 +157,7 @@ fn load_manifest(dir: &Path, folder: &str) -> Result<Value, Rejection> {
         )
     })?;
     manifest::validate(folder, &raw, |entry| serve::resolve(dir, entry).is_some())
+        .map(|m| (m, modified))
 }
 
 /// Every plugin folder under `root`, sorted by folder name. `.`/`_`-prefixed entries and
@@ -296,7 +304,8 @@ pub fn start(app: &AppHandle) {
     let debouncer = new_debouncer(WATCH_DEBOUNCE, move |res: DebounceEventResult| match res {
         Ok(_) => {
             // Rescan on any change; only tell the UI when the list actually differs
-            // (folder added/removed, manifest edited, entry appeared/disappeared).
+            // (folder added/removed, manifest edited, entry appeared/disappeared, or any
+            // plugin file edited: `modified` moved).
             if rescan(&handle).1 {
                 tracing::debug!("plugin widgets changed");
                 let _ = handle.emit(EVENT_PLUGIN_CHANGED, json!({}));
@@ -539,7 +548,31 @@ mod tests {
         let v = serde_json::to_value(invalid("x", "bad".into())).unwrap();
         assert_eq!(
             v,
-            json!({"id": "ext.x", "folder": "x", "manifest": null, "error": "bad", "errorCode": "other", "entryUrl": null})
+            json!({"id": "ext.x", "folder": "x", "manifest": null, "error": "bad", "errorCode": "other", "entryUrl": null, "modified": null})
         );
+    }
+
+    /// Editing the entry file (manifest untouched) changes the scan, so the watcher emits
+    /// `plugin://changed` and the frame reloads.
+    #[test]
+    fn editing_the_entry_changes_the_scan() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write_plugin(root, "hello", manifest_for("hello"));
+        let before = scan(root);
+        let t0 = before[0].modified.unwrap();
+        assert!(t0 > 0);
+        let entry = fs::OpenOptions::new()
+            .write(true)
+            .open(root.join("hello/index.html"))
+            .unwrap();
+        entry
+            .set_modified(std::time::UNIX_EPOCH + Duration::from_millis(t0 + 2_000))
+            .unwrap();
+        drop(entry);
+        let after = scan(root);
+        assert_eq!(after[0].modified, Some(t0 + 2_000));
+        assert_ne!(before, after);
+        assert_eq!(before[0].entry_url, after[0].entry_url);
     }
 }

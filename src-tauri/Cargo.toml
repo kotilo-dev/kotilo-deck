@@ -89,6 +89,8 @@ windows = { version = "0.62", features = [
     # Phase 3 companion_open_desktop (URL scheme lookup + ShellExecute)
     "Win32_System_Registry",
     "Win32_UI_Shell",
+    # Tray / notification language (GetUserDefaultUILanguage, LCIDToLocaleName)
+    "Win32_Globalization",
 ] }
 # `#[implement]` / `#[interface]` (COM callbacks, IPolicyConfig) expand to `::windows_core`.
 windows-core = "0.62"

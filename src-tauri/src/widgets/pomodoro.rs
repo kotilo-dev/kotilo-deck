@@ -21,6 +21,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Notify;
 
+use crate::i18n::{Lang, Msg, Text};
 use crate::migrations;
 use crate::settings::PomodoroSettings;
 
@@ -587,25 +588,36 @@ fn broadcast(app: &AppHandle, state: &PomodoroState) {
     crate::companion::broadcast_pomodoro(app, state);
 }
 
-fn minutes_label(seconds: u32) -> String {
-    format!("{} min", seconds.div_ceil(60))
+/// Notification title and body for a phase end, in `lang`.
+fn notice(
+    lang: Lang,
+    ended: Phase,
+    next: Phase,
+    auto: bool,
+    state: &PomodoroState,
+) -> (&'static str, String) {
+    let title = lang.text(match ended {
+        Phase::Focus => Text::FocusComplete,
+        _ => Text::BreakOver,
+    });
+    let len = lang.msg(Msg::Minutes(state.duration.div_ceil(60)));
+    let body = match next {
+        Phase::ShortBreak | Phase::LongBreak => lang.msg(Msg::Break {
+            long: next == Phase::LongBreak,
+            started: auto,
+            len: &len,
+        }),
+        _ => lang.msg(Msg::Focus {
+            session: state.session,
+            len: auto.then_some(len.as_str()),
+        }),
+    };
+    (title, body)
 }
 
-/// OS notification + `pomodoro://phase-end`. English until backend strings are localised.
+/// OS notification + `pomodoro://phase-end`.
 fn announce(app: &AppHandle, ended: Phase, next: Phase, auto: bool, state: &PomodoroState) {
-    let title = match ended {
-        Phase::Focus => "Focus session complete",
-        _ => "Break over",
-    };
-    let len = minutes_label(state.duration);
-    let body = match (next, auto) {
-        (Phase::ShortBreak, false) => format!("Time for a short break ({len})"),
-        (Phase::LongBreak, false) => format!("Time for a long break ({len})"),
-        (Phase::ShortBreak, true) => format!("Short break started ({len})"),
-        (Phase::LongBreak, true) => format!("Long break started ({len})"),
-        (_, false) => format!("Ready for focus session {}", state.session),
-        (_, true) => format!("Focus session {} started ({len})", state.session),
-    };
+    let (title, body) = notice(crate::i18n::lang(), ended, next, auto, state);
     let sound = crate::settings::load(app).notification_sound;
     let mut n = app.notification().builder().title(title).body(body);
     if sound {
@@ -763,6 +775,85 @@ mod tests {
     }
 
     const T0: i64 = 1_793_733_000_000;
+
+    #[test]
+    fn phase_end_notices_are_localised() {
+        let state = |duration, session| PomodoroState {
+            phase: Phase::Idle,
+            running: false,
+            ends_at: None,
+            remaining: duration,
+            duration,
+            session,
+            sessions_per_cycle: 4,
+        };
+        let n = |lang, ended, next, auto, s: &PomodoroState| notice(lang, ended, next, auto, s);
+        assert_eq!(
+            n(
+                Lang::En,
+                Phase::Focus,
+                Phase::ShortBreak,
+                false,
+                &state(300, 2)
+            ),
+            (
+                "Focus session complete",
+                "Time for a short break (5 min)".into()
+            )
+        );
+        assert_eq!(
+            n(
+                Lang::En,
+                Phase::Focus,
+                Phase::LongBreak,
+                true,
+                &state(899, 4)
+            )
+            .1,
+            "Long break started (15 min)"
+        );
+        assert_eq!(
+            n(
+                Lang::En,
+                Phase::ShortBreak,
+                Phase::Focus,
+                false,
+                &state(1500, 3)
+            ),
+            ("Break over", "Ready for focus session 3".into())
+        );
+        assert_eq!(
+            n(
+                Lang::En,
+                Phase::ShortBreak,
+                Phase::Focus,
+                true,
+                &state(1500, 3)
+            )
+            .1,
+            "Focus session 3 started (25 min)"
+        );
+        assert_eq!(
+            n(
+                Lang::Tr,
+                Phase::Focus,
+                Phase::ShortBreak,
+                false,
+                &state(300, 2)
+            ),
+            ("Odak oturumu tamamlandı", "Kısa mola zamanı (5 dk)".into())
+        );
+        assert_eq!(
+            n(
+                Lang::Tr,
+                Phase::LongBreak,
+                Phase::Focus,
+                true,
+                &state(1500, 1)
+            ),
+            ("Mola bitti", "1. odak oturumu başladı (25 dk)".into())
+        );
+    }
 
     #[test]
     fn idle_state_matches_contract() {
