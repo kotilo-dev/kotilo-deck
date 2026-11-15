@@ -1,194 +1,139 @@
-//! `TZID` → IANA zone. Outlook/Exchange feeds use Windows zone names ("W. Europe Standard
-//! Time"); Google/iCloud use IANA names, sometimes with a vendor prefix
-//! (`/mozilla.org/20050126_1/Europe/Berlin`). Unknown names resolve to `None` and the
-//! caller treats the time as floating (local).
+//! `TZID` → zone, in this order:
+//!
+//! 1. Normalised name: IANA as is, a Windows zone name via CLDR ([`windows_zones`]), or
+//!    an IANA name behind a vendor prefix (`/mozilla.org/20050126_1/Europe/Berlin`,
+//!    `tzone://Microsoft/…`).
+//! 2. The feed's own `VTIMEZONE` with that `TZID` ([`CustomTz`]), parsed lazily once.
+//! 3. Unknown: `None`, the caller treats the time as floating (local); logged once per
+//!    `TZID` per process.
+
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use chrono_tz::Tz;
 
-/// Windows zone → IANA (CLDR `windowsZones.xml`, territory "001").
-const WINDOWS_ZONES: &[(&str, &str)] = &[
-    ("Dateline Standard Time", "Etc/GMT+12"),
-    ("UTC-11", "Etc/GMT+11"),
-    ("Aleutian Standard Time", "America/Adak"),
-    ("Hawaiian Standard Time", "Pacific/Honolulu"),
-    ("Marquesas Standard Time", "Pacific/Marquesas"),
-    ("Alaskan Standard Time", "America/Anchorage"),
-    ("UTC-09", "Etc/GMT+9"),
-    ("Pacific Standard Time (Mexico)", "America/Tijuana"),
-    ("UTC-08", "Etc/GMT+8"),
-    ("Pacific Standard Time", "America/Los_Angeles"),
-    ("US Mountain Standard Time", "America/Phoenix"),
-    ("Mountain Standard Time (Mexico)", "America/Mazatlan"),
-    ("Mountain Standard Time", "America/Denver"),
-    ("Yukon Standard Time", "America/Whitehorse"),
-    ("Central America Standard Time", "America/Guatemala"),
-    ("Central Standard Time", "America/Chicago"),
-    ("Easter Island Standard Time", "Pacific/Easter"),
-    ("Central Standard Time (Mexico)", "America/Mexico_City"),
-    ("Canada Central Standard Time", "America/Regina"),
-    ("SA Pacific Standard Time", "America/Bogota"),
-    ("Eastern Standard Time (Mexico)", "America/Cancun"),
-    ("Eastern Standard Time", "America/New_York"),
-    ("Haiti Standard Time", "America/Port-au-Prince"),
-    ("Cuba Standard Time", "America/Havana"),
-    ("US Eastern Standard Time", "America/Indiana/Indianapolis"),
-    ("Turks And Caicos Standard Time", "America/Grand_Turk"),
-    ("Paraguay Standard Time", "America/Asuncion"),
-    ("Atlantic Standard Time", "America/Halifax"),
-    ("Venezuela Standard Time", "America/Caracas"),
-    ("Central Brazilian Standard Time", "America/Cuiaba"),
-    ("SA Western Standard Time", "America/La_Paz"),
-    ("Pacific SA Standard Time", "America/Santiago"),
-    ("Newfoundland Standard Time", "America/St_Johns"),
-    ("Tocantins Standard Time", "America/Araguaina"),
-    ("E. South America Standard Time", "America/Sao_Paulo"),
-    ("SA Eastern Standard Time", "America/Cayenne"),
-    ("Argentina Standard Time", "America/Argentina/Buenos_Aires"),
-    ("Greenland Standard Time", "America/Nuuk"),
-    ("Montevideo Standard Time", "America/Montevideo"),
-    ("Magallanes Standard Time", "America/Punta_Arenas"),
-    ("Saint Pierre Standard Time", "America/Miquelon"),
-    ("Bahia Standard Time", "America/Bahia"),
-    ("UTC-02", "Etc/GMT+2"),
-    ("Mid-Atlantic Standard Time", "Etc/GMT+2"),
-    ("Azores Standard Time", "Atlantic/Azores"),
-    ("Cape Verde Standard Time", "Atlantic/Cape_Verde"),
-    ("UTC", "Etc/UTC"),
-    ("Coordinated Universal Time", "Etc/UTC"),
-    ("GMT Standard Time", "Europe/London"),
-    ("Greenwich Standard Time", "Atlantic/Reykjavik"),
-    ("Sao Tome Standard Time", "Africa/Sao_Tome"),
-    ("Morocco Standard Time", "Africa/Casablanca"),
-    ("W. Europe Standard Time", "Europe/Berlin"),
-    ("Central Europe Standard Time", "Europe/Budapest"),
-    ("Romance Standard Time", "Europe/Paris"),
-    ("Central European Standard Time", "Europe/Warsaw"),
-    ("W. Central Africa Standard Time", "Africa/Lagos"),
-    ("Jordan Standard Time", "Asia/Amman"),
-    ("GTB Standard Time", "Europe/Bucharest"),
-    ("Middle East Standard Time", "Asia/Beirut"),
-    ("Egypt Standard Time", "Africa/Cairo"),
-    ("E. Europe Standard Time", "Europe/Chisinau"),
-    ("Syria Standard Time", "Asia/Damascus"),
-    ("West Bank Standard Time", "Asia/Hebron"),
-    ("South Africa Standard Time", "Africa/Johannesburg"),
-    ("FLE Standard Time", "Europe/Kyiv"),
-    ("Israel Standard Time", "Asia/Jerusalem"),
-    ("South Sudan Standard Time", "Africa/Juba"),
-    ("Kaliningrad Standard Time", "Europe/Kaliningrad"),
-    ("Sudan Standard Time", "Africa/Khartoum"),
-    ("Libya Standard Time", "Africa/Tripoli"),
-    ("Namibia Standard Time", "Africa/Windhoek"),
-    ("Arabic Standard Time", "Asia/Baghdad"),
-    ("Turkey Standard Time", "Europe/Istanbul"),
-    ("Arab Standard Time", "Asia/Riyadh"),
-    ("Belarus Standard Time", "Europe/Minsk"),
-    ("Russian Standard Time", "Europe/Moscow"),
-    ("E. Africa Standard Time", "Africa/Nairobi"),
-    ("Volgograd Standard Time", "Europe/Volgograd"),
-    ("Iran Standard Time", "Asia/Tehran"),
-    ("Arabian Standard Time", "Asia/Dubai"),
-    ("Astrakhan Standard Time", "Europe/Astrakhan"),
-    ("Azerbaijan Standard Time", "Asia/Baku"),
-    ("Russia Time Zone 3", "Europe/Samara"),
-    ("Mauritius Standard Time", "Indian/Mauritius"),
-    ("Saratov Standard Time", "Europe/Saratov"),
-    ("Georgian Standard Time", "Asia/Tbilisi"),
-    ("Caucasus Standard Time", "Asia/Yerevan"),
-    ("Afghanistan Standard Time", "Asia/Kabul"),
-    ("West Asia Standard Time", "Asia/Tashkent"),
-    ("Ekaterinburg Standard Time", "Asia/Yekaterinburg"),
-    ("Pakistan Standard Time", "Asia/Karachi"),
-    ("Qyzylorda Standard Time", "Asia/Qyzylorda"),
-    ("India Standard Time", "Asia/Kolkata"),
-    ("Sri Lanka Standard Time", "Asia/Colombo"),
-    ("Nepal Standard Time", "Asia/Kathmandu"),
-    ("Central Asia Standard Time", "Asia/Bishkek"),
-    ("Bangladesh Standard Time", "Asia/Dhaka"),
-    ("Omsk Standard Time", "Asia/Omsk"),
-    ("Myanmar Standard Time", "Asia/Yangon"),
-    ("SE Asia Standard Time", "Asia/Bangkok"),
-    ("Altai Standard Time", "Asia/Barnaul"),
-    ("W. Mongolia Standard Time", "Asia/Hovd"),
-    ("North Asia Standard Time", "Asia/Krasnoyarsk"),
-    ("N. Central Asia Standard Time", "Asia/Novosibirsk"),
-    ("Tomsk Standard Time", "Asia/Tomsk"),
-    ("China Standard Time", "Asia/Shanghai"),
-    ("North Asia East Standard Time", "Asia/Irkutsk"),
-    ("Singapore Standard Time", "Asia/Singapore"),
-    ("Malay Peninsula Standard Time", "Asia/Singapore"),
-    ("W. Australia Standard Time", "Australia/Perth"),
-    ("Taipei Standard Time", "Asia/Taipei"),
-    ("Ulaanbaatar Standard Time", "Asia/Ulaanbaatar"),
-    ("Aus Central W. Standard Time", "Australia/Eucla"),
-    ("Transbaikal Standard Time", "Asia/Chita"),
-    ("Tokyo Standard Time", "Asia/Tokyo"),
-    ("North Korea Standard Time", "Asia/Pyongyang"),
-    ("Korea Standard Time", "Asia/Seoul"),
-    ("Yakutsk Standard Time", "Asia/Yakutsk"),
-    ("Cen. Australia Standard Time", "Australia/Adelaide"),
-    ("AUS Central Standard Time", "Australia/Darwin"),
-    ("E. Australia Standard Time", "Australia/Brisbane"),
-    ("AUS Eastern Standard Time", "Australia/Sydney"),
-    ("West Pacific Standard Time", "Pacific/Port_Moresby"),
-    ("Tasmania Standard Time", "Australia/Hobart"),
-    ("Vladivostok Standard Time", "Asia/Vladivostok"),
-    ("Lord Howe Standard Time", "Australia/Lord_Howe"),
-    ("Bougainville Standard Time", "Pacific/Bougainville"),
-    ("Russia Time Zone 10", "Asia/Srednekolymsk"),
-    ("Magadan Standard Time", "Asia/Magadan"),
-    ("Norfolk Standard Time", "Pacific/Norfolk"),
-    ("Sakhalin Standard Time", "Asia/Sakhalin"),
-    ("Central Pacific Standard Time", "Pacific/Guadalcanal"),
-    ("Russia Time Zone 11", "Asia/Kamchatka"),
-    ("Kamchatka Standard Time", "Asia/Kamchatka"),
-    ("New Zealand Standard Time", "Pacific/Auckland"),
-    ("UTC+12", "Etc/GMT-12"),
-    ("Fiji Standard Time", "Pacific/Fiji"),
-    ("Chatham Islands Standard Time", "Pacific/Chatham"),
-    ("UTC+13", "Etc/GMT-13"),
-    ("Tonga Standard Time", "Pacific/Tongatapu"),
-    ("Samoa Standard Time", "Pacific/Apia"),
-    ("Line Islands Standard Time", "Pacific/Kiritimati"),
-];
+use super::ics::ContentLine;
+use super::vtimezone::CustomTz;
+use super::windows_zones::windows_to_iana;
 
-fn windows_to_iana(name: &str) -> Option<&'static str> {
-    WINDOWS_ZONES
-        .iter()
-        .find(|(win, _)| win.eq_ignore_ascii_case(name))
-        .map(|(_, iana)| *iana)
+/// Vendor prefixes in front of a zone name (compared case-insensitively).
+const PREFIXES: &[&str] = &["tzone://Microsoft/"];
+/// Bound on remembered unknown names (a hostile feed cannot grow it without limit).
+const MAX_LOGGED: usize = 256;
+
+/// A resolved `TZID`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Zone {
+    Iana(Tz),
+    Custom(Arc<CustomTz>),
 }
 
-/// Resolves a `TZID` parameter value; `None` = unknown (caller falls back to local time).
-pub fn resolve_tzid(raw: &str) -> Option<Tz> {
-    let name = raw.trim().trim_matches('"').trim();
-    if name.is_empty() {
-        return None;
-    }
+fn clean(raw: &str) -> &str {
+    raw.trim().trim_matches('"').trim()
+}
+
+fn strip_prefix_ci<'a>(name: &'a str, prefix: &str) -> Option<&'a str> {
+    let head = name.get(..prefix.len())?;
+    head.eq_ignore_ascii_case(prefix)
+        .then(|| &name[prefix.len()..])
+}
+
+/// One name, no prefix handling: IANA, UTC aliases, Windows.
+fn direct(name: &str) -> Option<Tz> {
     if let Ok(tz) = name.parse::<Tz>() {
         return Some(tz);
     }
-    if let Some(tz) = windows_to_iana(name).and_then(|iana| iana.parse::<Tz>().ok()) {
+    if ["utc", "gmt", "z", "etc/utc"]
+        .iter()
+        .any(|a| a.eq_ignore_ascii_case(name))
+    {
+        return Some(Tz::UTC);
+    }
+    windows_to_iana(name).and_then(|iana| iana.parse::<Tz>().ok())
+}
+
+/// Step 1: resolves a `TZID` by name only; `None` = not a known name.
+pub fn resolve_tzid(raw: &str) -> Option<Tz> {
+    let mut name = clean(raw);
+    if name.is_empty() {
+        return None;
+    }
+    for p in PREFIXES {
+        if let Some(rest) = strip_prefix_ci(name, p) {
+            name = rest;
+        }
+    }
+    if let Some(tz) = direct(name) {
         return Some(tz);
     }
-    // Vendor prefixes: try ever shorter `/`-suffixes ("/mozilla.org/x/Europe/Berlin").
+    // Path-like vendor prefixes: try ever shorter `/`-suffixes ("/mozilla.org/x/Europe/Berlin").
     let parts: Vec<&str> = name.split('/').filter(|p| !p.is_empty()).collect();
-    (1..parts.len()).find_map(|skip| parts[skip..].join("/").parse::<Tz>().ok())
+    (1..parts.len()).find_map(|skip| direct(&parts[skip..].join("/")))
+}
+
+fn log_unknown_once(name: &str) {
+    static LOGGED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    let Ok(mut seen) = LOGGED.get_or_init(Default::default).lock() else {
+        return;
+    };
+    if seen.len() < MAX_LOGGED && seen.insert(name.to_string()) {
+        tracing::warn!(tzid = %name, "calendar: unknown time zone, using local time");
+    }
+}
+
+/// Per-calendar resolver: the feed's VTIMEZONE blocks plus a cache of resolved names, so
+/// each distinct `TZID` is resolved (and a VTIMEZONE expanded) once per parse.
+#[derive(Default)]
+pub struct ZoneTable {
+    vtimezones: HashMap<String, Vec<ContentLine>>,
+    cache: HashMap<String, Option<Zone>>,
+}
+
+fn key(tzid: &str) -> String {
+    clean(tzid).to_lowercase()
+}
+
+impl ZoneTable {
+    /// Registers the content lines of one VTIMEZONE (nested BEGIN/END included). The
+    /// first block wins when a feed repeats a `TZID`.
+    pub fn add_vtimezone(&mut self, lines: Vec<ContentLine>) {
+        let mut depth = 0usize;
+        let tzid = lines.iter().find_map(|l| {
+            match l.name.as_str() {
+                "BEGIN" => depth += 1,
+                "END" => depth = depth.saturating_sub(1),
+                "TZID" if depth == 0 => return Some(key(&l.value)),
+                _ => {}
+            }
+            None
+        });
+        if let Some(k) = tzid.filter(|k| !k.is_empty()) {
+            self.vtimezones.entry(k).or_insert(lines);
+        }
+    }
+
+    pub fn lookup(&mut self, tzid: &str) -> Option<Zone> {
+        let k = key(tzid);
+        if let Some(z) = self.cache.get(&k) {
+            return z.clone();
+        }
+        let zone = resolve_tzid(tzid).map(Zone::Iana).or_else(|| {
+            self.vtimezones
+                .get(&k)
+                .and_then(|lines| CustomTz::from_lines(lines))
+                .map(|tz| Zone::Custom(Arc::new(tz)))
+        });
+        if zone.is_none() && !k.is_empty() {
+            log_unknown_once(clean(tzid));
+        }
+        self.cache.insert(k, zone.clone());
+        zone
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn every_windows_zone_maps_to_a_known_iana_zone() {
-        for (win, iana) in WINDOWS_ZONES {
-            assert!(
-                iana.parse::<Tz>().is_ok(),
-                "{win} → {iana} is not in chrono-tz"
-            );
-        }
-    }
 
     #[test]
     fn resolves_iana_windows_and_prefixed_names() {
@@ -209,7 +154,21 @@ mod tests {
             resolve_tzid("/mozilla.org/20050126_1/Europe/Berlin"),
             Some(Tz::Europe__Berlin)
         );
+        assert_eq!(
+            resolve_tzid("/softwarestudio.org/Olson_20011030_5/America/New_York"),
+            Some(Tz::America__New_York)
+        );
+        assert_eq!(
+            resolve_tzid("/citadel.org/20190914_1/Asia/Tokyo"),
+            Some(Tz::Asia__Tokyo)
+        );
+        assert_eq!(
+            resolve_tzid("tzone://Microsoft/W. Europe Standard Time"),
+            Some(Tz::Europe__Berlin)
+        );
+        assert_eq!(resolve_tzid("tzone://Microsoft/Utc"), Some(Tz::UTC));
         assert_eq!(resolve_tzid("Customized Time Zone"), None);
+        assert_eq!(resolve_tzid("(UTC+03:00) Istanbul"), None);
         assert_eq!(resolve_tzid(""), None);
     }
 }

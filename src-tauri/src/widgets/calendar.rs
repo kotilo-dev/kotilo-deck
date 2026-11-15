@@ -11,6 +11,8 @@
 //! Logs identify feeds by id.
 
 mod ics;
+mod vtimezone;
+mod windows_zones;
 mod zones;
 
 use std::collections::{HashMap, HashSet};
