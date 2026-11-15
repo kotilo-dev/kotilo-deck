@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MediaSession } from '#lib/ipc/index.ts';
+import { createArtworkCache, type MediaSession } from '#lib/ipc/index.ts';
 import { applyOverrides, byline, currentPosition, formatTime, HOLD_MS, nextRepeat, progress, repeatKey, seekSeconds } from './logic';
 
 const session = (over: Partial<MediaSession> = {}): MediaSession => ({
@@ -8,6 +8,7 @@ const session = (over: Partial<MediaSession> = {}): MediaSession => ({
 	artist: 'Marconi Union',
 	album: null,
 	artwork: null,
+	artworkKey: null,
 	playing: true,
 	position: 100,
 	duration: 480,
@@ -101,5 +102,30 @@ describe('applyOverrides', () => {
 		const o = { shuffle: { value: true, at: 1 }, repeat: { value: 'list' as const, at: 1 } };
 		expect(applyOverrides(session(), o, 2)).toMatchObject({ shuffle: true, repeat: 'list' });
 		expect(applyOverrides(session({ shuffle: null, repeat: null }), o, 2)).toMatchObject({ shuffle: null, repeat: null });
+	});
+});
+
+describe('artwork cache (media://state sends each artwork once)', () => {
+	it('restores omitted artwork while the key is unchanged', () => {
+		const cache = createArtworkCache();
+		const first = cache.fill({ session: session({ artwork: 'data:a', artworkKey: 'ka' }) });
+		expect(first).toEqual({ state: { session: session({ artwork: 'data:a', artworkKey: 'ka' }) }, missing: false });
+		const again = cache.fill({ session: session({ artwork: null, artworkKey: 'ka', playing: false }) });
+		expect(again.missing).toBe(false);
+		expect(again.state.session).toEqual(session({ artwork: 'data:a', artworkKey: 'ka', playing: false }));
+	});
+
+	it('reports an unknown key so the caller can fetch the snapshot', () => {
+		const cache = createArtworkCache();
+		cache.fill({ session: session({ artwork: 'data:a', artworkKey: 'ka' }) });
+		const other = cache.fill({ session: session({ artwork: null, artworkKey: 'kb' }) });
+		expect(other.missing).toBe(true);
+		expect(other.state.session?.artwork).toBeNull();
+	});
+
+	it('passes through no artwork and nothing playing', () => {
+		const cache = createArtworkCache();
+		expect(cache.fill({ session: null })).toEqual({ state: { session: null }, missing: false });
+		expect(cache.fill({ session: session() })).toEqual({ state: { session: session() }, missing: false });
 	});
 });

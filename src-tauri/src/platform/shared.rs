@@ -47,6 +47,17 @@ pub fn base64(bytes: &[u8]) -> String {
     out
 }
 
+/// Stable short id of an artwork data URL (FNV-1a 64, hex), so `media://state` events can
+/// skip artwork the listeners already have.
+pub fn artwork_key(url: &str) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in url.bytes() {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("{h:016x}")
+}
+
 /// `data:` URL for png/jpeg bytes within [`ARTWORK_MAX_BYTES`]; `None` otherwise.
 pub fn artwork_data_url(bytes: &[u8]) -> Option<String> {
     let mime = sniff_mime(bytes)?;
@@ -90,5 +101,17 @@ mod tests {
         jpeg.push(0);
         assert_eq!(artwork_data_url(&jpeg), None, "over the cap");
         assert_eq!(artwork_data_url(b"GIF89a"), None, "unknown type");
+    }
+
+    #[test]
+    fn artwork_key_is_stable_and_distinct() {
+        assert_eq!(artwork_key(""), "cbf29ce484222325");
+        assert_eq!(
+            artwork_key("a"),
+            "af63dc4c8601ec8c",
+            "FNV-1a 64 test vector"
+        );
+        assert_eq!(artwork_key("data:x"), artwork_key("data:x"));
+        assert_ne!(artwork_key("data:x"), artwork_key("data:y"));
     }
 }

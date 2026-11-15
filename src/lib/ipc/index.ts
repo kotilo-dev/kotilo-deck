@@ -353,8 +353,13 @@ export interface MediaSession {
 	title: string;
 	artist: string;
 	album: string | null;
-	/** data: URL (png/jpeg) or null. */
+	/**
+	 * data: URL (png/jpeg) or null. Raw `media://state` events leave it null while `artworkKey` is unchanged
+	 * (the backend sends each artwork once); `mediaState()` and `onMediaState()` fill it back in.
+	 */
 	artwork: string | null;
+	/** Id of the artwork (hash); null = no artwork. */
+	artworkKey: string | null;
 	playing: boolean;
 	/** Seconds; null when the source reports no timeline. */
 	position: number | null;
@@ -375,7 +380,42 @@ export interface MediaState {
 
 export type MediaAction = 'play-pause' | 'next' | 'prev' | 'toggle-shuffle' | 'cycle-repeat';
 
-export const mediaState = () => invoke<MediaState>('media_state');
+/**
+ * Remembers the last artwork per `artworkKey`, because `media://state` events carry each artwork only once.
+ * `fill` restores omitted artwork; `missing` means the key is unknown here (a late listener that missed the
+ * one event with the artwork), so the caller should fetch `media_state`, which always has it.
+ */
+export function createArtworkCache() {
+	let last: { key: string; url: string } | null = null;
+	return {
+		fill(st: MediaState): { state: MediaState; missing: boolean } {
+			const s = st.session;
+			if (!s || s.artworkKey == null) return { state: st, missing: false };
+			if (s.artwork !== null) {
+				last = { key: s.artworkKey, url: s.artwork };
+				return { state: st, missing: false };
+			}
+			if (last?.key === s.artworkKey) return { state: { session: { ...s, artwork: last.url } }, missing: false };
+			return { state: st, missing: true };
+		}
+	};
+}
+
+const mediaArtwork = createArtworkCache();
+
+/** Current media state, artwork always included. */
+export const mediaState = () => invoke<MediaState>('media_state').then((st) => mediaArtwork.fill(st).state);
+/**
+ * `media://state` with omitted artwork filled in from the shared cache. When the artwork is unknown here,
+ * delivers a fresh `mediaState()` instead (falls back to the event if that fails).
+ */
+export function onMediaState(handler: (state: MediaState) => void): Promise<UnlistenFn> {
+	return on('media://state', (st) => {
+		const { state, missing } = mediaArtwork.fill(st);
+		if (!missing) return handler(state);
+		mediaState().then(handler, () => handler(state));
+	});
+}
 export const mediaControl = (action: MediaAction) => invoke<void>('media_control', { action });
 export const mediaSeek = (seconds: number) => invoke<void>('media_seek', { seconds });
 /** Ref-counted (reset on page load); backend pushes `media://state` on session/playback/property events. */

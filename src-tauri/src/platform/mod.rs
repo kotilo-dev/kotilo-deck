@@ -117,8 +117,12 @@ pub struct MediaSession {
     pub title: String,
     pub artist: String,
     pub album: Option<String>,
-    /// `data:` URL (png/jpeg), size-capped by the platform.
+    /// `data:` URL (png/jpeg), size-capped by the platform. `media://state` events leave it
+    /// `None` while `artwork_key` matches the artwork their watcher sent last;
+    /// `media_state` always fills it.
     pub artwork: Option<String>,
+    /// `shared::artwork_key` of the artwork; `None` = no artwork.
+    pub artwork_key: Option<String>,
     pub playing: bool,
     /// Seconds; `None` when the source reports no timeline.
     pub position: Option<f64>,
@@ -440,6 +444,7 @@ mod tests {
             artist: "A".into(),
             album: None,
             artwork: None,
+            artwork_key: None,
             playing: true,
             position: Some(1.5),
             duration: Some(200.0),
@@ -463,6 +468,7 @@ mod tests {
                 "album",
                 "artist",
                 "artwork",
+                "artworkKey",
                 "canNext",
                 "canPlayPause",
                 "canPrev",

@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use zbus::zvariant::{ObjectPath, OwnedValue, Value};
 
 use super::worker::Worker;
-use crate::platform::shared::{artwork_data_url, ARTWORK_MAX_BYTES};
+use crate::platform::shared::{artwork_data_url, artwork_key, ARTWORK_MAX_BYTES};
 use crate::platform::{
     ChangeFn, MediaAction, MediaSession, MediaState, PlatformError, RepeatMode, Result, Watch,
 };
@@ -266,6 +266,7 @@ pub fn to_session(
         title,
         artist: m.artists.join(", "),
         album: m.album.clone(),
+        artwork_key: artwork.as_deref().map(artwork_key),
         artwork,
         playing: p.status == "Playing",
         position,

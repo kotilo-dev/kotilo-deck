@@ -252,6 +252,7 @@ export function createDemoBackend(opts: DemoOptions = {}): DemoBackend & {
 			artist: tr.artist,
 			album: tr.album,
 			artwork: artwork(tr.art[0], tr.art[1]),
+			artworkKey: `demo-${i % TRACKS.length}`,
 			playing,
 			position,
 			duration: tr.duration,
