@@ -66,7 +66,7 @@ A second-screen "deck" that stays on all day next to the developer's main monito
 - State: `tauri-plugin-store` for settings, **SQLite via `tauri-plugin-sql`** for todos/pomodoro history.
 - Crates: `sysinfo`, `windows` (windows-rs), `tokio`, `tokio-tungstenite`, `serde`, `chrono`, `reqwest`, `ical`.
 - Notifications: `tauri-plugin-notification`.
-- Target idle: < 1% CPU, < 120 MB RAM with all widgets enabled.
+- Target idle, with all widgets enabled: < 1% CPU; RAM (private working set) < 60 MB for the deck process and < 160 MB including its WebView2 / WebKitGTK processes.
 
 ---
 

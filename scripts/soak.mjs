@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Idle soak run (SPEC §1 "idle < 1% CPU, < 120 MB RAM with all widgets enabled", SPEC §8
+// Idle soak run (SPEC §1 "idle < 1% CPU; RAM < 60 MB deck process, < 160 MB with WebView2", SPEC §8
 // performance budget). Starts a built deck binary on a throwaway data folder holding one
 // workspace with every built-in widget, waits a warm-up, samples the process tree, then
 // reports and gates on the budget.
@@ -8,7 +8,7 @@
 //   node scripts/soak.mjs --app <binary> --minutes 2 --warmup 30                    # quick local try
 //
 // Flags: --minutes (10) --warmup <s> (60) --interval <s> (5) --cpu-budget <%> (1)
-// --ram-budget <MB> (120) --cpu-tolerance <%> / --ram-tolerance <%> (0; extra headroom on
+// --ram-budget <MB> (160, whole tree) --main-ram-budget <MB> (60, deck process) --cpu-tolerance <%> / --ram-tolerance <%> (0; extra headroom on
 // the gate, e.g. on a shared CI runner; the real target and whether it was met are still
 // printed) --max-log-lines (30)
 // --json <file> --markdown <file> --logs <dir> (copy the deck's logs there) --keep (leave
@@ -21,10 +21,10 @@
 //   renderer, GPU, utility, crashpad). The WebView2 user data folder is a fresh temp folder,
 //   so the deck never shares a browser process with another WebView2 app.
 // - Linux: the deck process and WebKitGTK's WebKitWebProcess / WebKitNetworkProcess.
-// - RAM gate = peak private working set of the whole tree (Task Manager's "Memory"
+// - RAM gates = peak private working set of the whole tree (Task Manager's "Memory"
 //   column; Linux: Private_Clean + Private_Dirty from smaps_rollup). That is the memory
-//   the user pays for; shared DLL/library pages are left out. The main process alone,
-//   private bytes (commit) and the full working set are reported too.
+//   the user pays for; shared DLL/library pages are left out. The deck process alone is
+//   gated separately (--main-ram-budget); private bytes (commit) and the full working set are reported too.
 // - CPU = total CPU time delta across the tree / (wall time × logical cores). The gate is
 //   the average over the sampling window; p95 of the per-interval values is reported.
 //
@@ -56,7 +56,8 @@ const { values: args } = parseArgs({
 		warmup: { type: 'string', default: '60' },
 		interval: { type: 'string', default: '5' },
 		'cpu-budget': { type: 'string', default: '1' },
-		'ram-budget': { type: 'string', default: '120' },
+		'ram-budget': { type: 'string', default: '160' },
+		'main-ram-budget': { type: 'string', default: '60' },
 		'cpu-tolerance': { type: 'string', default: '0' },
 		'ram-tolerance': { type: 'string', default: '0' },
 		'max-log-lines': { type: 'string', default: '30' },
@@ -70,7 +71,7 @@ const { values: args } = parseArgs({
 
 if (args.help || !args.app) {
 	console.log('usage: node scripts/soak.mjs --app <path to kotilo-deck binary> [--minutes 10] [--warmup 60] [--interval 5]');
-	console.log('       [--cpu-budget 1] [--ram-budget 120] [--cpu-tolerance 0] [--ram-tolerance 0] [--max-log-lines 30] [--json f] [--markdown f] [--logs dir] [--keep]');
+	console.log('       [--cpu-budget 1] [--ram-budget 160] [--main-ram-budget 60] [--cpu-tolerance 0] [--ram-tolerance 0] [--max-log-lines 30] [--json f] [--markdown f] [--logs dir] [--keep]');
 	process.exit(args.help ? 0 : 2);
 }
 
@@ -90,6 +91,7 @@ const warmupS = num('warmup', 0);
 const intervalS = num('interval', 1);
 const cpuBudget = num('cpu-budget', 0);
 const ramBudgetMb = num('ram-budget', 1);
+const mainRamBudgetMb = num('main-ram-budget', 1);
 const cpuTolerance = num('cpu-tolerance', 0);
 const ramTolerance = num('ram-tolerance', 0);
 const maxLogLines = num('max-log-lines', 0);
@@ -548,20 +550,27 @@ const result = {
 		cpuGatePct: cpuBudget * (1 + cpuTolerance / 100),
 		ramMb: ramBudgetMb,
 		ramTolerancePct: ramTolerance,
-		ramGateMb: ramBudgetMb * (1 + ramTolerance / 100)
+		ramGateMb: ramBudgetMb * (1 + ramTolerance / 100),
+		mainRamMb: mainRamBudgetMb,
+		mainRamGateMb: mainRamBudgetMb * (1 + ramTolerance / 100)
 	},
 	/** Whether the real SPEC targets were met (the gate may have tolerance on top). */
-	targetsMet: { cpu: false, ram: false },
+	targetsMet: { cpu: false, ram: false, mainRam: false },
 	log: { warnErrorLines: logs.total, maxLines: maxLogLines, top: logs.top.map(([line, count]) => ({ line, count })) },
 	failure,
 	/** @type {string[]} */
 	overBudget: []
 };
 
-result.targetsMet = { cpu: result.cpu.avgPct <= cpuBudget, ram: result.ramMb.treePrivateWsPeak <= ramBudgetMb };
+result.targetsMet = {
+	cpu: result.cpu.avgPct <= cpuBudget,
+	ram: result.ramMb.treePrivateWsPeak <= ramBudgetMb,
+	mainRam: result.ramMb.mainPrivateWsPeak <= mainRamBudgetMb
+};
 if (!failure) {
 	if (result.cpu.avgPct > result.budget.cpuGatePct) result.overBudget.push(`average CPU ${result.cpu.avgPct.toFixed(2)} % > ${result.budget.cpuGatePct.toFixed(2)} %`);
 	if (result.ramMb.treePrivateWsPeak > result.budget.ramGateMb) result.overBudget.push(`peak RAM ${result.ramMb.treePrivateWsPeak.toFixed(1)} MB > ${result.budget.ramGateMb.toFixed(1)} MB`);
+	if (result.ramMb.mainPrivateWsPeak > result.budget.mainRamGateMb) result.overBudget.push(`peak deck-process RAM ${result.ramMb.mainPrivateWsPeak.toFixed(1)} MB > ${result.budget.mainRamGateMb.toFixed(1)} MB`);
 	if (logs.total > maxLogLines) result.overBudget.push(`${logs.total} WARN/ERROR log lines while idle > ${maxLogLines} (error loop?)`);
 }
 
@@ -578,8 +587,9 @@ const gated = (value, target, gate, tolerance) =>
 	failure ? 'n/a' : value <= target ? 'pass' : value <= gate ? `**target missed**, within the ${tolerance} % CI tolerance` : '**over**';
 const cpuStatus = gated(result.cpu.avgPct, cpuBudget, result.budget.cpuGatePct, cpuTolerance);
 const ramStatus = gated(result.ramMb.treePrivateWsPeak, ramBudgetMb, result.budget.ramGateMb, ramTolerance);
+const mainRamStatus = gated(result.ramMb.mainPrivateWsPeak, mainRamBudgetMb, result.budget.mainRamGateMb, ramTolerance);
 const md = [
-	`## Idle soak ${failure ? 'failed to run' : !ok ? 'over budget' : result.targetsMet.cpu && result.targetsMet.ram ? 'passed' : 'passed the CI gate, SPEC target missed'}`,
+	`## Idle soak ${failure ? 'failed to run' : !ok ? 'over budget' : result.targetsMet.cpu && result.targetsMet.ram && result.targetsMet.mainRam ? 'passed' : 'passed the CI gate, SPEC target missed'}`,
 	'',
 	failure ? `> ${failure}\n` : '',
 	`${result.widgets.length} widgets (${result.widgets.map((w) => `${w.widget} ${w.size}`).join(', ')}), ${warmupS} s warm-up, ${result.sampledSeconds} s sampled every ${intervalS} s, ${cores} logical cores, ${process.platform}.`,
@@ -591,7 +601,7 @@ const md = [
 	`| CPU max per ${intervalS} s | ${f2(result.cpu.maxPct)} % | | |`,
 	`| RAM peak, private working set (tree) | ${f1(result.ramMb.treePrivateWsPeak)} MB | < ${ramBudgetMb} MB | ${ramStatus} |`,
 	`| RAM average, private working set (tree) | ${f1(result.ramMb.treePrivateWsAvg)} MB | | |`,
-	`| RAM peak / average, main process only | ${f1(result.ramMb.mainPrivateWsPeak)} / ${f1(result.ramMb.mainPrivateWsAvg)} MB | | |`,
+	`| RAM peak / average, deck process only | ${f1(result.ramMb.mainPrivateWsPeak)} / ${f1(result.ramMb.mainPrivateWsAvg)} MB | < ${mainRamBudgetMb} MB | ${mainRamStatus} |`,
 	`| RAM peak, private bytes / commit (tree) | ${f1(result.ramMb.treePrivateBytesPeak)} MB | | |`,
 	`| RAM peak, full working set incl. shared (tree) | ${f1(result.ramMb.treeWorkingSetPeak)} MB | | |`,
 	`| WARN/ERROR log lines while idle | ${logs.total} | ≤ ${maxLogLines} | ${mark(logs.total <= maxLogLines)} |`,

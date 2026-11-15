@@ -5,7 +5,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 ## [Unreleased]
 
 ### Added
-- CI: idle soak check (`scripts/soak.mjs`, `soak` job). Every PR runs the release build with all built-in widgets for 10 minutes and reports average/p95 CPU and peak/average RAM of the deck and its WebView2 processes against the idle budget.
+- CI: idle soak check (`scripts/soak.mjs`, `soak` job). Every PR runs the release build with all built-in widgets for 10 minutes and reports average/p95 CPU and peak/average RAM of the deck and its WebView2 processes against the idle budget (now < 1 % CPU and < 60 MB for the deck process / < 160 MB including WebView2).
 - `KOTILO_DECK_DATA_DIR` environment variable: runs the deck on a separate data folder (used by the soak run).
 
 ### Changed
