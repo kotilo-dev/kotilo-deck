@@ -122,11 +122,22 @@ pub fn read(dir: &Path, rel: &str) -> Option<Vec<u8>> {
     (bytes.len() as u64 <= MAX_FOLDER_BYTES).then_some(bytes)
 }
 
-/// Checks the per-folder limits without following symlinked directories.
-pub fn check_limits(dir: &Path) -> Result<(), Rejection> {
+/// Unix ms of a file's last modification; 0 when unknown.
+fn modified_ms(meta: &fs::Metadata) -> u64 {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+}
+
+/// Checks the per-folder limits without following symlinked directories. Returns the
+/// newest file modification time (Unix ms, 0 if unknown), used to reload a plugin's frame
+/// when any of its files is edited.
+pub fn check_limits(dir: &Path) -> Result<u64, Rejection> {
     let too_large = |msg: String| Rejection::new(code::TOO_LARGE, msg);
     let mut files = 0usize;
     let mut bytes = 0u64;
+    let mut newest = 0u64;
     let mut dirs = 0usize;
     let mut stack = vec![dir.to_path_buf()];
     while let Some(d) = stack.pop() {
@@ -146,14 +157,19 @@ pub fn check_limits(dir: &Path) -> Result<(), Rejection> {
                 return Err(too_large(format!("more than {MAX_FILES} files")));
             }
             if ft.is_file() {
-                bytes += entry.metadata().map(|m| m.len()).unwrap_or(0);
+                let meta = entry.metadata().ok();
+                bytes += meta.as_ref().map_or(0, fs::Metadata::len);
                 if bytes > MAX_FOLDER_BYTES {
                     return Err(too_large("folder is larger than 20 MB".into()));
                 }
+                newest = newest.max(meta.as_ref().map_or(0, modified_ms));
+            } else if ft.is_symlink() {
+                // A symlinked file (served if it stays inside the folder): its target's time.
+                newest = newest.max(fs::metadata(entry.path()).map_or(0, |m| modified_ms(&m)));
             }
         }
     }
-    Ok(())
+    Ok(newest)
 }
 
 /// Content-Type by extension; unknown types are served as opaque bytes (with `nosniff`).
@@ -345,7 +361,16 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path();
         fs::write(dir.join("index.html"), "x").unwrap();
-        assert!(check_limits(dir).is_ok());
+        let t0 = check_limits(dir).unwrap();
+        assert!(t0 > 0, "newest mtime is reported");
+        // Editing a file in a sub-folder moves the time forward.
+        fs::create_dir(dir.join("js")).unwrap();
+        let js = fs::File::create(dir.join("js/app.js")).unwrap();
+        js.set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_millis(t0 + 5_000))
+            .unwrap();
+        drop(js);
+        assert_eq!(check_limits(dir).unwrap(), t0 + 5_000);
+        fs::remove_dir_all(dir.join("js")).unwrap();
         let many = dir.join("many");
         fs::create_dir(&many).unwrap();
         for i in 0..MAX_FILES {

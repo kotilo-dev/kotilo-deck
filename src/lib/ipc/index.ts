@@ -641,6 +641,8 @@ export interface PluginWidget {
 	errorCode?: string | null;
 	/** iframe src inside the Tauri webview (`http://kotilo-widget.localhost/<folder>/<entry>` on Windows). In LAN mode use `/plugins/<folder>/<entry>`. */
 	entryUrl: string | null;
+	/** Newest file modification in the folder (Unix ms); null when invalid. Cache-busts the frame src. */
+	modified?: number | null;
 }
 
 export const pluginList = () => invoke<PluginWidget[]>('plugin_list');
