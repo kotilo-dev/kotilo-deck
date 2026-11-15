@@ -6,7 +6,7 @@
 //
 // Writes docs/screenshots/: deck-<preset>-<theme>.png (1920×1080), deck-<preset>-glass.png (glass look over the
 // bundled "Ember" gradient, static/wallpapers/ember.svg), deck-edit.png, deck-7in-<preset>.png (1024×600),
-// deck-portrait.png (4×8), widgets/<widget>-<theme>.png and deck.gif (glass Ops first; pure JS: gifenc + pngjs).
+// deck-portrait.png (4×8), widgets/<widget>-<theme>.png, widgets/<widget>-glass.png and deck.gif (glass Ops first; pure JS: gifenc + pngjs).
 // The clock is pinned and animations are off, so reruns produce the same pictures.
 import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, statSync, readdirSync, writeFileSync } from 'node:fs';
@@ -168,6 +168,10 @@ async function stills(browser, base) {
 	for (const preset of PRESETS) {
 		await open(page, base, { theme: THEMES[0], workspace: preset, glass: true });
 		await page.screenshot({ path: join(OUT, `deck-${preset}-glass.png`) });
+		for (const [widget, from] of Object.entries(WIDGETS)) {
+			if (from !== preset) continue;
+			await page.locator(`[data-instance="${widget}-1"]`).screenshot({ path: join(OUT, 'widgets', `${widget}-glass.png`) });
+		}
 		log('deck', preset, 'glass');
 	}
 	// Edit mode (E): dot grid, resize handles, drawer button.
