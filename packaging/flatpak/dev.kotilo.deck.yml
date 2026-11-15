@@ -45,8 +45,8 @@ modules:
     sources:
       - type: file
         dest-filename: kotilo-deck.deb
-        url: https://github.com/kotilo-dev/kotilo-deck/releases/download/v1.1.0/Kotilo.Deck_1.1.0_amd64.deb
-        sha256: 604486dc0d4694b73dcd569f67ecc31761629e8d225e015268954dfd03086561
+        url: https://github.com/kotilo-dev/kotilo-deck/releases/download/v1.2.0/Kotilo.Deck_1.2.0_amd64.deb
+        sha256: a450980675aa2f4525985c6700126718f3140e52bbe45605a81814e041b1b892
         only-arches: [x86_64]
       - type: file
         path: dev.kotilo.deck.metainfo.xml
