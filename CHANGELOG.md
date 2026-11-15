@@ -16,6 +16,9 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Changing several settings quickly no longer leaves the shortcut or start-with-OS out of step with what was saved.
 - Reloading the deck while the media or volume widget is starting no longer briefly freezes the window.
 - Editing a widget plugin's files now reloads it on the deck straight away, not only when its manifest changes.
+- Calendar: events from Outlook/Exchange and other feeds that use custom time zone names (e.g. "(UTC+03:00) Istanbul", "Customized Time Zone") now show at the right time, including across daylight-saving changes, using the time zone definition included in the feed.
+- Calendar: time zone names with vendor prefixes (e.g. `/mozilla.org/…/Europe/Berlin`, `tzone://Microsoft/…`) are recognised.
+- Calendar: changing "this and all following" occurrences of a recurring event (moving it, renaming it, changing the room or length, or cancelling the rest) now shows correctly for every later occurrence, not just the first one.
 
 ## [1.1.0] - 2026-11-12
 
