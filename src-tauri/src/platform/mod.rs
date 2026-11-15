@@ -267,6 +267,14 @@ pub trait Platform: Send + Sync {
     fn open_path(&self, _path: &std::path::Path) -> Result<()> {
         Err(PlatformError::Unsupported(Capability::SystemInfo))
     }
+
+    // Tray menu and notification text (`crate::i18n`). No dedicated capability either; the
+    // caller falls back to English on any error.
+    /// The user's UI language as a BCP 47 tag (e.g. "tr-TR"), the same source the webview
+    /// uses for `navigator.language`.
+    fn ui_language(&self) -> Result<String> {
+        Err(PlatformError::Unsupported(Capability::SystemInfo))
+    }
 }
 
 /// The implementation for the OS this binary was built for.
@@ -326,6 +334,23 @@ mod tests {
             Bare.open_path(std::path::Path::new(".")),
             Err(PlatformError::Unsupported(_))
         ));
+    }
+
+    #[test]
+    fn ui_language_defaults_to_unsupported() {
+        assert!(matches!(
+            Bare.ui_language(),
+            Err(PlatformError::Unsupported(_))
+        ));
+    }
+
+    /// Real OS call: prints the language the tray / notifications will use.
+    #[test]
+    #[ignore]
+    fn current_ui_language() {
+        let lang = current().ui_language().unwrap();
+        eprintln!("ui language: {lang}");
+        assert!(!lang.is_empty());
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Tray icon: Show / Hide, Workspaces ▸, Monitor ▸, Settings…, Quit.
 //! Left-click toggles the deck. The menu is rebuilt whenever workspaces or monitors change.
+//! Labels are in English or Turkish (`crate::i18n`).
 
 use std::sync::Mutex;
 
@@ -9,6 +10,7 @@ use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, 
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, Wry};
 
+use crate::i18n::{self, Text};
 use crate::window;
 
 const TRAY_ID: &str = "deck-tray";
@@ -35,10 +37,17 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .clone();
+    // OS UI language, fixed for the process like the UI's (no language setting to follow).
+    let lang = i18n::lang();
 
-    let ws_menu = Submenu::new(app, "Workspaces", true)?;
+    let ws_menu = Submenu::new(app, lang.text(Text::TrayWorkspaces), true)?;
     if workspaces.is_empty() {
-        ws_menu.append(&MenuItem::new(app, "(none)", false, None::<&str>)?)?;
+        ws_menu.append(&MenuItem::new(
+            app,
+            lang.text(Text::TrayNoWorkspaces),
+            false,
+            None::<&str>,
+        )?)?;
     }
     for ws in &workspaces {
         ws_menu.append(&CheckMenuItem::with_id(
@@ -51,7 +60,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         )?)?;
     }
 
-    let mon_menu = Submenu::new(app, "Monitor", true)?;
+    let mon_menu = Submenu::new(app, lang.text(Text::TrayMonitor), true)?;
     let current = app.state::<window::Placement>().current().map(|m| m.name);
     let monitors = window::deck(app)
         .and_then(|w| w.available_monitors().ok())
@@ -78,13 +87,25 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     Menu::with_items(
         app,
         &[
-            &MenuItem::with_id(app, ID_SHOW_HIDE, "Show / Hide", true, None::<&str>)?,
+            &MenuItem::with_id(
+                app,
+                ID_SHOW_HIDE,
+                lang.text(Text::TrayShowHide),
+                true,
+                None::<&str>,
+            )?,
             &PredefinedMenuItem::separator(app)?,
             &ws_menu,
             &mon_menu,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, ID_SETTINGS, "Settings…", true, None::<&str>)?,
-            &MenuItem::with_id(app, ID_QUIT, "Quit", true, None::<&str>)?,
+            &MenuItem::with_id(
+                app,
+                ID_SETTINGS,
+                lang.text(Text::TraySettings),
+                true,
+                None::<&str>,
+            )?,
+            &MenuItem::with_id(app, ID_QUIT, lang.text(Text::TrayQuit), true, None::<&str>)?,
         ],
     )
 }

@@ -51,11 +51,15 @@ impl Host for TauriHost {
         if !s.companion.notify_approvals {
             return;
         }
+        let lang = crate::i18n::lang();
         let who = agent.map_or_else(
-            || "An agent".to_string(),
+            || lang.text(crate::i18n::Text::AnAgent).to_string(),
             |a| format!("{} · {}", a.repo, a.name),
         );
-        let body = format!("{who} needs approval: {}", approval.summary);
+        let body = lang.msg(crate::i18n::Msg::NeedsApproval {
+            who: &who,
+            summary: &approval.summary,
+        });
         let mut n = self
             .0
             .notification()

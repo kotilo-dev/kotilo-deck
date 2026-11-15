@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use windows::core::{w, PCWSTR};
 use windows::Win32::Foundation::{COLORREF, HWND};
+use windows::Win32::Globalization::{GetUserDefaultUILanguage, LCIDToLocaleName};
 use windows::Win32::Graphics::Dxgi::{
     CreateDXGIFactory1, IDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE,
 };
@@ -51,6 +52,23 @@ impl Platform for WindowsPlatform {
 
     fn open_path(&self, path: &std::path::Path) -> Result<()> {
         shell::open_path(path)
+    }
+
+    fn ui_language(&self) -> Result<String> {
+        // WebView2's `navigator.language` follows the Windows display language.
+        // SAFETY: GetUserDefaultUILanguage has no preconditions; LCIDToLocaleName writes at
+        // most `buf.len()` UTF-16 units into our buffer.
+        let langid = unsafe { GetUserDefaultUILanguage() };
+        let mut buf = [0u16; 85]; // LOCALE_NAME_MAX_LENGTH
+                                  // LCID = MAKELCID(langid, SORT_DEFAULT) = langid.
+        let n = unsafe { LCIDToLocaleName(u32::from(langid), Some(&mut buf), 0) };
+        let len = usize::try_from(n).unwrap_or(0).saturating_sub(1); // minus the NUL
+        if len == 0 {
+            return Err(PlatformError::Os(format!(
+                "no locale name for UI language {langid:#06x}"
+            )));
+        }
+        Ok(String::from_utf16_lossy(&buf[..len.min(buf.len())]))
     }
 
     fn set_window_opacity(&self, window: NativeWindow, opacity: f64) -> Result<()> {
