@@ -371,7 +371,13 @@ mod tests {
                 });
             })
         };
-        std::thread::sleep(Duration::from_millis(50));
+        // Release only once the second subscriber is counted (it then waits on `started`);
+        // releasing earlier would drop the fresh handle and let it start a second time.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while sub.count() == 0 {
+            assert!(Instant::now() < deadline, "second subscriber never arrived");
+            std::thread::yield_now();
+        }
         release_tx.send(()).unwrap();
         first.join().unwrap();
         second.join().unwrap();
