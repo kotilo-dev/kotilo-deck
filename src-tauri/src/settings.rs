@@ -18,7 +18,6 @@ use tauri_plugin_store::StoreExt;
 
 use crate::migrations;
 
-pub const STORE_FILE: &str = "settings.json";
 pub const DEFAULT_HOTKEY: &str = "Ctrl+Alt+K";
 pub const EVENT_SETTINGS_CHANGED: &str = "settings://changed";
 
@@ -707,12 +706,13 @@ pub struct SettingsLock {
 
 /// Whether `settings.json` is on disk (readable or not).
 fn store_file_exists(app: &AppHandle) -> bool {
-    tauri_plugin_store::resolve_store_path(app, STORE_FILE).is_ok_and(|p| p.is_file())
+    tauri_plugin_store::resolve_store_path(app, crate::paths::settings_store_file())
+        .is_ok_and(|p| p.is_file())
 }
 
 pub fn load(app: &AppHandle) -> DeckSettings {
     let on_disk = store_file_exists(app);
-    match app.store(STORE_FILE) {
+    match app.store(crate::paths::settings_store_file()) {
         Ok(store) => {
             let entries: Map<String, Value> = store.entries().into_iter().collect();
             if on_disk && entries.is_empty() {
@@ -734,7 +734,9 @@ pub fn update(
 ) -> Result<(DeckSettings, DeckSettings), String> {
     let lock = app.state::<SettingsLock>();
     let _guard = lock.store.lock().unwrap_or_else(|p| p.into_inner());
-    let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
+    let store = app
+        .store(crate::paths::settings_store_file())
+        .map_err(|e| e.to_string())?;
     let old = from_stored_on_disk(
         store.entries().into_iter().collect(),
         store_file_exists(app),

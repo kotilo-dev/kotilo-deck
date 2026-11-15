@@ -106,6 +106,8 @@ Windows: COM/WinRT calls run on dedicated MTA worker threads (`platform/windows/
 | Plugin widgets | `~/.kotilo/deck/widgets/<folder>/` | `docs/plugin-api.md`, hot-reloaded |
 | Logs | `~/.kotilo/deck/logs/` | `tracing`, daily rotation |
 
+`KOTILO_DECK_DATA_DIR=<absolute path>` replaces `~/.kotilo/deck` (its parent replaces `~/.kotilo`) and holds `settings.json` too; that deck also skips the single-instance check. Only the idle soak run (`scripts/soak.mjs`) sets it.
+
 ## Rendering layers (SPEC §5.3)
 
 background layer → widget surfaces (`--k-surface-a`) → content (`opacity: var(--k-dim)`).

@@ -82,8 +82,42 @@ jobs:
         with:
           workspaces: src-tauri
       - run: pnpm install --frozen-lockfile
+      # --no-bundle skips the installers, so createUpdaterArtifacts never asks for
+      # TAURI_SIGNING_PRIVATE_KEY (only the bundler signs updater artifacts).
       - run: pnpm tauri build --no-bundle
       - uses: actions/upload-artifact@v4
         with:
           name: kotilo-deck-windows
           path: src-tauri/target/release/kotilo-deck.exe
+
+  # SPEC §8 performance budget: idle CPU/RAM with every built-in widget on screen, on the
+  # release binary from windows-build. See the header of scripts/soak.mjs for what counts.
+  soak:
+    runs-on: windows-latest
+    needs: [windows-build]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: kotilo-deck-windows
+          path: soak-bin
+      # Gate = SPEC target plus headroom: CPU 1 % + 25 % (1.25 %), since the runner has no
+      # GPU (software rendering) and shares its host; RAM 120 MB + 40 % (168 MB), since
+      # v1.1.0 already measures 140-148 MB tree private working set locally and a hard
+      # 120 MB gate would fail every PR. This makes the job a regression guard; the summary
+      # marks any miss of the real target in bold. Tighten as the footprint comes down.
+      - name: Idle soak (60 s warm-up + 10 min)
+        run: >-
+          node scripts/soak.mjs --app soak-bin/kotilo-deck.exe --minutes 10 --warmup 60
+          --cpu-tolerance 25 --ram-tolerance 40
+          --json soak-out/soak-result.json --logs soak-out/logs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-result
+          path: soak-out
+          if-no-files-found: ignore
