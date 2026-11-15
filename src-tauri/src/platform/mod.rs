@@ -117,8 +117,12 @@ pub struct MediaSession {
     pub title: String,
     pub artist: String,
     pub album: Option<String>,
-    /// `data:` URL (png/jpeg), size-capped by the platform.
+    /// `data:` URL (png/jpeg), size-capped by the platform. `media://state` events leave it
+    /// `None` while `artwork_key` matches the artwork their watcher sent last;
+    /// `media_state` always fills it.
     pub artwork: Option<String>,
+    /// `shared::artwork_key` of the artwork; `None` = no artwork.
+    pub artwork_key: Option<String>,
     pub playing: bool,
     /// Seconds; `None` when the source reports no timeline.
     pub position: Option<f64>,
@@ -263,6 +267,14 @@ pub trait Platform: Send + Sync {
     fn open_path(&self, _path: &std::path::Path) -> Result<()> {
         Err(PlatformError::Unsupported(Capability::SystemInfo))
     }
+
+    // Tray menu and notification text (`crate::i18n`). No dedicated capability either; the
+    // caller falls back to English on any error.
+    /// The user's UI language as a BCP 47 tag (e.g. "tr-TR"), the same source the webview
+    /// uses for `navigator.language`.
+    fn ui_language(&self) -> Result<String> {
+        Err(PlatformError::Unsupported(Capability::SystemInfo))
+    }
 }
 
 /// The implementation for the OS this binary was built for.
@@ -322,6 +334,23 @@ mod tests {
             Bare.open_path(std::path::Path::new(".")),
             Err(PlatformError::Unsupported(_))
         ));
+    }
+
+    #[test]
+    fn ui_language_defaults_to_unsupported() {
+        assert!(matches!(
+            Bare.ui_language(),
+            Err(PlatformError::Unsupported(_))
+        ));
+    }
+
+    /// Real OS call: prints the language the tray / notifications will use.
+    #[test]
+    #[ignore]
+    fn current_ui_language() {
+        let lang = current().ui_language().unwrap();
+        eprintln!("ui language: {lang}");
+        assert!(!lang.is_empty());
     }
 
     #[test]
@@ -440,6 +469,7 @@ mod tests {
             artist: "A".into(),
             album: None,
             artwork: None,
+            artwork_key: None,
             playing: true,
             position: Some(1.5),
             duration: Some(200.0),
@@ -463,6 +493,7 @@ mod tests {
                 "album",
                 "artist",
                 "artwork",
+                "artworkKey",
                 "canNext",
                 "canPlayPause",
                 "canPrev",

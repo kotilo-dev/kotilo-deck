@@ -167,7 +167,10 @@
 			"widgetLabel": "{name} bileşeni, {size}",
 			"unplacedOne": "1 bileşen bu ızgaraya sığmıyor: {names}",
 			"undo": "Geri al",
-			"undoNoRoom": "{name} geri koymak için yer yok"
+			"undoNoRoom": "{name} geri koymak için yer yok",
+			"hiddenTitle": "Gizli bileşenler",
+			"hiddenHelp": "Bunlar bu ızgaraya sığmıyor. Göstermek için yoğunluğu artırın ya da kaldırın.",
+			"hiddenRemove": "Kaldır: {name}"
 		},
 		"drawer": {
 			"title": "Bileşen ekle",

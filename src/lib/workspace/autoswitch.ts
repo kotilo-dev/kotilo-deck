@@ -12,11 +12,21 @@
  *
  * Rules are only triggers: a manual switch stays until the next trigger fires. Disabled rules and rules
  * targeting a missing workspace are ignored (they never shadow a valid rule).
+ *
+ * While `held()` (edit mode) a firing is deferred, not dropped: only the latest one is kept and `resume()`
+ * applies it when the hold ends, unless it is older than `DEFER_MAX_MS`, its rule is gone or disabled, or
+ * the active workspace changed meanwhile (a manual switch wins, as above).
  */
 import type { AutoSwitchRule, CalendarEvent, PomodoroPhase, PomodoroState } from '#lib/ipc/index.ts';
 
 /** Catch-up window after a long hide or downtime. */
 export const MAX_CATCH_UP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A switch deferred by edit mode is dropped when the edit session outlasts this. Triggers mark a moment
+ * (a time, an event start, a focus block); after a long edit the user is clearly at the deck and in charge.
+ */
+export const DEFER_MAX_MS = 15 * 60 * 1000;
 
 export interface Firing {
 	rule: AutoSwitchRule;
@@ -106,6 +116,17 @@ export interface AutoSwitchDeps {
 	/** Persisted last evaluation time (Unix ms), null when unknown. */
 	loadLast(): number | null;
 	saveLast(ms: number): void;
+	/** True while switches must wait (edit mode); the firing is kept for `resume()`. */
+	held?(): boolean;
+	/** Clock for pomodoro firings (they carry no time of their own). Default `Date.now`. */
+	now?(): number;
+}
+
+interface Pending {
+	rule: AutoSwitchRule;
+	at: number;
+	/** Active workspace when the firing was deferred. */
+	from: string;
 }
 
 export class AutoSwitcher {
@@ -115,6 +136,7 @@ export class AutoSwitcher {
 	#events: CalendarEvent[] = [];
 	#pomodoro: PomodoroState | null = null;
 	#pomodoroKnown = false;
+	#pending: Pending | null = null;
 
 	constructor(deps: AutoSwitchDeps) {
 		this.#deps = deps;
@@ -139,7 +161,16 @@ export class AutoSwitcher {
 		if (now <= from) return; // clock went backwards or same instant
 		const rules = this.#valid();
 		const best = pickLatest([...timeCrossings(rules, from, now), ...calendarCrossings(rules, this.#events, from, now)], rules);
-		if (best) this.#apply(best.rule);
+		if (best) this.#apply(best.rule, best.at);
+	}
+
+	/** The hold ended (edit mode closed): applies the latest deferred switch if it still makes sense. */
+	resume(now: number): void {
+		const p = this.#pending;
+		this.#pending = null;
+		if (!p || now - p.at > DEFER_MAX_MS || this.#deps.activeId() !== p.from) return;
+		const rule = this.#valid().find((r) => r.id === p.rule.id && r.workspace === p.rule.workspace);
+		if (rule) this.#apply(rule, p.at);
 	}
 
 	/** Upcoming calendar events (refreshed on `calendar://changed`). */
@@ -174,11 +205,18 @@ export class AutoSwitcher {
 
 	#first(type: 'pomodoro-start' | 'pomodoro-end') {
 		const rule = this.#valid().find((r) => r.trigger.type === type);
-		if (rule) this.#apply(rule);
+		if (rule) this.#apply(rule, this.#deps.now?.() ?? Date.now());
 	}
 
-	#apply(rule: AutoSwitchRule) {
-		if (rule.workspace === this.#deps.activeId()) return;
+	#apply(rule: AutoSwitchRule, at: number) {
+		const active = this.#deps.activeId();
+		if (this.#deps.held?.()) {
+			// Latest firing wins, even one for the workspace already shown (it cancels an older one).
+			// A manual switch before it is superseded, as outside edit mode.
+			this.#pending = rule.workspace === active ? null : { rule, at, from: active };
+			return;
+		}
+		if (rule.workspace === active) return;
 		this.#deps.switchTo(rule.workspace, rule);
 	}
 }

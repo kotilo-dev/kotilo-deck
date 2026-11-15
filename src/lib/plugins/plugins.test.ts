@@ -174,6 +174,18 @@ describe('plugin registry (docs/plugin-api.md)', () => {
 		expect(pluginSrc(info, true)).toBe('/plugins/hello/dist/my%20page.html');
 		expect(pluginSrc({ ...info, entryUrl: null }, false)).toBeNull();
 	});
+
+	it('cache-busts the frame src with the folder mtime, so editing a file reloads the frame', () => {
+		const info = { folder: 'hello', entry: 'index.html', entryUrl: 'http://kotilo-widget.localhost/hello/index.html', modified: 1700000000123 };
+		expect(pluginSrc(info, false)).toBe('http://kotilo-widget.localhost/hello/index.html?v=1700000000123');
+		expect(pluginSrc(info, true)).toBe('/plugins/hello/index.html?v=1700000000123');
+		expect(pluginSrc({ ...info, modified: null }, false)).toBe(info.entryUrl);
+		const def = toDefinition({ ...plugin('hello'), modified: 5 })!;
+		const edited = toDefinition({ ...plugin('hello'), modified: 6 })!;
+		expect(def.plugin.modified).toBe(5);
+		// PluginFrame remounts when its PluginInfo JSON changes.
+		expect(JSON.stringify(def.plugin)).not.toBe(JSON.stringify(edited.plugin));
+	});
 });
 
 // ── bridge ────────────────────────────────────────────────────────────────

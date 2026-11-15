@@ -24,6 +24,8 @@ export interface PluginInfo {
 	entry: string;
 	/** Backend-provided iframe src (Tauri webview); null if the backend gave none. */
 	entryUrl: string | null;
+	/** Newest file time in the folder (Unix ms): editing any plugin file changes it, which reloads the frame. */
+	modified?: number | null;
 	topics: readonly PluginTopic[];
 	version?: string;
 	author?: string;
@@ -90,6 +92,7 @@ export function toDefinition(p: PluginWidget, component: Component<WidgetProps<a
 			folder: p.folder,
 			entry: m.entry || 'index.html',
 			entryUrl: p.entryUrl,
+			modified: p.modified ?? null,
 			topics: (m.topics ?? []).filter((t) => TOPICS.includes(t)),
 			version: m.version,
 			author: m.author,
@@ -98,11 +101,15 @@ export function toDefinition(p: PluginWidget, component: Component<WidgetProps<a
 	};
 }
 
-/** iframe src: the backend's URL in the Tauri webview, `/plugins/<folder>/<entry>` over the LAN server. */
-export function pluginSrc(info: Pick<PluginInfo, 'folder' | 'entry' | 'entryUrl'>, remote = isRemote()): string | null {
-	if (!remote) return info.entryUrl;
+/**
+ * iframe src: the backend's URL in the Tauri webview, `/plugins/<folder>/<entry>` over the LAN server, plus
+ * `?v=<modified>` so an edited plugin never loads a cached entry (both servers ignore the query).
+ */
+export function pluginSrc(info: Pick<PluginInfo, 'folder' | 'entry' | 'entryUrl' | 'modified'>, remote = isRemote()): string | null {
+	const v = info.modified ? `?v=${info.modified}` : '';
+	if (!remote) return info.entryUrl === null ? null : info.entryUrl + v;
 	const path = info.entry.split('/').map(encodeURIComponent).join('/');
-	return `/plugins/${encodeURIComponent(info.folder)}/${path}`;
+	return `/plugins/${encodeURIComponent(info.folder)}/${path}${v}`;
 }
 
 export interface RegistryDeps {

@@ -18,6 +18,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Notify;
 
+use crate::i18n::{Lang, Msg, Text};
 use crate::migrations;
 
 pub const EVENT_CHANGED: &str = "todo://changed";
@@ -317,21 +318,27 @@ pub fn now_ms() -> i64 {
 }
 
 /// Notification body: the due time in local time ("Due 14:30", or with the date when it
-/// is not today). English until backend strings are localised.
-pub fn reminder_body(due: Option<i64>, now: i64) -> String {
-    use chrono::{Local, TimeZone};
+/// is not today, e.g. "Due Mon 3 Nov, 14:30" / "Bitiş: Pzt 3 Kas, 14:30").
+pub fn reminder_body(lang: Lang, due: Option<i64>, now: i64) -> String {
+    use chrono::{Datelike, Local, TimeZone};
     let Some(due) = due.and_then(|d| Local.timestamp_millis_opt(d).single()) else {
-        return "Reminder".into();
+        return lang.text(Text::Reminder).into();
     };
     let today = Local
         .timestamp_millis_opt(now)
         .single()
         .map(|n| n.date_naive());
-    if today == Some(due.date_naive()) {
-        format!("Due {}", due.format("%H:%M"))
+    let time = due.format("%H:%M");
+    let when = if today == Some(due.date_naive()) {
+        time.to_string()
     } else {
-        format!("Due {}", due.format("%a %-d %b, %H:%M"))
-    }
+        let (day, month) = lang.weekday_month(
+            due.weekday().num_days_from_monday() as usize,
+            due.month0() as usize,
+        );
+        format!("{day} {} {month}, {time}", due.day())
+    };
+    lang.msg(Msg::Due(&when))
 }
 
 // ── State, commands, scheduler ──────────────────────────────────────────────
@@ -444,15 +451,26 @@ fn notify(app: &AppHandle, title: &str, body: &str, sound: bool) {
 
 fn fire(app: &AppHandle, due: &[Todo], now: i64) {
     let sound = crate::settings::load(app).notification_sound;
+    let lang = crate::i18n::lang();
     for (i, t) in due.iter().enumerate() {
         if i < MAX_INDIVIDUAL_NOTIFICATIONS {
-            notify(app, &t.text, &reminder_body(t.due, now), sound && i == 0);
+            notify(
+                app,
+                &t.text,
+                &reminder_body(lang, t.due, now),
+                sound && i == 0,
+            );
         }
         let _ = app.emit(EVENT_REMINDER, json!({ "id": t.id }));
     }
     if due.len() > MAX_INDIVIDUAL_NOTIFICATIONS {
         let more = due.len() - MAX_INDIVIDUAL_NOTIFICATIONS;
-        notify(app, "Kotilo Deck", &format!("{more} more reminders"), false);
+        notify(
+            app,
+            "Kotilo Deck",
+            &lang.msg(Msg::MoreReminders(more)),
+            false,
+        );
     }
     tracing::info!(count = due.len(), "todo reminders fired");
     let _ = app.emit(EVENT_CHANGED, json!({}));
@@ -649,10 +667,30 @@ mod tests {
 
     #[test]
     fn body_formats_due() {
-        assert_eq!(reminder_body(None, 0), "Reminder");
+        use chrono::{Local, TimeZone};
+        assert_eq!(reminder_body(Lang::En, None, 0), "Reminder");
+        assert_eq!(reminder_body(Lang::Tr, None, 0), "Hatırlatma");
         let now = now_ms();
-        assert!(reminder_body(Some(now), now).starts_with("Due "));
-        assert_eq!(reminder_body(Some(now), now).len(), "Due 14:30".len());
+        assert!(reminder_body(Lang::En, Some(now), now).starts_with("Due "));
+        assert_eq!(
+            reminder_body(Lang::En, Some(now), now).len(),
+            "Due 14:30".len()
+        );
+        assert!(reminder_body(Lang::Tr, Some(now), now).starts_with("Bitiş: "));
+        // Another day shows the date (Mon 3 Nov 2025, local time).
+        let due = Local
+            .with_ymd_and_hms(2025, 11, 3, 14, 30, 0)
+            .unwrap()
+            .timestamp_millis();
+        let later = due + 3 * 86_400_000;
+        assert_eq!(
+            reminder_body(Lang::En, Some(due), later),
+            "Due Mon 3 Nov, 14:30"
+        );
+        assert_eq!(
+            reminder_body(Lang::Tr, Some(due), later),
+            "Bitiş: Pzt 3 Kas, 14:30"
+        );
     }
 
     #[test]

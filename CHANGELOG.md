@@ -4,6 +4,19 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+- The media widget no longer resends the album art with every playback update, which lowers IPC traffic and LAN bandwidth while music plays.
+- The tray menu and the app's own notifications (Pomodoro, to-do reminders, agent approvals) now appear in Turkish when the system language is Turkish.
+
+### Fixed
+- Edit mode: widgets that don't fit the grid can now be removed. Tap the "doesn't fit" notice in the top bar to list them; Undo puts them back.
+- Workspace auto-switch rules that fire while you are editing are no longer lost: the latest one is applied when you tap Done (unless more than 15 minutes have passed or you switched workspace yourself).
+- User themes with an invalid `radius` or `font` value now fall back to the defaults instead of breaking the card radius or fonts.
+- Long-pressing the edge of an external (plugin) widget now enters edit mode; taps inside the plugin still work.
+- Changing several settings quickly no longer leaves the shortcut or start-with-OS out of step with what was saved.
+- Reloading the deck while the media or volume widget is starting no longer briefly freezes the window.
+- Editing a widget plugin's files now reloads it on the deck straight away, not only when its manifest changes.
+
 ## [1.1.0] - 2026-11-12
 
 ### Added
@@ -99,5 +112,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Settings dialogs are centred (Tailwind preflight zeroed dialog margins).
 - Tablet/browser mode: plugin widgets load their scripts, styles and images; large video wallpapers stream instead of loading whole; `lan://status` (token URLs, QR) stays on the host. Install in the "ready" state relaunches the app. LAN, update and plugin errors carry an `errorCode` for translation.
 
-[Unreleased]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/kotilo-dev/kotilo-deck/releases/tag/v1.0.0

@@ -28,7 +28,7 @@ use windows::Storage::Streams::{
 };
 
 use super::com::{os, ComGuard, Worker};
-use crate::platform::shared::artwork_data_url;
+use crate::platform::shared::{artwork_data_url, artwork_key};
 use crate::platform::{
     ChangeFn, MediaAction, MediaSession, MediaState, PlatformError, RepeatMode, Result, Watch,
 };
@@ -354,6 +354,7 @@ fn read_session(s: &Session) -> Result<MediaSession> {
         title,
         artist,
         album,
+        artwork_key: artwork.as_deref().map(artwork_key),
         artwork,
         playing,
         position,

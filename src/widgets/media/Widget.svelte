@@ -7,7 +7,7 @@
 		mediaState,
 		mediaSubscribe,
 		mediaUnsubscribe,
-		on,
+		onMediaState,
 		type MediaAction,
 		type MediaSession
 	} from '#lib/ipc/index.ts';
@@ -63,7 +63,7 @@
 		if (!tauri || !available || !visible) return;
 		let disposed = false;
 		let unlisten: (() => void) | null = null;
-		on('media://state', (st) => {
+		onMediaState((st) => {
 			if (!disposed) receive(st.session);
 		})
 			.then((u) => (disposed ? u() : (unlisten = u)))

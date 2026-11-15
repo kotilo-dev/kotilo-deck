@@ -4,6 +4,7 @@ mod companion;
 mod crash;
 mod files;
 mod hotkeys;
+mod i18n;
 mod lan;
 mod logging;
 mod migrations;

@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 
 use super::{
     AudioDevice, AudioSession, AudioState, Capability, ChangeFn, MediaAction, MediaState, Platform,
-    Result, Watch,
+    PlatformError, Result, Watch,
 };
 
 mod audio;
@@ -115,12 +115,62 @@ impl Platform for LinuxPlatform {
     fn gpu_name(&self) -> Result<String> {
         gpu::name()
     }
+
+    fn ui_language(&self) -> Result<String> {
+        language_from_env(|k| std::env::var(k).ok())
+            .ok_or_else(|| PlatformError::Os("no UI language in the locale environment".into()))
+    }
+}
+
+/// gettext order (what WebKitGTK's `navigator.language` follows): the first entry of
+/// `LANGUAGE`, then `LC_ALL`, `LC_MESSAGES`, `LANG`. "tr_TR.UTF-8@x" → "tr-TR"; the
+/// "C" / "POSIX" locales count as unset.
+fn language_from_env(var: impl Fn(&str) -> Option<String>) -> Option<String> {
+    ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"]
+        .iter()
+        .filter_map(|k| var(k))
+        .find_map(|v| {
+            let first = v.split(':').next().unwrap_or_default();
+            let tag = first.split(['.', '@']).next().unwrap_or_default().trim();
+            (!tag.is_empty() && tag != "C" && tag != "POSIX").then(|| tag.replace('_', "-"))
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::platform::{NativeWindow, PlatformError};
+
+    #[test]
+    fn ui_language_follows_gettext_order() {
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |k: &str| {
+                pairs
+                    .iter()
+                    .find(|(n, _)| *n == k)
+                    .map(|(_, v)| v.to_string())
+            }
+        };
+        assert_eq!(
+            language_from_env(env(&[("LANG", "tr_TR.UTF-8")])).as_deref(),
+            Some("tr-TR")
+        );
+        assert_eq!(
+            language_from_env(env(&[("LANG", "tr_TR.UTF-8"), ("LC_ALL", "en_US.UTF-8")]))
+                .as_deref(),
+            Some("en-US")
+        );
+        assert_eq!(
+            language_from_env(env(&[("LANGUAGE", "tr:en"), ("LC_ALL", "en_US.UTF-8")])).as_deref(),
+            Some("tr")
+        );
+        assert_eq!(
+            language_from_env(env(&[("LC_ALL", "C"), ("LANG", "de_DE@euro")])).as_deref(),
+            Some("de-DE")
+        );
+        assert_eq!(language_from_env(env(&[("LANG", "POSIX")])), None);
+        assert_eq!(language_from_env(env(&[])), None);
+    }
 
     #[test]
     fn opacity_is_not_implemented() {

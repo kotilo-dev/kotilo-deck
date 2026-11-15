@@ -3,6 +3,29 @@ import { COLOR_TOKENS, type Theme } from './types';
 
 const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
+export const DEFAULT_RADIUS = '16px';
+export const DEFAULT_FONT_UI = 'Inter, system-ui, sans-serif';
+export const DEFAULT_FONT_MONO = 'JetBrains Mono, ui-monospace, monospace';
+
+/** Card radius: a non-negative CSS length (`0`, `16px`, `1.25rem`, `.5em`, `8%`), nothing else. */
+const RADIUS = /^(?:0|(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%))$/;
+/** One font family: a quoted name without quotes/backslashes inside, or space-separated identifiers. */
+const FAMILY = /^(?:"[^"\\;{}<>]+"|'[^'\\;{}<>]+'|[\p{L}_-][\p{L}\p{N}_-]*(?: [\p{L}_-][\p{L}\p{N}_-]*)*)$/u;
+const MAX_FONT_LENGTH = 200;
+
+/** True for a CSS length usable as `--k-radius`. */
+export const isRadius = (v: unknown): v is string => typeof v === 'string' && RADIUS.test(v.trim());
+
+/**
+ * True for a plain `font-family` list (`Inter, "Noto Sans", sans-serif`). Rejects anything that could
+ * escape the custom property or load something: `;`, braces, `url(`, `var(`, backslashes, stray quotes.
+ */
+export function isFontList(v: unknown): v is string {
+	if (typeof v !== 'string' || v.length > MAX_FONT_LENGTH) return false;
+	const families = v.split(',').map((f) => f.trim());
+	return families.length > 0 && families.every((f) => FAMILY.test(f));
+}
+
 export class ThemeError extends Error {}
 
 /** Validates unknown JSON against the theme contract; throws ThemeError naming the offending field. */
@@ -39,11 +62,12 @@ export function parseTheme(input: unknown): Theme {
 		pair: typeof t.pair === 'string' ? t.pair : undefined,
 		short: typeof t.short === 'string' && t.short.trim() ? t.short.trim() : undefined,
 		colors: Object.fromEntries(COLOR_TOKENS.map((k) => [k, t.colors[k]])) as Theme['colors'],
-		radius: typeof t.radius === 'string' ? t.radius : '16px',
+		// Values go straight into CSS custom properties: invalid ones fall back to the defaults.
+		radius: isRadius(t.radius) ? t.radius.trim() : DEFAULT_RADIUS,
 		opacity: { surface, bg },
 		font: {
-			ui: t.font?.ui ?? 'Inter, system-ui, sans-serif',
-			mono: t.font?.mono ?? 'JetBrains Mono, ui-monospace, monospace'
+			ui: isFontList(t.font?.ui) ? t.font.ui.trim() : DEFAULT_FONT_UI,
+			mono: isFontList(t.font?.mono) ? t.font.mono.trim() : DEFAULT_FONT_MONO
 		}
 	};
 }
