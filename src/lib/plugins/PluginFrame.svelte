@@ -1,3 +1,12 @@
+<script lang="ts" module>
+	/**
+	 * Width of the transparent grip ring along the card edges outside edit mode. The iframe swallows pointer
+	 * events, so without it a long-press on a plugin card never reaches the deck. Kept under the smallest card
+	 * padding (DESIGN §3: 14 px on 1-row cards) so it covers padding, not the plugin's own controls.
+	 */
+	export const GRIP_PX = 12;
+</script>
+
 <script lang="ts">
 	/**
 	 * Host for every external widget (docs/plugin-api.md): a sandboxed iframe filling the card, plus the
@@ -159,6 +168,12 @@
 		{#if editing}
 			<!-- iframes swallow pointer events: this keeps long-press / drag on the deck while editing. -->
 			<div class="overlay" aria-hidden="true"></div>
+		{:else}
+			<!-- Outside edit mode only the card edges stay with the deck (long-press → edit, swipe), so taps
+			     inside the plugin keep working. -->
+			<div class="grip" style:--grip="{GRIP_PX}px" aria-hidden="true">
+				<span class="edge top"></span><span class="edge right"></span><span class="edge bottom"></span><span class="edge left"></span>
+			</div>
 		{/if}
 	</section>
 {/if}
@@ -186,6 +201,40 @@
 		position: absolute;
 		inset: 0;
 		background: transparent;
+	}
+	.grip {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+	.edge {
+		position: absolute;
+		background: transparent;
+		pointer-events: auto;
+	}
+	.edge.top,
+	.edge.bottom {
+		left: 0;
+		right: 0;
+		height: var(--grip);
+	}
+	.edge.top {
+		top: 0;
+	}
+	.edge.bottom {
+		bottom: 0;
+	}
+	.edge.left,
+	.edge.right {
+		top: var(--grip);
+		bottom: var(--grip);
+		width: var(--grip);
+	}
+	.edge.left {
+		left: 0;
+	}
+	.edge.right {
+		right: 0;
 	}
 	.skeleton {
 		position: absolute;
