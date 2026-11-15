@@ -4,13 +4,15 @@
 	import { layout, nextDensity } from '#lib/grid/index.ts';
 	import Icon from './Icon.svelte';
 	import Mark from './Mark.svelte';
+	import Popover from './Popover.svelte';
 	import ThemePicker from './ThemePicker.svelte';
 	import WorkspaceMenu from './WorkspaceMenu.svelte';
 	import WorkspaceSwitcher from './WorkspaceSwitcher.svelte';
-	import { getDeck, unplacedText, widgetName } from './deck.svelte';
+	import { fmtSize, getDeck, removeWithUndo, unplacedText, widgetName } from './deck.svelte';
 	import { canOpenSettings, companionText, companionView, openSettingsAt } from './companion.svelte';
 
-	const { store, ui } = getDeck();
+	const deck = getDeck();
+	const { store, ui } = deck;
 	const companion = ui.companion;
 	const ws = $derived(store.active);
 	const view = $derived(companionView(store.settings.companion.enabled, companion.status));
@@ -23,6 +25,17 @@
 	}
 
 	const unplaced = $derived(ws ? layout(ws.widgets, ws.grid).unplaced : []);
+	let hiddenMenu = $state<HTMLDivElement>();
+
+	/** Hidden (unplaced) widgets can't be dragged to the trash: remove them from the list instead (Undo as usual). */
+	function removeHidden(instance: string) {
+		const last = unplaced.length <= 1;
+		if (last) hiddenMenu?.hidePopover();
+		removeWithUndo(deck, instance);
+		// The row (or the whole list) is gone: keep focus somewhere useful for keyboard users.
+		if (last) document.querySelector<HTMLElement>('.deck-grid')?.focus();
+		else hiddenMenu?.querySelector<HTMLElement>('button')?.focus();
+	}
 	/** Overlay mode is a borderless normal window: the empty parts of the top bar move it. */
 	const drag = $derived(store.settings.displayMode === 'overlay' ? true : undefined);
 
@@ -77,13 +90,38 @@
 		</div>
 		<p class="hint" class:warn={unplaced.length > 0} aria-live="polite">
 			{#if unplaced.length > 0}
-				<Icon name="alert" size={16} />
-				{unplacedText(unplaced.map((w) => widgetName(w.widget)))}
+				<button type="button" class="hidden-trigger" popovertarget="k-hidden-menu" aria-haspopup="dialog">
+					<Icon name="alert" size={16} />
+					<span class="hidden-text">{unplacedText(unplaced.map((w) => widgetName(w.widget)))}</span>
+					<Icon name="chevronDown" size={16} />
+				</button>
 			{:else}
 				{t('shell.edit.hint')}
 				<span class="k-sr-only">{t('shell.edit.hintKeys')}</span>
 			{/if}
 		</p>
+		{#if unplaced.length > 0}
+			<Popover id="k-hidden-menu" label={t('shell.edit.hiddenTitle')} align="center" width={300} bind:el={hiddenMenu}>
+				<p class="hidden-help">{t('shell.edit.hiddenHelp')}</p>
+				<ul class="hidden-list">
+					{#each unplaced as w (w.instance)}
+						<li class="hidden-row">
+							<span class="hidden-name">{widgetName(w.widget)}</span>
+							<span class="hidden-size k-mono">{fmtSize(w)}</span>
+							<button
+								type="button"
+								class="k-btn k-btn-icon hidden-remove"
+								aria-label={t('shell.edit.hiddenRemove', { name: widgetName(w.widget) })}
+								title={t('shell.edit.hiddenRemove', { name: widgetName(w.widget) })}
+								onclick={() => removeHidden(w.instance)}
+							>
+								<Icon name="trash" size={16} />
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</Popover>
+		{/if}
 		<div class="side end">
 			<button type="button" class="k-btn add" aria-expanded={ui.drawerOpen} aria-controls="k-drawer" onclick={() => (ui.drawerOpen = !ui.drawerOpen)}>
 				<Icon name="plus" size={16} stroke={2.4} />{t('shell.edit.addWidget')}
@@ -224,6 +262,69 @@
 	.hint.warn {
 		/* Raw warning fails 4.5:1 on light bg (Latte ≈ 2.3:1); same mix the widgets use. */
 		color: color-mix(in srgb, var(--k-warning) 35%, var(--k-text));
+	}
+	.hidden-trigger {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		max-width: 100%;
+		min-height: 44px;
+		padding: 0 10px;
+		border: 0;
+		border-radius: 10px;
+		background: transparent;
+		color: inherit;
+		font-size: 12px;
+	}
+	.hidden-trigger:hover {
+		background: color-mix(in srgb, var(--k-text) 6%, transparent);
+	}
+	.hidden-trigger :global(svg) {
+		flex: none;
+	}
+	.hidden-text {
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+	.hidden-help {
+		margin: 4px 8px 8px;
+		font-size: 12px;
+		color: var(--k-text-muted);
+	}
+	.hidden-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.hidden-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 0 0 0 12px;
+		border-radius: 10px;
+	}
+	.hidden-row:hover {
+		background: var(--k-surface);
+	}
+	.hidden-name {
+		flex: 1;
+		min-width: 0;
+		font-size: 13px;
+		font-weight: 600;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+	.hidden-size {
+		font-size: 11px;
+		color: var(--k-text-muted);
+	}
+	.hidden-remove {
+		border-color: transparent;
+		color: var(--k-danger);
 	}
 	.add {
 		font-weight: 500;

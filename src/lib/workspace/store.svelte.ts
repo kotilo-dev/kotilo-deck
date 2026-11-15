@@ -13,6 +13,7 @@ import {
 	fits,
 	isAutoDensity,
 	isPortrait,
+	layout,
 	reflow,
 	type GridSize,
 	type Size
@@ -496,23 +497,31 @@ export class WorkspaceStore {
 		return inst;
 	}
 
-	/** Returns what was removed (for Undo), or null. */
-	removeWidget(instance: string): { workspace: string; widget: WidgetInstance } | null {
+	/**
+	 * Returns what was removed (for Undo), or null. Works for hidden (unplaced) instances too;
+	 * `hidden` tells Undo to put such an instance back as it was instead of looking for room.
+	 */
+	removeWidget(instance: string): { workspace: string; widget: WidgetInstance; hidden: boolean } | null {
 		const ws = this.active;
 		const found = ws?.widgets.find((w) => w.instance === instance);
 		if (!ws || !found || this.#stored.has(ws.id)) return null;
+		const hidden = layout(ws.widgets, ws.grid).unplaced.includes(found);
 		const widget = structuredClone($state.snapshot(found)) as WidgetInstance;
 		ws.widgets = ws.widgets.filter((w) => w.instance !== instance);
 		this.#dropUnplaced(ws.id, instance);
 		this.#touch(ws.id);
-		return { workspace: ws.id, widget };
+		return { workspace: ws.id, widget, hidden };
 	}
 
-	/** Undo of `removeWidget`: back in its old cells if they are still free, else the first free slot. Call once. */
-	restoreWidget(workspace: string, widget: WidgetInstance): boolean {
+	/**
+	 * Undo of `removeWidget`: back in its old cells if they are still free, else the first free slot. Call once.
+	 * A `hidden` instance goes back at its old coordinates even without room (hidden again, never lost).
+	 */
+	restoreWidget(workspace: string, widget: WidgetInstance, hidden = false): boolean {
 		const ws = this.#find(workspace);
 		if (!ws || this.#stored.has(ws.id)) return false;
-		const slot = fits(widget, ws.widgets, ws.grid) ? { x: widget.x, y: widget.y } : firstFreeSlot(widget, ws.widgets, ws.grid);
+		const slot =
+			hidden || fits(widget, ws.widgets, ws.grid) ? { x: widget.x, y: widget.y } : firstFreeSlot(widget, ws.widgets, ws.grid);
 		if (!slot) return false;
 		// A widget added since may have reused the instance id: the restored one then gets a fresh id.
 		const taken = ws.widgets.map((w) => w.instance);

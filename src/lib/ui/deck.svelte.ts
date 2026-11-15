@@ -115,7 +115,7 @@ export const getDeck = () => getContext<DeckContext>(KEY);
 /** Toast duration for removals with Undo. */
 export const UNDO_MS = 5000;
 
-/** Removes a widget instance and offers Undo for 5 s (edit-mode Delete, trash zone, sheet button). */
+/** Removes a widget instance and offers Undo for 5 s (edit-mode Delete, trash zone, sheet button, hidden list). */
 export function removeWithUndo({ store, ui }: DeckContext, instance: string): void {
 	const removed = store.removeWidget(instance);
 	if (!removed) return;
@@ -124,7 +124,7 @@ export function removeWithUndo({ store, ui }: DeckContext, instance: string): vo
 	ui.say(t('shell.edit.removed', { name }), 'info', UNDO_MS, {
 		label: t('shell.edit.undo'),
 		run: () => {
-			if (store.restoreWidget(removed.workspace, removed.widget)) {
+			if (store.restoreWidget(removed.workspace, removed.widget, removed.hidden)) {
 				const back = store.active?.widgets.at(-1)?.instance;
 				if (back) ui.flash(back);
 			} else {
