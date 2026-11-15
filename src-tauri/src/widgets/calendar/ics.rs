@@ -130,6 +130,8 @@ pub struct VEvent {
     pub exdates: Vec<IcsTime>,
     pub rdates: Vec<IcsTime>,
     pub recurrence_id: Option<IcsTime>,
+    /// `RECURRENCE-ID;RANGE=THISANDFUTURE`: the override also applies to later instances.
+    pub this_and_future: bool,
     pub cancelled: bool,
 }
 
@@ -484,6 +486,7 @@ impl VEvent {
         };
         let exdates = all("EXDATE");
         let rdates = all("RDATE");
+        let rid_line = get("RECURRENCE-ID");
         Some(VEvent {
             uid,
             summary,
@@ -496,7 +499,10 @@ impl VEvent {
                 .filter(|r| !r.is_empty()),
             exdates,
             rdates,
-            recurrence_id: get("RECURRENCE-ID").and_then(|l| line_time(l, zones)),
+            recurrence_id: rid_line.and_then(|l| line_time(l, zones)),
+            this_and_future: rid_line
+                .and_then(|l| l.param("RANGE"))
+                .is_some_and(|r| r.trim().eq_ignore_ascii_case("THISANDFUTURE")),
             cancelled: get("STATUS")
                 .is_some_and(|l| l.value.trim().eq_ignore_ascii_case("CANCELLED")),
         })
@@ -504,6 +510,10 @@ impl VEvent {
 }
 
 // ── Expansion ───────────────────────────────────────────────────────────────
+
+/// Extra scan horizon when a THISANDFUTURE override moves instances earlier: the shift
+/// is in wall-clock time, so a DST change can add to it.
+const SHIFT_SLACK_MS: i64 = 86_400_000;
 
 /// Length of each occurrence.
 #[derive(Debug, Clone, Copy)]
@@ -592,24 +602,106 @@ fn single(
     })
 }
 
+/// What a series instance looks like (after any THISANDFUTURE override).
+#[derive(Debug, Clone)]
+struct Look {
+    span: Span,
+    all_day: bool,
+    title: String,
+    location: Option<String>,
+}
+
+/// A `RANGE=THISANDFUTURE` override resolved against its series.
+struct Future {
+    /// Original start of the overridden instance; applies to every instance at or after it.
+    rid_ms: i64,
+    /// The override's own start.
+    start: DateTime<Tz>,
+    /// DTSTART − RECURRENCE-ID, in the series' wall clock (so DST does not drift it).
+    shift: TimeDelta,
+    look: Look,
+    cancelled: bool,
+}
+
+/// THISANDFUTURE overrides of one series, sorted by RECURRENCE-ID. Each RECURRENCE-ID
+/// names an original (rule-generated) instance. Text, location and length an override
+/// leaves out are inherited from the previous override of the chain, then the series.
+fn future_chain(overrides: &[&VEvent], frame: &Frame, series: &Look, local: Tz) -> Vec<Future> {
+    let mut list: Vec<(DateTime<Tz>, DateTime<Tz>, &VEvent)> = overrides
+        .iter()
+        .filter_map(|o| {
+            let rid = o.recurrence_id.as_ref()?.resolve(local)?;
+            Some((rid, o.start.resolve(local)?, *o))
+        })
+        .collect();
+    list.sort_by_key(|(rid, _, _)| rid.timestamp_millis());
+    let mut prev = series.clone();
+    let mut chain = Vec::with_capacity(list.len());
+    for (rid, start, o) in list {
+        let own_span =
+            o.end.is_some() || o.duration.is_some() || o.start.is_date() != series.all_day;
+        let look = Look {
+            span: if own_span {
+                Span::of(o, start, local)
+            } else {
+                prev.span
+            },
+            all_day: if own_span {
+                o.start.is_date()
+            } else {
+                prev.all_day
+            },
+            title: o.summary.clone().unwrap_or_else(|| prev.title.clone()),
+            location: o.location.clone().or_else(|| prev.location.clone()),
+        };
+        let shift = frame.wall(frame.anchor(start)) - frame.wall(frame.anchor(rid));
+        prev = look.clone();
+        chain.push(Future {
+            rid_ms: rid.timestamp_millis(),
+            start,
+            shift,
+            look,
+            cancelled: o.cancelled,
+        });
+    }
+    chain
+}
+
 /// Occurrences overlapping `[from_ms, to_ms)`: recurring series expanded (RRULE + RDATE −
-/// EXDATE − overridden instances), `RECURRENCE-ID` overrides applied, cancelled ones
-/// dropped. Not sorted.
+/// EXDATE − overridden instances), `RECURRENCE-ID` overrides applied (a
+/// `RANGE=THISANDFUTURE` one to its instance and every later one; a plain override wins
+/// for its own instance), cancelled ones dropped. Not sorted.
 pub fn expand(events: &[VEvent], from_ms: i64, to_ms: i64, local: Tz) -> Vec<Occurrence> {
-    let mut overridden: HashMap<&str, HashSet<i64>> = HashMap::new();
+    let mut plain: HashMap<&str, HashSet<i64>> = HashMap::new();
+    let mut futures: HashMap<&str, Vec<&VEvent>> = HashMap::new();
+    let mut series: HashSet<&str> = HashSet::new();
     for ev in events {
-        if let Some(rid) = ev.recurrence_id.as_ref().and_then(|r| r.resolve(local)) {
-            overridden
-                .entry(ev.uid.as_str())
-                .or_default()
-                .insert(rid.timestamp_millis());
+        match &ev.recurrence_id {
+            Some(_) if ev.this_and_future => {
+                futures.entry(ev.uid.as_str()).or_default().push(ev);
+            }
+            Some(rid) => {
+                if let Some(rid) = rid.resolve(local) {
+                    plain
+                        .entry(ev.uid.as_str())
+                        .or_default()
+                        .insert(rid.timestamp_millis());
+                }
+            }
+            None => {
+                if !ev.cancelled && (ev.rrule.is_some() || !ev.rdates.is_empty()) {
+                    series.insert(ev.uid.as_str());
+                }
+            }
         }
     }
 
     let mut out = Vec::new();
     for ev in events {
         if let Some(rid) = &ev.recurrence_id {
-            if !ev.cancelled {
+            // THISANDFUTURE overrides of a live series are emitted with their series.
+            let with_series = ev.this_and_future && series.contains(ev.uid.as_str());
+            if !ev.cancelled && !with_series {
                 out.extend(single(ev, rid.resolve(local), local, from_ms, to_ms));
             }
             continue;
@@ -626,9 +718,19 @@ pub fn expand(events: &[VEvent], from_ms: i64, to_ms: i64, local: Tz) -> Vec<Occ
             continue;
         };
         let frame = Frame::of(&ev.start, local);
-        let span = Span::of(ev, start, local);
-        let mut excluded: HashSet<i64> =
-            overridden.get(ev.uid.as_str()).cloned().unwrap_or_default();
+        let base = Look {
+            span: Span::of(ev, start, local),
+            all_day: ev.start.is_date(),
+            title: ev.summary.clone().unwrap_or_default(),
+            location: ev.location.clone(),
+        };
+        let plain_keys = plain.get(ev.uid.as_str());
+        let chain = futures
+            .get(ev.uid.as_str())
+            .map(|o| future_chain(o, &frame, &base, local))
+            .unwrap_or_default();
+
+        let mut excluded: HashSet<i64> = plain_keys.cloned().unwrap_or_default();
         let mut excluded_days: HashSet<NaiveDate> = HashSet::new();
         for ex in &ev.exdates {
             match (ex, ev.start.is_date()) {
@@ -643,27 +745,76 @@ pub fn expand(events: &[VEvent], from_ms: i64, to_ms: i64, local: Tz) -> Vec<Occ
                 }
             }
         }
-        let emit = |f: DateTime<Tz>, out: &mut Vec<Occurrence>| {
-            let occ = frame.instant(f);
-            let key = occ.timestamp_millis();
-            if excluded.contains(&key) || excluded_days.contains(&frame.wall(f).date()) {
-                return;
+        // A THISANDFUTURE override's own instance is emitted as itself, not from the rule.
+        for f in &chain {
+            excluded.insert(f.rid_ms);
+            let replaced = plain_keys.is_some_and(|k| k.contains(&f.rid_ms));
+            if f.cancelled || replaced {
+                continue;
             }
-            if let Some((s, e)) = span.at(occ, local) {
+            if let Some((s, e)) = f.look.span.at(f.start, local) {
                 if e > from_ms && s < to_ms {
                     out.push(Occurrence {
                         uid: ev.uid.clone(),
-                        key_ms: s,
+                        key_ms: f.rid_ms,
                         start_ms: s,
                         end_ms: e,
-                        all_day: ev.start.is_date(),
-                        title: ev.summary.clone().unwrap_or_default(),
-                        location: ev.location.clone(),
+                        all_day: f.look.all_day,
+                        title: f.look.title.clone(),
+                        location: f.look.location.clone(),
+                    });
+                }
+            }
+        }
+
+        let emit = |f: DateTime<Tz>, out: &mut Vec<Occurrence>| {
+            let orig = frame.instant(f);
+            let key = orig.timestamp_millis();
+            if excluded.contains(&key) || excluded_days.contains(&frame.wall(f).date()) {
+                return;
+            }
+            let (at, look) = match chain.partition_point(|c| c.rid_ms <= key) {
+                0 => (orig, &base),
+                i => {
+                    let c = &chain[i - 1];
+                    if c.cancelled {
+                        return;
+                    }
+                    let Some(moved) = frame
+                        .wall(f)
+                        .checked_add_signed(c.shift)
+                        .and_then(|w| frame.at_wall(w))
+                    else {
+                        return;
+                    };
+                    (frame.instant(moved), &c.look)
+                }
+            };
+            if let Some((s, e)) = look.span.at(at, local) {
+                if e > from_ms && s < to_ms {
+                    out.push(Occurrence {
+                        uid: ev.uid.clone(),
+                        key_ms: key,
+                        start_ms: s,
+                        end_ms: e,
+                        all_day: look.all_day,
+                        title: look.title.clone(),
+                        location: look.location.clone(),
                     });
                 }
             }
         };
 
+        // Instances an override moves earlier may come from beyond the window.
+        let earlier = chain
+            .iter()
+            .map(|c| -c.shift.num_milliseconds())
+            .max()
+            .unwrap_or(0);
+        let horizon = match earlier {
+            e if e > 0 => to_ms.saturating_add(e).saturating_add(SHIFT_SLACK_MS),
+            _ => to_ms,
+        };
         let mut seen: HashSet<i64> = HashSet::new();
         let first = frame.anchor(start);
         match ev
@@ -674,7 +825,7 @@ pub fn expand(events: &[VEvent], from_ms: i64, to_ms: i64, local: Tz) -> Vec<Occ
             Some(set) => {
                 for occ in (&set).into_iter().take(MAX_SCANNED) {
                     let t = frame.instant(occ).timestamp_millis();
-                    if t >= to_ms {
+                    if t >= horizon {
                         break;
                     }
                     seen.insert(t);
