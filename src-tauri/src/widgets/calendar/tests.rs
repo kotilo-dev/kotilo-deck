@@ -12,6 +12,8 @@ use super::*;
 const GOOGLE: &str = include_str!("../fixtures/calendar/google.ics");
 const OUTLOOK: &str = include_str!("../fixtures/calendar/outlook.ics");
 const ICLOUD: &str = include_str!("../fixtures/calendar/icloud.ics");
+const VTIMEZONE: &str = include_str!("../fixtures/calendar/vtimezone.ics");
+const THIS_AND_FUTURE: &str = include_str!("../fixtures/calendar/thisandfuture.ics");
 const BERLIN: Tz = Tz::Tz(chrono_tz::Europe::Berlin);
 
 fn ms(rfc3339: &str) -> i64 {
@@ -506,6 +508,356 @@ fn old_daily_series_expands_within_window_only() {
             ),
         ]
     );
+}
+
+// ── VTIMEZONE and TZID normalisation ────────────────────────────────────────
+
+/// (title, start, end, allDay) of `expand` over an explicit window, sorted.
+fn expand_rows(text: &str, from: &str, to: &str) -> Vec<(String, i64, i64, bool)> {
+    let events = parse_calendar(text).unwrap();
+    let mut v: Vec<_> = ics::expand(&events, ms(from), ms(to), BERLIN)
+        .into_iter()
+        .map(|o| (o.title, o.start_ms, o.end_ms, o.all_day))
+        .collect();
+    v.sort_by(|a, b| (a.1, &a.0).cmp(&(b.1, &b.0)));
+    v
+}
+
+#[test]
+fn vtimezone_fixture() {
+    assert!(VTIMEZONE.contains("\r\n"), "fixture keeps Outlook CRLF");
+    let got = expand_rows(VTIMEZONE, "2026-10-28T00:00:00Z", "2027-04-01T00:00:00Z");
+    let ny = |start: &str, end: &str| row("NY standup", start, end, false);
+    assert_eq!(
+        got,
+        vec![
+            // Custom-named VTIMEZONE with US rules: EDT (-4) until 1 Nov 02:00.
+            ny("2026-10-28T13:00:00Z", "2026-10-28T13:15:00Z"),
+            ny("2026-10-29T13:00:00Z", "2026-10-29T13:15:00Z"),
+            // 30 Oct: EXDATE in the custom zone.
+            ny("2026-10-31T13:00:00Z", "2026-10-31T13:15:00Z"),
+            // 01:30 happens twice on 1 Nov: the first one (EDT).
+            row(
+                "Night batch (fall-back)",
+                "2026-11-01T05:30:00Z",
+                "2026-11-01T06:00:00Z",
+                false
+            ),
+            // Still 09:00 wall clock, now EST (-5).
+            ny("2026-11-01T14:00:00Z", "2026-11-01T14:15:00Z"),
+            ny("2026-11-02T14:00:00Z", "2026-11-02T14:15:00Z"),
+            ny("2026-11-03T14:00:00Z", "2026-11-03T14:15:00Z"),
+            // Unknown name, no VTIMEZONE: local (Berlin) wall clock.
+            row(
+                "Unknown zone",
+                "2026-11-04T09:00:00Z",
+                "2026-11-04T09:30:00Z",
+                false
+            ),
+            // "GTB Standard Time" → Europe/Athens (EET, +2) despite the feed's +0 block.
+            row(
+                "Athens sync",
+                "2026-11-04T10:00:00Z",
+                "2026-11-04T10:30:00Z",
+                false
+            ),
+            row(
+                "Mozilla prefixed",
+                "2026-11-04T12:00:00Z",
+                "2026-11-04T13:00:00Z",
+                false
+            ),
+            row(
+                "Citadel prefixed",
+                "2026-11-04T14:00:00Z",
+                "2026-11-04T15:00:00Z",
+                false
+            ),
+            // UNTIL (UTC) equals this instance: inclusive, and the last one.
+            ny("2026-11-04T14:00:00Z", "2026-11-04T14:15:00Z"),
+            // Fixed-offset VTIMEZONE (+03:00, no RRULE), weekly COUNT=2; the event comes
+            // before its VTIMEZONE in the file.
+            row(
+                "Istanbul office hours",
+                "2026-11-05T07:00:00Z",
+                "2026-11-05T08:00:00Z",
+                false
+            ),
+            row(
+                "Istanbul office hours",
+                "2026-11-12T07:00:00Z",
+                "2026-11-12T08:00:00Z",
+                false
+            ),
+            // 02:30 does not exist on 14 Mar 2027: read with the offset before the gap
+            // (EST), i.e. 03:30 EDT.
+            row(
+                "Night batch (spring-forward)",
+                "2027-03-14T07:30:00Z",
+                "2027-03-14T08:00:00Z",
+                false
+            ),
+        ]
+    );
+}
+
+#[test]
+fn vtimezone_is_parsed_once_and_matches_chrono_tz() {
+    let events = parse_calendar(VTIMEZONE).unwrap();
+    let custom = |uid: &str| match &events.iter().find(|e| e.uid == uid).unwrap().start {
+        IcsTime::Custom(_, tz) => tz.clone(),
+        other => panic!("{uid}: expected a VTIMEZONE zone, got {other:?}"),
+    };
+    let ny = custom("ny-daily");
+    // One transition table per TZID and parse, shared by every event using it.
+    assert!(Arc::ptr_eq(&ny, &custom("ny-overlap")));
+    assert!(Arc::ptr_eq(&ny, &custom("ny-gap")));
+    assert_eq!(ny.tzid, "(UTC-05:00) Eastern Time (US & Canada)");
+
+    // Every half hour of 2026–2027 (gaps and overlaps included) resolves exactly like
+    // chrono-tz's America/New_York.
+    let mut t = chrono::NaiveDate::from_ymd_opt(2026, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    let end = chrono::NaiveDate::from_ymd_opt(2028, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    while t < end {
+        let a = IcsTime::Custom(t, ny.clone()).resolve(BERLIN).unwrap();
+        let b = IcsTime::Zoned(t, chrono_tz::America::New_York)
+            .resolve(BERLIN)
+            .unwrap();
+        assert_eq!(a.timestamp(), b.timestamp(), "{t}");
+        t += chrono::TimeDelta::minutes(30);
+    }
+
+    let fixed = custom("fixed-offset-weekly");
+    for y in [1990, 2026, 2150] {
+        let n = chrono::NaiveDate::from_ymd_opt(y, 7, 1)
+            .unwrap()
+            .and_hms_opt(12, 0, 0)
+            .unwrap();
+        assert_eq!(fixed.to_utc(n), n - chrono::TimeDelta::hours(3));
+    }
+}
+
+#[test]
+fn outlook_style_vtimezone_with_untils_and_rdates() {
+    // Historic observances end with UNTIL; the current rule starts later. An RDATE-based
+    // one-off transition is honoured too.
+    let text = cal(
+        "BEGIN:VTIMEZONE\nTZID:Custom Zone\n\
+         BEGIN:STANDARD\nDTSTART:19700101T000000\nTZOFFSETFROM:+0100\nTZOFFSETTO:+0100\nEND:STANDARD\n\
+         BEGIN:DAYLIGHT\nDTSTART:20000326T020000\nRRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU;UNTIL=20200329T010000Z\n\
+         TZOFFSETFROM:+0100\nTZOFFSETTO:+0200\nEND:DAYLIGHT\n\
+         BEGIN:STANDARD\nDTSTART:20001029T030000\nRRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU;UNTIL=20201025T010000Z\n\
+         TZOFFSETFROM:+0200\nTZOFFSETTO:+0100\nEND:STANDARD\n\
+         BEGIN:STANDARD\nDTSTART:20260601T000000\nRDATE:20260601T000000\nTZOFFSETFROM:+0100\nTZOFFSETTO:+0300\nEND:STANDARD\n\
+         END:VTIMEZONE\n\
+         BEGIN:VEVENT\nUID:a\nSUMMARY:2020 summer\nDTSTART;TZID=Custom Zone:20200701T120000\nEND:VEVENT\n\
+         BEGIN:VEVENT\nUID:b\nSUMMARY:2021 summer\nDTSTART;TZID=Custom Zone:20210701T120000\nEND:VEVENT\n\
+         BEGIN:VEVENT\nUID:c\nSUMMARY:2026 winter\nDTSTART;TZID=Custom Zone:20261201T120000\nEND:VEVENT",
+    );
+    assert_eq!(
+        expand_rows(&text, "2020-01-01T00:00:00Z", "2027-01-01T00:00:00Z"),
+        vec![
+            // Last DST season of the old rule (2020 onset is the UNTIL instant).
+            row(
+                "2020 summer",
+                "2020-07-01T10:00:00Z",
+                "2020-07-01T10:00:00Z",
+                false
+            ),
+            // Rules ended: plain +01:00.
+            row(
+                "2021 summer",
+                "2021-07-01T11:00:00Z",
+                "2021-07-01T11:00:00Z",
+                false
+            ),
+            // RDATE onset on 1 Jun 2026 moved the zone to +03:00.
+            row(
+                "2026 winter",
+                "2026-12-01T09:00:00Z",
+                "2026-12-01T09:00:00Z",
+                false
+            ),
+        ]
+    );
+}
+
+#[test]
+fn broken_vtimezone_falls_back_to_local_time() {
+    let text = cal(
+        "BEGIN:VTIMEZONE\nTZID:Broken\nBEGIN:STANDARD\nDTSTART:19700101T000000\nTZOFFSETTO:junk\nEND:STANDARD\nEND:VTIMEZONE\n\
+         BEGIN:VEVENT\nUID:x\nSUMMARY:X\nDTSTART;TZID=Broken:20261104T100000\nEND:VEVENT",
+    );
+    let events = parse_calendar(&text).unwrap();
+    assert!(matches!(events[0].start, IcsTime::Floating(_)));
+}
+
+// ── RANGE=THISANDFUTURE ─────────────────────────────────────────────────────
+
+#[test]
+fn this_and_future_fixture() {
+    let up = upcoming_of(THIS_AND_FUTURE, 42, 100);
+    let located: Vec<_> = up
+        .events
+        .iter()
+        .map(|e| (e.title.as_str(), e.location.as_deref()))
+        .collect();
+    assert_eq!(
+        rows(&up),
+        vec![
+            row(
+                "Planning",
+                "2026-11-03T09:00:00Z",
+                "2026-11-03T09:30:00Z",
+                false
+            ),
+            // Cancelled THISANDFUTURE from 19 Nov ends the retro series.
+            row(
+                "Retro",
+                "2026-11-05T15:00:00Z",
+                "2026-11-05T16:00:00Z",
+                false
+            ),
+            // THISANDFUTURE: +1 h 30, 1 h long, new title and room.
+            row(
+                "Planning (new time)",
+                "2026-11-10T10:30:00Z",
+                "2026-11-10T11:30:00Z",
+                false
+            ),
+            row(
+                "Retro",
+                "2026-11-12T15:00:00Z",
+                "2026-11-12T16:00:00Z",
+                false
+            ),
+            // A plain override wins for its own instance.
+            row(
+                "Planning (one-off)",
+                "2026-11-17T14:00:00Z",
+                "2026-11-17T14:30:00Z",
+                false
+            ),
+            // Second THISANDFUTURE (09:00, i.e. -1 h from the original 10:00): keeps the
+            // title and length of the first, changes the room.
+            row(
+                "Planning (new time)",
+                "2026-11-24T08:00:00Z",
+                "2026-11-24T09:00:00Z",
+                false
+            ),
+            row(
+                "Planning (new time)",
+                "2026-12-01T08:00:00Z",
+                "2026-12-01T09:00:00Z",
+                false
+            ),
+            // 8 Dec: EXDATE matches the original (unshifted) instance time.
+        ]
+    );
+    assert_eq!(
+        located,
+        vec![
+            ("Planning", Some("Room 1")),
+            ("Retro", None),
+            ("Planning (new time)", Some("Room 2")),
+            ("Retro", None),
+            ("Planning (one-off)", None),
+            ("Planning (new time)", Some("Room 3")),
+            ("Planning (new time)", Some("Room 3")),
+        ]
+    );
+    // Ids stay keyed by the original instance time.
+    let ids: Vec<_> = up
+        .events
+        .iter()
+        .filter(|e| e.title != "Retro")
+        .map(|e| e.id.rsplit(':').next().unwrap().parse::<i64>().unwrap())
+        .collect();
+    assert_eq!(
+        ids,
+        vec![
+            ms("2026-11-03T09:00:00Z"),
+            ms("2026-11-10T09:00:00Z"),
+            ms("2026-11-17T09:00:00Z"),
+            ms("2026-11-24T09:00:00Z"),
+            ms("2026-12-01T09:00:00Z"),
+        ]
+    );
+}
+
+#[test]
+fn this_and_future_shift_is_wall_clock_across_dst() {
+    // Europe/Berlin switches to CEST on 28 Mar 2027; the +1 h shift stays 10:00 local.
+    let mut got = expand_rows(
+        THIS_AND_FUTURE,
+        "2027-03-25T00:00:00Z",
+        "2027-04-01T00:00:00Z",
+    );
+    got.retain(|r| r.0.ends_with("sync"));
+    let at = |title: &str, start: &str, end: &str| row(title, start, end, false);
+    assert_eq!(
+        got,
+        vec![
+            at("Early sync", "2027-03-25T08:00:00Z", "2027-03-25T08:15:00Z"),
+            at("Later sync", "2027-03-26T09:00:00Z", "2027-03-26T09:15:00Z"),
+            at("Later sync", "2027-03-27T09:00:00Z", "2027-03-27T09:15:00Z"),
+            at("Later sync", "2027-03-28T08:00:00Z", "2027-03-28T08:15:00Z"),
+            at("Later sync", "2027-03-29T08:00:00Z", "2027-03-29T08:15:00Z"),
+            at("Later sync", "2027-03-30T08:00:00Z", "2027-03-30T08:15:00Z"),
+            at("Later sync", "2027-03-31T08:00:00Z", "2027-03-31T08:15:00Z"),
+        ]
+    );
+}
+
+#[test]
+fn this_and_future_edge_cases() {
+    // Earlier shift pulls an instance from beyond the window end into it; an override
+    // without its series still shows as itself.
+    let text = cal(
+        "BEGIN:VEVENT\nUID:s\nSUMMARY:S\nDTSTART:20261102T120000Z\nDURATION:PT1H\nRRULE:FREQ=DAILY\nEND:VEVENT\n\
+         BEGIN:VEVENT\nUID:s\nRECURRENCE-ID;RANGE=THISANDFUTURE:20261103T120000Z\n\
+         DTSTART:20261103T090000Z\nSUMMARY:S early\nEND:VEVENT\n\
+         BEGIN:VEVENT\nUID:orphan\nRECURRENCE-ID;RANGE=THISANDFUTURE:20261104T120000Z\n\
+         DTSTART:20261104T130000Z\nDURATION:PT30M\nSUMMARY:Orphan\nEND:VEVENT",
+    );
+    assert_eq!(
+        expand_rows(&text, "2026-11-02T00:00:00Z", "2026-11-04T10:00:00Z"),
+        vec![
+            row("S", "2026-11-02T12:00:00Z", "2026-11-02T13:00:00Z", false),
+            row(
+                "S early",
+                "2026-11-03T09:00:00Z",
+                "2026-11-03T10:00:00Z",
+                false
+            ),
+            // Original 4 Nov 12:00 is past the window end; shifted to 09:00 it is inside.
+            row(
+                "S early",
+                "2026-11-04T09:00:00Z",
+                "2026-11-04T10:00:00Z",
+                false
+            ),
+        ]
+    );
+    assert_eq!(
+        expand_rows(&text, "2026-11-04T12:30:00Z", "2026-11-04T14:00:00Z"),
+        vec![row(
+            "Orphan",
+            "2026-11-04T13:00:00Z",
+            "2026-11-04T13:30:00Z",
+            false
+        )]
+    );
+    let events = parse_calendar(&text).unwrap();
+    assert!(events[1].this_and_future);
+    assert!(!events[0].this_and_future);
 }
 
 // ── Window, limit, sort, aggregation ────────────────────────────────────────

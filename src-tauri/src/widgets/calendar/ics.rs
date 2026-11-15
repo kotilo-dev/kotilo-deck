@@ -8,13 +8,15 @@
 //! zone (DST-correct); only the final occurrences become Unix ms.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use chrono::{
     DateTime, Days, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, TimeZone,
 };
 use rrule::{RRule, RRuleSet, Tz, Unvalidated};
 
-use super::zones::resolve_tzid;
+use super::vtimezone::CustomTz;
+use super::zones::{Zone, ZoneTable};
 
 /// Upper bound of recurrence instances scanned per series and query (a daily series
 /// started decades ago still fits; a runaway `FREQ=SECONDLY` does not stall the deck).
@@ -22,7 +24,7 @@ const MAX_SCANNED: usize = 100_000;
 /// Event lengths beyond this are clamped (bad `DURATION`/`DTEND` values).
 const MAX_SPAN_DAYS: i64 = 3650;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IcsTime {
     /// `VALUE=DATE`: a calendar day, interpreted in the local zone.
     Date(NaiveDate),
@@ -30,28 +32,75 @@ pub enum IcsTime {
     Floating(NaiveDateTime),
     Utc(NaiveDateTime),
     Zoned(NaiveDateTime, chrono_tz::Tz),
+    /// `TZID` defined only by the feed's own VTIMEZONE.
+    Custom(NaiveDateTime, Arc<CustomTz>),
 }
 
 impl IcsTime {
-    pub fn is_date(self) -> bool {
+    pub fn is_date(&self) -> bool {
         matches!(self, IcsTime::Date(_))
     }
 
-    /// The zone recurrences of this start expand in.
-    fn zone(self, local: Tz) -> Tz {
+    pub fn resolve(&self, local: Tz) -> Option<DateTime<Tz>> {
         match self {
-            IcsTime::Utc(_) => Tz::UTC,
-            IcsTime::Zoned(_, tz) => Tz::Tz(tz),
-            IcsTime::Date(_) | IcsTime::Floating(_) => local,
+            IcsTime::Date(d) => wall_clock(local, d.and_time(NaiveTime::MIN)),
+            IcsTime::Floating(n) => wall_clock(local, *n),
+            IcsTime::Utc(n) => Some(Tz::UTC.from_utc_datetime(n)),
+            IcsTime::Zoned(n, tz) => wall_clock(Tz::Tz(*tz), *n),
+            IcsTime::Custom(n, tz) => Some(Tz::UTC.from_utc_datetime(&tz.to_utc(*n))),
+        }
+    }
+}
+
+/// The wall clock a recurrence expands in. `rrule` only knows chrono-tz zones, so a
+/// VTIMEZONE-defined zone expands its rule on naive wall-clock times (tagged UTC) and
+/// each instance is converted to an instant afterwards: DST-correct, and the zone's
+/// transition table is built once per parse, not per instance.
+#[derive(Debug, Clone)]
+enum Frame {
+    Real(Tz),
+    Custom(Arc<CustomTz>),
+}
+
+impl Frame {
+    fn of(t: &IcsTime, local: Tz) -> Frame {
+        match t {
+            IcsTime::Utc(_) => Frame::Real(Tz::UTC),
+            IcsTime::Zoned(_, tz) => Frame::Real(Tz::Tz(*tz)),
+            IcsTime::Date(_) | IcsTime::Floating(_) => Frame::Real(local),
+            IcsTime::Custom(_, tz) => Frame::Custom(tz.clone()),
         }
     }
 
-    pub fn resolve(self, local: Tz) -> Option<DateTime<Tz>> {
+    /// Instant → frame time (what `rrule` iterates over).
+    fn anchor(&self, instant: DateTime<Tz>) -> DateTime<Tz> {
         match self {
-            IcsTime::Date(d) => wall_clock(local, d.and_time(NaiveTime::MIN)),
-            IcsTime::Floating(n) => wall_clock(local, n),
-            IcsTime::Utc(n) => Some(Tz::UTC.from_utc_datetime(&n)),
-            IcsTime::Zoned(n, tz) => wall_clock(Tz::Tz(tz), n),
+            Frame::Real(tz) => instant.with_timezone(tz),
+            Frame::Custom(tz) => Tz::UTC.from_utc_datetime(&tz.to_local(instant.naive_utc())),
+        }
+    }
+
+    /// Frame time → instant.
+    fn instant(&self, f: DateTime<Tz>) -> DateTime<Tz> {
+        match self {
+            Frame::Real(_) => f,
+            Frame::Custom(tz) => Tz::UTC.from_utc_datetime(&tz.to_utc(f.naive_utc())),
+        }
+    }
+
+    /// Frame time → wall clock.
+    fn wall(&self, f: DateTime<Tz>) -> NaiveDateTime {
+        match self {
+            Frame::Real(_) => f.naive_local(),
+            Frame::Custom(_) => f.naive_utc(),
+        }
+    }
+
+    /// Wall clock → frame time.
+    fn at_wall(&self, n: NaiveDateTime) -> Option<DateTime<Tz>> {
+        match self {
+            Frame::Real(tz) => wall_clock(*tz, n),
+            Frame::Custom(_) => Some(Tz::UTC.from_utc_datetime(&n)),
         }
     }
 }
@@ -81,6 +130,8 @@ pub struct VEvent {
     pub exdates: Vec<IcsTime>,
     pub rdates: Vec<IcsTime>,
     pub recurrence_id: Option<IcsTime>,
+    /// `RECURRENCE-ID;RANGE=THISANDFUTURE`: the override also applies to later instances.
+    pub this_and_future: bool,
     pub cancelled: bool,
 }
 
@@ -110,7 +161,7 @@ pub struct ContentLine {
 }
 
 impl ContentLine {
-    fn param(&self, key: &str) -> Option<&str> {
+    pub(super) fn param(&self, key: &str) -> Option<&str> {
         self.params
             .iter()
             .find(|(k, _)| k == key)
@@ -208,11 +259,21 @@ fn parse_date(s: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(s, "%Y%m%d").ok()
 }
 
-/// One DATE / DATE-TIME value with the property's `VALUE` and `TZID` parameters.
+/// One DATE / DATE-TIME value with the property's `VALUE` and `TZID` parameters, without
+/// the feed's VTIMEZONEs (names only).
 pub fn parse_time_value(
     value: &str,
     value_type: Option<&str>,
     tzid: Option<&str>,
+) -> Option<IcsTime> {
+    parse_time_in(value, value_type, tzid, &mut ZoneTable::default())
+}
+
+fn parse_time_in(
+    value: &str,
+    value_type: Option<&str>,
+    tzid: Option<&str>,
+    zones: &mut ZoneTable,
 ) -> Option<IcsTime> {
     let v = value.trim();
     let is_date = value_type.is_some_and(|t| t.eq_ignore_ascii_case("DATE"))
@@ -230,24 +291,47 @@ pub fn parse_time_value(
     if utc {
         return Some(IcsTime::Utc(naive));
     }
-    Some(match tzid.and_then(resolve_tzid) {
-        Some(tz) => IcsTime::Zoned(naive, tz),
+    Some(match tzid.and_then(|t| zones.lookup(t)) {
+        Some(Zone::Iana(tz)) => IcsTime::Zoned(naive, tz),
+        Some(Zone::Custom(tz)) => IcsTime::Custom(naive, tz),
         None => IcsTime::Floating(naive),
     })
 }
 
-fn line_time(line: &ContentLine) -> Option<IcsTime> {
-    parse_time_value(&line.value, line.param("VALUE"), line.param("TZID"))
+fn line_time(line: &ContentLine, zones: &mut ZoneTable) -> Option<IcsTime> {
+    parse_time_in(&line.value, line.param("VALUE"), line.param("TZID"), zones)
 }
 
-fn line_times(line: &ContentLine) -> impl Iterator<Item = IcsTime> + '_ {
+fn line_times(line: &ContentLine, zones: &mut ZoneTable) -> Vec<IcsTime> {
     let period = line
         .param("VALUE")
         .is_some_and(|t| t.eq_ignore_ascii_case("PERIOD"));
+    if period {
+        return Vec::new();
+    }
     line.value
         .split(',')
-        .filter(move |v| !period && !v.contains('/'))
-        .filter_map(|v| parse_time_value(v, line.param("VALUE"), line.param("TZID")))
+        .filter(|v| !v.contains('/'))
+        .filter_map(|v| parse_time_in(v, line.param("VALUE"), line.param("TZID"), zones))
+        .collect()
+}
+
+/// Splits `UNTIL=…` off an RRULE value (it is re-expressed by the caller, whose frame
+/// decides what a UTC or floating UNTIL means).
+pub(super) fn split_until(rule: &str) -> (String, Option<&str>) {
+    let mut until = None;
+    let parts: Vec<&str> = rule
+        .split(';')
+        .map(str::trim)
+        .filter(|p| match p.split_once('=') {
+            Some((k, v)) if k.eq_ignore_ascii_case("UNTIL") => {
+                until = Some(v);
+                false
+            }
+            _ => !p.is_empty(),
+        })
+        .collect();
+    (parts.join(";"), until)
 }
 
 /// `[+-]P[nW][nD][T[nH][nM][nS]]` (§3.3.6).
@@ -292,62 +376,82 @@ pub fn parse_duration(raw: &str) -> Option<TimeDelta> {
 
 // ── Components ──────────────────────────────────────────────────────────────
 
-/// All VEVENTs of a calendar body, in file order.
+/// All VEVENTs of a calendar body, in file order. VTIMEZONE blocks may appear anywhere
+/// (they are collected first, then the events are built against them).
 pub fn parse_calendar(text: &str) -> Result<Vec<VEvent>, NotCalendar> {
     let mut saw_calendar = false;
     let mut stack: Vec<String> = Vec::new();
     let mut current: Option<Vec<ContentLine>> = None;
-    let mut events = Vec::new();
-    fn finish(props: Vec<ContentLine>, events: &mut Vec<VEvent>) {
-        events.extend(VEvent::from_lines(&props));
-    }
+    let mut event_lines: Vec<Vec<ContentLine>> = Vec::new();
+    let mut tz_lines: Option<Vec<ContentLine>> = None;
+    let mut zones = ZoneTable::default();
 
     for line in unfold(text) {
         let Some(cl) = parse_line(&line) else {
             continue;
         };
+        let comp = || cl.value.trim().to_ascii_uppercase();
         match cl.name.as_str() {
             "BEGIN" => {
-                let comp = cl.value.trim().to_ascii_uppercase();
-                if comp == "VCALENDAR" {
-                    saw_calendar = true;
-                }
-                if comp == "VEVENT" {
+                let comp = comp();
+                match comp.as_str() {
+                    "VCALENDAR" => saw_calendar = true,
                     // A missing END:VEVENT must not swallow the next event.
-                    if let Some(props) = current.replace(Vec::new()) {
-                        finish(props, &mut events);
+                    "VEVENT" => event_lines.extend(current.replace(Vec::new())),
+                    "VTIMEZONE" => {
+                        if let Some(lines) = tz_lines.replace(Vec::new()) {
+                            zones.add_vtimezone(lines);
+                        }
+                    }
+                    _ => {
+                        if let Some(lines) = tz_lines.as_mut() {
+                            lines.push(cl.clone());
+                        }
                     }
                 }
                 stack.push(comp);
             }
             "END" => {
-                let comp = cl.value.trim().to_ascii_uppercase();
+                let comp = comp();
                 if let Some(pos) = stack.iter().rposition(|c| *c == comp) {
-                    let closed_event = stack.drain(pos..).any(|c| c == "VEVENT");
-                    if closed_event {
-                        if let Some(props) = current.take() {
-                            finish(props, &mut events);
+                    let closed: Vec<String> = stack.drain(pos..).collect();
+                    if closed.iter().any(|c| c == "VEVENT") {
+                        event_lines.extend(current.take());
+                    }
+                    if closed.iter().any(|c| c == "VTIMEZONE") {
+                        if let Some(lines) = tz_lines.take() {
+                            zones.add_vtimezone(lines);
                         }
+                    } else if let Some(lines) = tz_lines.as_mut() {
+                        lines.push(cl);
                     }
                 }
             }
-            _ => {
-                if stack.last().is_some_and(|c| c == "VEVENT") {
+            _ => match stack.last().map(String::as_str) {
+                Some("VEVENT") => {
                     if let Some(props) = current.as_mut() {
                         props.push(cl);
                     }
                 }
-            }
+                _ => {
+                    if let Some(lines) = tz_lines.as_mut() {
+                        lines.push(cl);
+                    }
+                }
+            },
         }
     }
-    if let Some(props) = current.take() {
-        finish(props, &mut events);
+    event_lines.extend(current.take());
+    if let Some(lines) = tz_lines.take() {
+        zones.add_vtimezone(lines);
     }
-    if saw_calendar {
-        Ok(events)
-    } else {
-        Err(NotCalendar)
+    if !saw_calendar {
+        return Err(NotCalendar);
     }
+    Ok(event_lines
+        .iter()
+        .filter_map(|props| VEvent::from_lines(props, &mut zones))
+        .collect())
 }
 
 /// FNV-1a 64; stable across Rust versions (unlike `DefaultHasher`).
@@ -358,7 +462,7 @@ pub fn fnv1a(bytes: &[u8]) -> u64 {
 }
 
 impl VEvent {
-    fn from_lines(lines: &[ContentLine]) -> Option<VEvent> {
+    fn from_lines(lines: &[ContentLine], zones: &mut ZoneTable) -> Option<VEvent> {
         let get = |name: &str| lines.iter().find(|l| l.name == name);
         let text = |name: &str| {
             get(name)
@@ -366,33 +470,39 @@ impl VEvent {
                 .filter(|s| !s.is_empty())
         };
         let start_line = get("DTSTART")?;
-        let start = line_time(start_line)?;
+        let start = line_time(start_line, zones)?;
         let summary = text("SUMMARY");
         let uid = text("UID").unwrap_or_else(|| {
             // No UID (rare, broken exporters): derive a stable one.
             let seed = format!("{}|{}", start_line.value, summary.as_deref().unwrap_or(""));
             format!("nouid-{:016x}", fnv1a(seed.as_bytes()))
         });
-        let all = |name: &'static str| {
+        let mut all = |name: &str| {
             lines
                 .iter()
-                .filter(move |l| l.name == name)
-                .flat_map(line_times)
+                .filter(|l| l.name == name)
+                .flat_map(|l| line_times(l, zones))
                 .collect::<Vec<_>>()
         };
+        let exdates = all("EXDATE");
+        let rdates = all("RDATE");
+        let rid_line = get("RECURRENCE-ID");
         Some(VEvent {
             uid,
             summary,
             location: text("LOCATION"),
             start,
-            end: get("DTEND").and_then(line_time),
+            end: get("DTEND").and_then(|l| line_time(l, zones)),
             duration: get("DURATION").and_then(|l| parse_duration(&l.value)),
             rrule: get("RRULE")
                 .map(|l| l.value.trim().to_string())
                 .filter(|r| !r.is_empty()),
-            exdates: all("EXDATE"),
-            rdates: all("RDATE"),
-            recurrence_id: get("RECURRENCE-ID").and_then(line_time),
+            exdates,
+            rdates,
+            recurrence_id: rid_line.and_then(|l| line_time(l, zones)),
+            this_and_future: rid_line
+                .and_then(|l| l.param("RANGE"))
+                .is_some_and(|r| r.trim().eq_ignore_ascii_case("THISANDFUTURE")),
             cancelled: get("STATUS")
                 .is_some_and(|l| l.value.trim().eq_ignore_ascii_case("CANCELLED")),
         })
@@ -400,6 +510,10 @@ impl VEvent {
 }
 
 // ── Expansion ───────────────────────────────────────────────────────────────
+
+/// Extra scan horizon when a THISANDFUTURE override moves instances earlier: the shift
+/// is in wall-clock time, so a DST change can add to it.
+const SHIFT_SLACK_MS: i64 = 86_400_000;
 
 /// Length of each occurrence.
 #[derive(Debug, Clone, Copy)]
@@ -413,17 +527,17 @@ impl Span {
     fn of(ev: &VEvent, start: DateTime<Tz>, local: Tz) -> Span {
         let max = TimeDelta::try_days(MAX_SPAN_DAYS).unwrap_or(TimeDelta::MAX);
         if let IcsTime::Date(sd) = ev.start {
-            let days = match ev.end {
-                Some(IcsTime::Date(ed)) => (ed - sd).num_days(),
+            let days = match &ev.end {
+                Some(IcsTime::Date(ed)) => (*ed - sd).num_days(),
                 Some(other) => other
                     .resolve(local)
-                    .map(|e| (e.date_naive() - sd).num_days())
+                    .map(|e| (e.with_timezone(&local).date_naive() - sd).num_days())
                     .unwrap_or(1),
                 None => ev.duration.map(|d| d.num_days()).unwrap_or(1),
             };
             return Span::Days(days.clamp(1, MAX_SPAN_DAYS) as u64);
         }
-        let len = match (ev.end.and_then(|e| e.resolve(local)), ev.duration) {
+        let len = match (ev.end.as_ref().and_then(|e| e.resolve(local)), ev.duration) {
             (Some(end), _) => end.signed_duration_since(start),
             (None, Some(d)) => d,
             (None, None) => TimeDelta::zero(),
@@ -434,7 +548,7 @@ impl Span {
     fn at(self, start: DateTime<Tz>, local: Tz) -> Option<(i64, i64)> {
         match self {
             Span::Days(n) => {
-                let day = start.date_naive();
+                let day = start.with_timezone(&local).date_naive();
                 let s = wall_clock(local, day.and_time(NaiveTime::MIN))?;
                 let e = wall_clock(
                     local,
@@ -450,31 +564,20 @@ impl Span {
     }
 }
 
-/// `RRULE` value → rule set anchored at `start`. `UNTIL` is re-expressed in UTC (allowed
-/// for every DTSTART kind) so floating/DATE/zoned starts all validate.
-fn build_rrule(rule: &str, start: DateTime<Tz>) -> Option<RRuleSet> {
-    let mut until = None;
-    let parts: Vec<&str> = rule
-        .split(';')
-        .map(str::trim)
-        .filter(|p| match p.split_once('=') {
-            Some((k, v)) if k.eq_ignore_ascii_case("UNTIL") => {
-                until = Some(v);
-                false
-            }
-            _ => !p.is_empty(),
-        })
-        .collect();
-    let mut parsed: RRule<Unvalidated> = parts.join(";").parse().ok()?;
+/// `RRULE` value → rule set anchored at `start` (a frame time). `UNTIL` is re-expressed
+/// in the frame and passed as UTC (allowed for every DTSTART kind) so floating, DATE,
+/// zoned and VTIMEZONE starts all validate.
+fn build_rrule(rule: &str, frame: &Frame, start: DateTime<Tz>, local: Tz) -> Option<RRuleSet> {
+    let (rest, until) = split_until(rule);
+    let mut parsed: RRule<Unvalidated> = rest.parse().ok()?;
     if let Some(u) = until {
-        let tz = start.timezone();
-        let until_dt = match parse_time_value(u, None, None)? {
+        let until_f = match parse_time_value(u, None, None)? {
             // Inclusive: the whole day counts.
-            IcsTime::Date(d) => wall_clock(tz, d.and_hms_opt(23, 59, 59)?)?,
-            IcsTime::Floating(n) => wall_clock(tz, n)?,
-            t => t.resolve(tz)?,
+            IcsTime::Date(d) => frame.at_wall(d.and_hms_opt(23, 59, 59)?)?,
+            IcsTime::Floating(n) => frame.at_wall(n)?,
+            t => frame.anchor(t.resolve(local)?),
         };
-        parsed = parsed.until(until_dt.with_timezone(&Tz::UTC));
+        parsed = parsed.until(until_f.with_timezone(&Tz::UTC));
     }
     parsed.build(start).ok().map(RRuleSet::limit)
 }
@@ -499,24 +602,106 @@ fn single(
     })
 }
 
+/// What a series instance looks like (after any THISANDFUTURE override).
+#[derive(Debug, Clone)]
+struct Look {
+    span: Span,
+    all_day: bool,
+    title: String,
+    location: Option<String>,
+}
+
+/// A `RANGE=THISANDFUTURE` override resolved against its series.
+struct Future {
+    /// Original start of the overridden instance; applies to every instance at or after it.
+    rid_ms: i64,
+    /// The override's own start.
+    start: DateTime<Tz>,
+    /// DTSTART − RECURRENCE-ID, in the series' wall clock (so DST does not drift it).
+    shift: TimeDelta,
+    look: Look,
+    cancelled: bool,
+}
+
+/// THISANDFUTURE overrides of one series, sorted by RECURRENCE-ID. Each RECURRENCE-ID
+/// names an original (rule-generated) instance. Text, location and length an override
+/// leaves out are inherited from the previous override of the chain, then the series.
+fn future_chain(overrides: &[&VEvent], frame: &Frame, series: &Look, local: Tz) -> Vec<Future> {
+    let mut list: Vec<(DateTime<Tz>, DateTime<Tz>, &VEvent)> = overrides
+        .iter()
+        .filter_map(|o| {
+            let rid = o.recurrence_id.as_ref()?.resolve(local)?;
+            Some((rid, o.start.resolve(local)?, *o))
+        })
+        .collect();
+    list.sort_by_key(|(rid, _, _)| rid.timestamp_millis());
+    let mut prev = series.clone();
+    let mut chain = Vec::with_capacity(list.len());
+    for (rid, start, o) in list {
+        let own_span =
+            o.end.is_some() || o.duration.is_some() || o.start.is_date() != series.all_day;
+        let look = Look {
+            span: if own_span {
+                Span::of(o, start, local)
+            } else {
+                prev.span
+            },
+            all_day: if own_span {
+                o.start.is_date()
+            } else {
+                prev.all_day
+            },
+            title: o.summary.clone().unwrap_or_else(|| prev.title.clone()),
+            location: o.location.clone().or_else(|| prev.location.clone()),
+        };
+        let shift = frame.wall(frame.anchor(start)) - frame.wall(frame.anchor(rid));
+        prev = look.clone();
+        chain.push(Future {
+            rid_ms: rid.timestamp_millis(),
+            start,
+            shift,
+            look,
+            cancelled: o.cancelled,
+        });
+    }
+    chain
+}
+
 /// Occurrences overlapping `[from_ms, to_ms)`: recurring series expanded (RRULE + RDATE −
-/// EXDATE − overridden instances), `RECURRENCE-ID` overrides applied, cancelled ones
-/// dropped. Not sorted.
+/// EXDATE − overridden instances), `RECURRENCE-ID` overrides applied (a
+/// `RANGE=THISANDFUTURE` one to its instance and every later one; a plain override wins
+/// for its own instance), cancelled ones dropped. Not sorted.
 pub fn expand(events: &[VEvent], from_ms: i64, to_ms: i64, local: Tz) -> Vec<Occurrence> {
-    let mut overridden: HashMap<&str, HashSet<i64>> = HashMap::new();
+    let mut plain: HashMap<&str, HashSet<i64>> = HashMap::new();
+    let mut futures: HashMap<&str, Vec<&VEvent>> = HashMap::new();
+    let mut series: HashSet<&str> = HashSet::new();
     for ev in events {
-        if let Some(rid) = ev.recurrence_id.and_then(|r| r.resolve(local)) {
-            overridden
-                .entry(ev.uid.as_str())
-                .or_default()
-                .insert(rid.timestamp_millis());
+        match &ev.recurrence_id {
+            Some(_) if ev.this_and_future => {
+                futures.entry(ev.uid.as_str()).or_default().push(ev);
+            }
+            Some(rid) => {
+                if let Some(rid) = rid.resolve(local) {
+                    plain
+                        .entry(ev.uid.as_str())
+                        .or_default()
+                        .insert(rid.timestamp_millis());
+                }
+            }
+            None => {
+                if !ev.cancelled && (ev.rrule.is_some() || !ev.rdates.is_empty()) {
+                    series.insert(ev.uid.as_str());
+                }
+            }
         }
     }
 
     let mut out = Vec::new();
     for ev in events {
-        if let Some(rid) = ev.recurrence_id {
-            if !ev.cancelled {
+        if let Some(rid) = &ev.recurrence_id {
+            // THISANDFUTURE overrides of a live series are emitted with their series.
+            let with_series = ev.this_and_future && series.contains(ev.uid.as_str());
+            if !ev.cancelled && !with_series {
                 out.extend(single(ev, rid.resolve(local), local, from_ms, to_ms));
             }
             continue;
@@ -532,10 +717,20 @@ pub fn expand(events: &[VEvent], from_ms: i64, to_ms: i64, local: Tz) -> Vec<Occ
         let Some(start) = ev.start.resolve(local) else {
             continue;
         };
-        let zone = ev.start.zone(local);
-        let span = Span::of(ev, start, local);
-        let mut excluded: HashSet<i64> =
-            overridden.get(ev.uid.as_str()).cloned().unwrap_or_default();
+        let frame = Frame::of(&ev.start, local);
+        let base = Look {
+            span: Span::of(ev, start, local),
+            all_day: ev.start.is_date(),
+            title: ev.summary.clone().unwrap_or_default(),
+            location: ev.location.clone(),
+        };
+        let plain_keys = plain.get(ev.uid.as_str());
+        let chain = futures
+            .get(ev.uid.as_str())
+            .map(|o| future_chain(o, &frame, &base, local))
+            .unwrap_or_default();
+
+        let mut excluded: HashSet<i64> = plain_keys.cloned().unwrap_or_default();
         let mut excluded_days: HashSet<NaiveDate> = HashSet::new();
         for ex in &ev.exdates {
             match (ex, ev.start.is_date()) {
@@ -550,51 +745,103 @@ pub fn expand(events: &[VEvent], from_ms: i64, to_ms: i64, local: Tz) -> Vec<Occ
                 }
             }
         }
-        let emit = |occ: DateTime<Tz>, out: &mut Vec<Occurrence>| {
-            let key = occ.timestamp_millis();
-            if excluded.contains(&key) || excluded_days.contains(&occ.date_naive()) {
-                return;
+        // A THISANDFUTURE override's own instance is emitted as itself, not from the rule.
+        for f in &chain {
+            excluded.insert(f.rid_ms);
+            let replaced = plain_keys.is_some_and(|k| k.contains(&f.rid_ms));
+            if f.cancelled || replaced {
+                continue;
             }
-            if let Some((s, e)) = span.at(occ, local) {
+            if let Some((s, e)) = f.look.span.at(f.start, local) {
                 if e > from_ms && s < to_ms {
                     out.push(Occurrence {
                         uid: ev.uid.clone(),
-                        key_ms: s,
+                        key_ms: f.rid_ms,
                         start_ms: s,
                         end_ms: e,
-                        all_day: ev.start.is_date(),
-                        title: ev.summary.clone().unwrap_or_default(),
-                        location: ev.location.clone(),
+                        all_day: f.look.all_day,
+                        title: f.look.title.clone(),
+                        location: f.look.location.clone(),
+                    });
+                }
+            }
+        }
+
+        let emit = |f: DateTime<Tz>, out: &mut Vec<Occurrence>| {
+            let orig = frame.instant(f);
+            let key = orig.timestamp_millis();
+            if excluded.contains(&key) || excluded_days.contains(&frame.wall(f).date()) {
+                return;
+            }
+            let (at, look) = match chain.partition_point(|c| c.rid_ms <= key) {
+                0 => (orig, &base),
+                i => {
+                    let c = &chain[i - 1];
+                    if c.cancelled {
+                        return;
+                    }
+                    let Some(moved) = frame
+                        .wall(f)
+                        .checked_add_signed(c.shift)
+                        .and_then(|w| frame.at_wall(w))
+                    else {
+                        return;
+                    };
+                    (frame.instant(moved), &c.look)
+                }
+            };
+            if let Some((s, e)) = look.span.at(at, local) {
+                if e > from_ms && s < to_ms {
+                    out.push(Occurrence {
+                        uid: ev.uid.clone(),
+                        key_ms: key,
+                        start_ms: s,
+                        end_ms: e,
+                        all_day: look.all_day,
+                        title: look.title.clone(),
+                        location: look.location.clone(),
                     });
                 }
             }
         };
 
+        // Instances an override moves earlier may come from beyond the window.
+        let earlier = chain
+            .iter()
+            .map(|c| -c.shift.num_milliseconds())
+            .max()
+            .unwrap_or(0);
+        let horizon = match earlier {
+            e if e > 0 => to_ms.saturating_add(e).saturating_add(SHIFT_SLACK_MS),
+            _ => to_ms,
+        };
         let mut seen: HashSet<i64> = HashSet::new();
+        let first = frame.anchor(start);
         match ev
             .rrule
             .as_deref()
-            .and_then(|r| build_rrule(r, start.with_timezone(&zone)))
+            .and_then(|r| build_rrule(r, &frame, first, local))
         {
             Some(set) => {
                 for occ in (&set).into_iter().take(MAX_SCANNED) {
-                    if occ.timestamp_millis() >= to_ms {
+                    let t = frame.instant(occ).timestamp_millis();
+                    if t >= horizon {
                         break;
                     }
-                    seen.insert(occ.timestamp_millis());
+                    seen.insert(t);
                     emit(occ, &mut out);
                 }
             }
             // Unparseable rule (or RDATE-only): DTSTART is still the first instance.
             None => {
                 seen.insert(start.timestamp_millis());
-                emit(start, &mut out);
+                emit(first, &mut out);
             }
         }
         for rd in &ev.rdates {
             if let Some(t) = rd.resolve(local) {
                 if seen.insert(t.timestamp_millis()) {
-                    emit(t.with_timezone(&zone), &mut out);
+                    emit(frame.anchor(t), &mut out);
                 }
             }
         }
