@@ -19,6 +19,7 @@ description: Kotilo theme token schema, bundled theme list with exact hex values
 ```
 
 All 12 colours are required hex (`#rgb` or `#rrggbb`). `parseTheme` in `src/lib/theme/loader.ts` validates and fills defaults for `radius`, `opacity`, `font`.
+`radius` must be a non-negative CSS length (`0`, `16px`, `1.25rem`, `.5em`, `8%`) and each `font` entry a plain family list (quoted names or identifiers, comma-separated, max 200 chars; no `;`, braces, `url(`/`var(`, backslashes). Invalid values fall back to the defaults per field instead of failing the theme (`isRadius` / `isFontList`).
 
 ## CSS variable mapping (`themeToCssVars`)
 
