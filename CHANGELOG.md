@@ -99,5 +99,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 - Settings dialogs are centred (Tailwind preflight zeroed dialog margins).
 - Tablet/browser mode: plugin widgets load their scripts, styles and images; large video wallpapers stream instead of loading whole; `lan://status` (token URLs, QR) stays on the host. Install in the "ready" state relaunches the app. LAN, update and plugin errors carry an `errorCode` for translation.
 
-[Unreleased]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/kotilo-dev/kotilo-deck/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/kotilo-dev/kotilo-deck/releases/tag/v1.0.0
