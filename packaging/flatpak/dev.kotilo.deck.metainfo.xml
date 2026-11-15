@@ -67,6 +67,12 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="1.2.0" date="2026-11-15">
+      <url type="details">https://github.com/kotilo-dev/kotilo-deck/releases/tag/v1.2.0</url>
+      <description>
+        <p>Calendar events from Outlook/Exchange and other feeds with custom time zones now show at the right time, and "this and all following" changes to recurring events apply to every later occurrence. Hidden widgets can be removed in edit mode, the tray menu and notifications follow a Turkish system language, album art is no longer resent on every playback update, and several smaller fixes.</p>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-11-12">
       <url type="details">https://github.com/kotilo-dev/kotilo-deck/releases/tag/v1.1.0</url>
       <description>
